@@ -4,15 +4,34 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { usePageTracking } from "@/hooks/usePageTracking";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import BudgetFlow from "./pages/BudgetFlow";
 import Summary from "./pages/Summary";
 import Checklist from "./pages/Checklist";
 import SharedBudget from "./pages/SharedBudget";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function AppRoutes() {
+  usePageTracking();
+  
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/budget" element={<BudgetFlow />} />
+      <Route path="/summary" element={<Summary />} />
+      <Route path="/checklist" element={<Checklist />} />
+      <Route path="/shared/:token" element={<SharedBudget />} />
+      <Route path="/admin" element={<Admin />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -21,15 +40,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/budget" element={<BudgetFlow />} />
-            <Route path="/summary" element={<Summary />} />
-            <Route path="/checklist" element={<Checklist />} />
-            <Route path="/shared/:token" element={<SharedBudget />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

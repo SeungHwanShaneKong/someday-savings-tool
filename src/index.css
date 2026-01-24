@@ -1,96 +1,124 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* 
+  Toss-Style Korean Wedding Budget Calculator Design System
+  Clean, minimal fintech UI with soft shadows and plenty of whitespace
 */
 
 @layer base {
   :root {
+    /* Toss Blue Primary */
+    --primary: 213 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Clean whites and grays */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    --foreground: 220 15% 15%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 220 15% 15%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
+    --popover-foreground: 220 15% 15%;
+    
+    /* Soft Gray for secondary elements */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 15% 25%;
+    
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 50%;
+    
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 15% 15%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Success color for paid items */
+    --success: 145 65% 42%;
+    --success-foreground: 0 0% 100%;
+    
+    /* Warning color for pending items */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 213 100% 50%;
+    
+    --radius: 1rem;
+    
+    /* Sidebar variables */
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
+    --sidebar-foreground: 220 10% 26%;
+    --sidebar-primary: 213 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 15% 15%;
     --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 213 100% 50%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Chart colors for donut chart */
+    --chart-1: 213 100% 50%;
+    --chart-2: 340 75% 55%;
+    --chart-3: 145 65% 42%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 262 83% 58%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --primary: 213 100% 60%;
+    --primary-foreground: 220 15% 10%;
+    
+    --background: 220 15% 8%;
+    --foreground: 220 10% 95%;
+    
+    --card: 220 15% 12%;
+    --card-foreground: 220 10% 95%;
+    
+    --popover: 220 15% 12%;
+    --popover-foreground: 220 10% 95%;
+    
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 220 10% 90%;
+    
+    --muted: 220 15% 18%;
+    --muted-foreground: 220 10% 60%;
+    
+    --accent: 220 15% 18%;
+    --accent-foreground: 220 10% 95%;
+    
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --success: 145 60% 50%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 85% 55%;
+    --warning-foreground: 0 0% 100%;
+    
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 213 100% 60%;
+    
+    --sidebar-background: 220 15% 10%;
+    --sidebar-foreground: 220 10% 90%;
+    --sidebar-primary: 213 100% 60%;
+    --sidebar-primary-foreground: 220 15% 10%;
+    --sidebar-accent: 220 15% 15%;
+    --sidebar-accent-foreground: 220 10% 95%;
+    --sidebar-border: 220 15% 20%;
+    --sidebar-ring: 213 100% 60%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --chart-1: 213 100% 60%;
+    --chart-2: 340 75% 60%;
+    --chart-3: 145 60% 50%;
+    --chart-4: 38 85% 55%;
+    --chart-5: 262 83% 65%;
   }
 }
 
@@ -98,8 +126,74 @@ All colors MUST be HSL.
   * {
     @apply border-border;
   }
-
+  
+  html {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+  }
+  
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  /* Custom shadow for Toss-style cards */
+  .shadow-toss {
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.04), 0 4px 16px 0 rgba(0, 0, 0, 0.04);
+  }
+  
+  .shadow-toss-lg {
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.06), 0 8px 32px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  /* Smooth number animation */
+  .animate-number {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Floating bar animation */
+  .animate-float-up {
+    animation: floatUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes floatUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Page transition */
+  .page-transition {
+    animation: pageIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  @keyframes pageIn {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  /* Pulse animation for hints */
+  .hint-pulse {
+    animation: hintPulse 2s ease-in-out infinite;
+  }
+  
+  @keyframes hintPulse {
+    0%, 100% {
+      opacity: 0.7;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 }

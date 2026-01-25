@@ -30,6 +30,7 @@ import { LogoutButton } from '@/components/LogoutButton';
 import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
+import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
 
 const CHART_COLORS = [
   'hsl(213, 100%, 50%)',
@@ -38,6 +39,13 @@ const CHART_COLORS = [
   'hsl(340, 75%, 55%)',
   'hsl(262, 83%, 58%)',
 ];
+
+const COST_SPLIT_COLORS: Record<CostSplitType, string> = {
+  'groom': 'hsl(221, 83%, 53%)',
+  'bride': 'hsl(340, 75%, 55%)',
+  'together': 'hsl(145, 65%, 42%)',
+  '-': 'hsl(var(--muted-foreground))',
+};
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -387,6 +395,58 @@ export default function Summary() {
                         </td>
                       ))}
                     </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Cost Split Summary */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">분담별 비용 비교</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">분담</th>
+                      {budgetsForComparison.map((budget, index) => (
+                        <th 
+                          key={budget.id} 
+                          className="text-right py-2 px-2 text-sm font-medium"
+                          style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
+                        >
+                          {budget.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {COST_SPLIT_OPTIONS.map((splitOpt) => {
+                      const splitTotals = budgetsForComparison.map(budget => ({
+                        budgetId: budget.id,
+                        total: budget.items
+                          .filter(item => (item.cost_split || '-') === splitOpt.value)
+                          .reduce((sum, item) => sum + item.amount, 0)
+                      }));
+                      const hasAnyValue = splitTotals.some(t => t.total > 0);
+                      if (!hasAnyValue && splitOpt.value === '-') return null;
+                      
+                      return (
+                        <tr key={splitOpt.value} className="border-b last:border-0">
+                          <td className="py-3 px-2">
+                            <span 
+                              className="inline-block w-3 h-3 rounded-full mr-2"
+                              style={{ backgroundColor: COST_SPLIT_COLORS[splitOpt.value] }}
+                            />
+                            <span className="text-sm">{splitOpt.label}</span>
+                          </td>
+                          {splitTotals.map((st) => (
+                            <td key={st.budgetId} className="text-right py-3 px-2 text-sm font-medium">
+                              {st.total > 0 ? formatKoreanWon(st.total) : '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

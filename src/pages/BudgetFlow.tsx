@@ -47,6 +47,7 @@ export default function BudgetFlow() {
     togglePaid,
     updateNotes,
     renameItem,
+    updateCostSplit,
     addCustomItem,
     deleteCustomItem,
     getTotal,
@@ -262,6 +263,7 @@ export default function BudgetFlow() {
                 onTogglePaid={togglePaid}
                 onNotesChange={updateNotes}
                 onRenameItem={renameItem}
+                onCostSplitChange={updateCostSplit}
                 onAddCustomItem={addCustomItem}
                 onDeleteCustomItem={deleteCustomItem}
               />

@@ -275,6 +275,11 @@ export function useMultipleBudgets() {
     await updateItem(itemId, { custom_name: newName });
   };
 
+  // Update cost split
+  const updateCostSplit = async (itemId: string, costSplit: string) => {
+    await updateItem(itemId, { cost_split: costSplit } as any);
+  };
+
   // Add a custom item
   const addCustomItem = async (categoryId: string, name: string) => {
     if (!activeBudgetId) return;
@@ -394,6 +399,7 @@ export function useMultipleBudgets() {
     togglePaid,
     updateNotes,
     renameItem,
+    updateCostSplit,
     addCustomItem,
     deleteCustomItem,
     getTotal,

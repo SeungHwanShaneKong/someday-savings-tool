@@ -325,8 +325,8 @@ export function useMultipleBudgets() {
     }
   };
 
-  // Delete a custom item
-  const deleteCustomItem = async (itemId: string) => {
+  // Delete any item (custom or default)
+  const deleteItem = async (itemId: string) => {
     if (!activeBudgetId) return;
     
     try {
@@ -356,6 +356,9 @@ export function useMultipleBudgets() {
       });
     }
   };
+
+  // Alias for backward compatibility
+  const deleteCustomItem = deleteItem;
 
   // Get total
   const getTotal = () => items.reduce((sum, item) => sum + item.amount, 0);
@@ -402,6 +405,7 @@ export function useMultipleBudgets() {
     updateCostSplit,
     addCustomItem,
     deleteCustomItem,
+    deleteItem,
     getTotal,
     getBudgetsForComparison,
     refetch: fetchBudgets,

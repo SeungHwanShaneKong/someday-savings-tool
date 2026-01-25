@@ -176,7 +176,7 @@ export default function BudgetFlow() {
                     <Input
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
-                      className="h-7 w-24 text-sm"
+                      className="h-7 w-24 text-sm bg-white text-foreground"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleSaveEdit();

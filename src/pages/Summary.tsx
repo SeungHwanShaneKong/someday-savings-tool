@@ -19,7 +19,6 @@ import {
   Download, 
   Share2, 
   ClipboardList,
-  LogOut,
   Check,
   Link as LinkIcon,
   TrendingDown,
@@ -27,6 +26,7 @@ import {
   Minus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { LogoutButton } from '@/components/LogoutButton';
 import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
@@ -41,7 +41,7 @@ const CHART_COLORS = [
 
 export default function Summary() {
   const navigate = useNavigate();
-  const { user, signOut, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { 
     budgets, 
     activeBudgetId, 
@@ -182,10 +182,6 @@ export default function Summary() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
 
   // Chart data for comparison
   const comparisonChartData = budgetsForComparison.map((budget, index) => ({
@@ -220,14 +216,7 @@ export default function Summary() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-subheading font-semibold">예산 요약</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleSignOut}
-            className="rounded-full"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <LogoutButton />
         </div>
       </header>
 

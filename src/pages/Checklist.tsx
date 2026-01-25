@@ -5,6 +5,7 @@ import { ChecklistItem } from '@/components/ChecklistItem';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, BarChart3 } from 'lucide-react';
+import { LogoutButton } from '@/components/LogoutButton';
 
 export default function Checklist() {
   const navigate = useNavigate();
@@ -59,14 +60,7 @@ export default function Checklist() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-subheading font-semibold">결제 체크리스트</h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/summary')}
-            className="rounded-full"
-          >
-            <BarChart3 className="h-5 w-5" />
-          </Button>
+          <LogoutButton />
         </div>
       </header>
 

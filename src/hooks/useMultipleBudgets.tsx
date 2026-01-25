@@ -118,9 +118,21 @@ export function useMultipleBudgets() {
         });
       });
 
-      await supabase.from('budget_items').insert(initialItems);
+      const { data: insertedItems } = await supabase
+        .from('budget_items')
+        .insert(initialItems)
+        .select();
 
       setBudgets(prev => [...prev, newBudget]);
+      
+      // Also update allBudgetsItems for immediate comparison dashboard update
+      if (insertedItems) {
+        setAllBudgetsItems(prev => ({
+          ...prev,
+          [newBudget.id]: insertedItems as ExtendedBudgetItem[]
+        }));
+      }
+      
       setActiveBudgetId(newBudget.id);
       
       return newBudget;
@@ -209,6 +221,16 @@ export function useMultipleBudgets() {
           item.id === itemId ? { ...item, ...updates } : item
         )
       );
+      
+      // Also update allBudgetsItems for real-time comparison dashboard sync
+      if (activeBudgetId) {
+        setAllBudgetsItems(prev => ({
+          ...prev,
+          [activeBudgetId]: (prev[activeBudgetId] || []).map(item =>
+            item.id === itemId ? { ...item, ...updates } : item
+          )
+        }));
+      }
     } catch (error: any) {
       toast({
         title: '저장 중 오류가 발생했어요',
@@ -276,7 +298,14 @@ export function useMultipleBudgets() {
 
       if (error) throw error;
 
-      setItems(prev => [...prev, newItem as ExtendedBudgetItem]);
+      const typedNewItem = newItem as ExtendedBudgetItem;
+      setItems(prev => [...prev, typedNewItem]);
+      
+      // Also update allBudgetsItems for real-time comparison dashboard sync
+      setAllBudgetsItems(prev => ({
+        ...prev,
+        [activeBudgetId]: [...(prev[activeBudgetId] || []), typedNewItem]
+      }));
       
       toast({
         title: '항목이 추가되었어요',
@@ -293,6 +322,8 @@ export function useMultipleBudgets() {
 
   // Delete a custom item
   const deleteCustomItem = async (itemId: string) => {
+    if (!activeBudgetId) return;
+    
     try {
       const { error } = await supabase
         .from('budget_items')
@@ -302,6 +333,12 @@ export function useMultipleBudgets() {
       if (error) throw error;
 
       setItems(prev => prev.filter(item => item.id !== itemId));
+      
+      // Also update allBudgetsItems for real-time comparison dashboard sync
+      setAllBudgetsItems(prev => ({
+        ...prev,
+        [activeBudgetId]: (prev[activeBudgetId] || []).filter(item => item.id !== itemId)
+      }));
       
       toast({
         title: '항목이 삭제되었어요',

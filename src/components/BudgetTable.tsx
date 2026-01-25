@@ -1,4 +1,5 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef } from 'react';
+import React from 'react';
 import { formatKoreanWon, SubCategory, Category } from '@/lib/budget-categories';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,6 +44,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -88,15 +91,22 @@ interface BudgetTableProps {
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
 }
 
-// Draggable Category Section Component
-function DraggableCategorySection({
+// Sortable category component that handles the dragging logic
+function SortableCategory({
   category,
-  items,
   children,
+  isAnyDragging,
+  categoryItemsCount,
+  categoryTotal,
 }: {
   category: Category;
-  items: ExtendedBudgetItem[];
-  children: React.ReactNode;
+  children: (props: { 
+    attributes: Record<string, any>; 
+    listeners: Record<string, any> | undefined;
+  }) => React.ReactNode;
+  isAnyDragging: boolean;
+  categoryItemsCount: number;
+  categoryTotal: number;
 }) {
   const {
     attributes,
@@ -112,16 +122,61 @@ function DraggableCategorySection({
     transition,
   };
 
+  // When dragging, show collapsed view
+  if (isAnyDragging) {
+    return (
+      <tr
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          "border-t-2 border-primary/10 transition-all duration-200",
+          isDragging && "opacity-50 bg-primary/10"
+        )}
+      >
+        <td className="font-semibold bg-secondary/50 px-1 sm:px-4 py-3">
+          <div className="flex flex-col items-center gap-1">
+            <div
+              {...attributes}
+              {...listeners}
+              className={cn(
+                "cursor-grab active:cursor-grabbing p-1.5 rounded-md hover:bg-primary/10 transition-all touch-none",
+                isDragging && "cursor-grabbing bg-primary/20 scale-110"
+              )}
+              title="드래그하여 순서 변경"
+            >
+              <GripVertical className={cn(
+                "h-4 w-4 transition-colors",
+                isDragging ? "text-primary" : "text-muted-foreground"
+              )} />
+            </div>
+            <span className="text-base sm:text-lg">{category.icon}</span>
+            <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
+          </div>
+        </td>
+        <td colSpan={5} className="text-muted-foreground text-xs sm:text-sm px-1 sm:px-4">
+          <div className="flex items-center justify-between">
+            <span>{categoryItemsCount}개 항목</span>
+            <span className="font-medium text-primary">
+              ₩{categoryTotal.toLocaleString()}
+            </span>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  // Normal view - render children with drag handle props
+  return <>{children({ attributes, listeners })}</>;
+}
+
+// Collapsed category preview during drag overlay
+function DragOverlayCategory({ category }: { category: Category }) {
   return (
-    <tbody
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        isDragging && "opacity-50 bg-primary/10"
-      )}
-    >
-      {children}
-    </tbody>
+    <div className="flex items-center gap-2 p-3 bg-card border-2 border-primary rounded-lg shadow-lg">
+      <GripVertical className="h-5 w-5 text-primary" />
+      <span className="text-lg">{category.icon}</span>
+      <span className="font-semibold">{category.name}</span>
+    </div>
   );
 }
 
@@ -149,6 +204,9 @@ export function BudgetTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
   
+  // Drag state
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  
   // For handling Korean IME input properly
   const [tempNotes, setTempNotes] = useState<{ [key: string]: string }>({});
   const isComposingRef = useRef<{ [key: string]: boolean }>({});
@@ -157,7 +215,7 @@ export function BudgetTable({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -165,12 +223,25 @@ export function BudgetTable({
     })
   );
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
       reorderCategories(active.id as string, over.id as string);
     }
+    setActiveDragId(null);
   };
+
+  const handleDragCancel = () => {
+    setActiveDragId(null);
+  };
+
+  const draggingCategory = activeDragId 
+    ? orderedCategories.find(c => c.id === activeDragId) 
+    : null;
 
   const handleNotesChange = (itemId: string, value: string) => {
     setTempNotes(prev => ({ ...prev, [itemId]: value }));
@@ -218,7 +289,6 @@ export function BudgetTable({
     return items.reduce((sum, item) => sum + item.amount, 0);
   };
 
-  // Parse numeric input - only allow numbers
   const parseNumericInput = (value: string): string => {
     return value.replace(/[^0-9]/g, '');
   };
@@ -294,13 +364,37 @@ export function BudgetTable({
     setDeleteDialogOpen(false);
   };
 
+  const getCategoryItems = (categoryId: string) => {
+    const categoryItems: { item: ExtendedBudgetItem; subCat: SubCategory }[] = [];
+    const category = orderedCategories.find(c => c.id === categoryId);
+    if (!category) return categoryItems;
+
+    category.subCategories.forEach(subCat => {
+      const item = getItem(categoryId, subCat.id);
+      if (item) {
+        categoryItems.push({ item, subCat });
+      }
+    });
+
+    const customItems = getCustomItems(categoryId);
+    customItems.forEach(item => {
+      categoryItems.push({
+        item,
+        subCat: { id: item.sub_category, name: item.custom_name || item.sub_category }
+      });
+    });
+
+    return categoryItems;
+  };
+
   const renderItemRow = (
     category: Category,
     subCat: SubCategory,
     subIndex: number,
     totalRowsForCategory: number,
     item: ExtendedBudgetItem,
-    isFirstInCategory: boolean
+    isFirstInCategory: boolean,
+    dragHandleProps?: { attributes: Record<string, any>; listeners: Record<string, any> | undefined }
   ) => {
     const cellKey = `${category.id}-${subCat.id}`;
     const isEditing = editingCell === cellKey;
@@ -323,7 +417,9 @@ export function BudgetTable({
           >
             <div className="flex flex-col items-center gap-1">
               <div
-                className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted transition-colors touch-none"
+                {...(dragHandleProps?.attributes || {})}
+                {...(dragHandleProps?.listeners || {})}
+                className="cursor-grab active:cursor-grabbing p-1.5 rounded-md hover:bg-primary/10 transition-all touch-none"
                 title="드래그하여 순서 변경"
               >
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -518,38 +614,16 @@ export function BudgetTable({
     );
   };
 
-  // Get visible items for each category
-  const getCategoryItems = (categoryId: string) => {
-    const categoryItems: { item: ExtendedBudgetItem; subCat: SubCategory }[] = [];
-    const category = orderedCategories.find(c => c.id === categoryId);
-    if (!category) return categoryItems;
-
-    // Add default items that exist in the items array
-    category.subCategories.forEach(subCat => {
-      const item = getItem(categoryId, subCat.id);
-      if (item) {
-        categoryItems.push({ item, subCat });
-      }
-    });
-
-    // Add custom items
-    const customItems = getCustomItems(categoryId);
-    customItems.forEach(item => {
-      categoryItems.push({
-        item,
-        subCat: { id: item.sub_category, name: item.custom_name || item.sub_category }
-      });
-    });
-
-    return categoryItems;
-  };
+  const isAnyDragging = activeDragId !== null;
 
   return (
     <div className="w-full overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <SortableContext
           items={orderedCategories.map(c => c.id)}
@@ -569,140 +643,154 @@ export function BudgetTable({
             <TableBody>
               {orderedCategories.map((category) => {
                 const categoryItems = getCategoryItems(category.id);
-                const customItems = getCustomItems(category.id);
-                
-                // Total rows = visible items + add row + subtotal row
+                const categoryTotal = getCategoryTotal(category.id);
                 const visibleItemCount = categoryItems.length;
-                const totalRowsForCategory = visibleItemCount + 2; // +1 for add row, +1 for subtotal
-
-                if (visibleItemCount === 0) {
-                  // Category with no items - still show it for adding
-                  return (
-                    <React.Fragment key={category.id}>
-                      <TableRow className="border-t-2 border-primary/10">
-                        <TableCell 
-                          rowSpan={2}
-                          className="font-semibold bg-secondary/50 align-top pt-2 sm:pt-4 px-1 sm:px-4"
-                        >
-                          <div className="flex flex-col items-center gap-1">
-                            <div
-                              className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted transition-colors touch-none"
-                              title="드래그하여 순서 변경"
-                            >
-                              <GripVertical className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <span className="text-base sm:text-lg">{category.icon}</span>
-                            <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell colSpan={5} className="px-1 sm:px-4">
-                          {addingToCategory === category.id ? (
-                            <div className="flex items-center gap-1 sm:gap-2">
-                              <Input
-                                value={newItemName}
-                                onChange={(e) => setNewItemName(e.target.value)}
-                                placeholder="새 항목 이름..."
-                                className="h-6 sm:h-7 text-xs sm:text-sm w-24 sm:w-40"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleAddCustomItem(category.id);
-                                  if (e.key === 'Escape') {
-                                    setAddingToCategory(null);
-                                    setNewItemName('');
-                                  }
-                                }}
-                              />
-                              <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => handleAddCustomItem(category.id)}>
-                                <Check className="h-3 w-3" />
-                              </Button>
-                              <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => { setAddingToCategory(null); setNewItemName(''); }}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[10px] sm:text-sm px-1 sm:px-3"
-                              onClick={() => setAddingToCategory(category.id)}
-                            >
-                              <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                              항목 추가
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                      <TableRow className="bg-warning/10 border-b-2 border-warning/30">
-                        <TableCell colSpan={3} className="font-semibold text-right text-[10px] sm:text-sm px-1 sm:px-4">
-                          {category.name} 총 비용
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-primary text-[10px] sm:text-sm px-1 sm:px-4">
-                          ₩0
-                        </TableCell>
-                        <TableCell></TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  );
-                }
+                const totalRowsForCategory = visibleItemCount + 2;
 
                 return (
-                  <React.Fragment key={category.id}>
-                    {categoryItems.map(({ item, subCat }, subIndex) => 
-                      renderItemRow(category, subCat, subIndex, totalRowsForCategory, item, subIndex === 0)
-                    )}
-                    {/* Add custom item row */}
-                    <TableRow className="hover:bg-muted/30">
-                      <TableCell colSpan={5} className="px-1 sm:px-4">
-                        {addingToCategory === category.id ? (
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <Input
-                              value={newItemName}
-                              onChange={(e) => setNewItemName(e.target.value)}
-                              placeholder="새 항목 이름..."
-                              className="h-6 sm:h-7 text-xs sm:text-sm w-24 sm:w-40"
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleAddCustomItem(category.id);
-                                if (e.key === 'Escape') {
-                                  setAddingToCategory(null);
-                                  setNewItemName('');
-                                }
-                              }}
-                            />
-                            <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => handleAddCustomItem(category.id)}>
-                              <Check className="h-3 w-3" />
-                            </Button>
-                            <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => { setAddingToCategory(null); setNewItemName(''); }}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
+                  <SortableCategory
+                    key={category.id}
+                    category={category}
+                    isAnyDragging={isAnyDragging}
+                    categoryItemsCount={visibleItemCount}
+                    categoryTotal={categoryTotal}
+                  >
+                    {({ attributes, listeners }) => (
+                      <React.Fragment>
+                        {visibleItemCount === 0 ? (
+                          <>
+                            <TableRow className="border-t-2 border-primary/10">
+                              <TableCell 
+                                rowSpan={2}
+                                className="font-semibold bg-secondary/50 align-top pt-2 sm:pt-4 px-1 sm:px-4"
+                              >
+                                <div className="flex flex-col items-center gap-1">
+                                  <div
+                                    {...attributes}
+                                    {...listeners}
+                                    className="cursor-grab active:cursor-grabbing p-1.5 rounded-md hover:bg-primary/10 transition-all touch-none"
+                                    title="드래그하여 순서 변경"
+                                  >
+                                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                  </div>
+                                  <span className="text-base sm:text-lg">{category.icon}</span>
+                                  <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell colSpan={5} className="px-1 sm:px-4">
+                                {addingToCategory === category.id ? (
+                                  <div className="flex items-center gap-1 sm:gap-2">
+                                    <Input
+                                      value={newItemName}
+                                      onChange={(e) => setNewItemName(e.target.value)}
+                                      placeholder="새 항목 이름..."
+                                      className="h-6 sm:h-7 text-xs sm:text-sm w-24 sm:w-40"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddCustomItem(category.id);
+                                        if (e.key === 'Escape') {
+                                          setAddingToCategory(null);
+                                          setNewItemName('');
+                                        }
+                                      }}
+                                    />
+                                    <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => handleAddCustomItem(category.id)}>
+                                      <Check className="h-3 w-3" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => { setAddingToCategory(null); setNewItemName(''); }}>
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[10px] sm:text-sm px-1 sm:px-3"
+                                    onClick={() => setAddingToCategory(category.id)}
+                                  >
+                                    <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                                    항목 추가
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                            <TableRow className="bg-warning/10 border-b-2 border-warning/30">
+                              <TableCell colSpan={3} className="font-semibold text-right text-[10px] sm:text-sm px-1 sm:px-4">
+                                {category.name} 총 비용
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-primary text-[10px] sm:text-sm px-1 sm:px-4">
+                                ₩0
+                              </TableCell>
+                              <TableCell></TableCell>
+                            </TableRow>
+                          </>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[10px] sm:text-sm px-1 sm:px-3"
-                            onClick={() => setAddingToCategory(category.id)}
-                          >
-                            <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                            항목 추가
-                          </Button>
+                          <>
+                            {categoryItems.map(({ item, subCat }, subIndex) => 
+                              renderItemRow(
+                                category, 
+                                subCat, 
+                                subIndex, 
+                                totalRowsForCategory, 
+                                item, 
+                                subIndex === 0,
+                                subIndex === 0 ? { attributes, listeners } : undefined
+                              )
+                            )}
+                            <TableRow className="hover:bg-muted/30">
+                              <TableCell colSpan={5} className="px-1 sm:px-4">
+                                {addingToCategory === category.id ? (
+                                  <div className="flex items-center gap-1 sm:gap-2">
+                                    <Input
+                                      value={newItemName}
+                                      onChange={(e) => setNewItemName(e.target.value)}
+                                      placeholder="새 항목 이름..."
+                                      className="h-6 sm:h-7 text-xs sm:text-sm w-24 sm:w-40"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddCustomItem(category.id);
+                                        if (e.key === 'Escape') {
+                                          setAddingToCategory(null);
+                                          setNewItemName('');
+                                        }
+                                      }}
+                                    />
+                                    <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => handleAddCustomItem(category.id)}>
+                                      <Check className="h-3 w-3" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-6 sm:h-7 px-2" onClick={() => { setAddingToCategory(null); setNewItemName(''); }}>
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[10px] sm:text-sm px-1 sm:px-3"
+                                    onClick={() => setAddingToCategory(category.id)}
+                                  >
+                                    <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                                    항목 추가
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                            <TableRow className="bg-warning/10 border-b-2 border-warning/30">
+                              <TableCell colSpan={3} className="font-semibold text-right text-[10px] sm:text-sm px-1 sm:px-4">
+                                {category.name} 총 비용
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-primary text-[10px] sm:text-sm px-1 sm:px-4">
+                                ₩{categoryTotal.toLocaleString()}
+                              </TableCell>
+                              <TableCell></TableCell>
+                            </TableRow>
+                          </>
                         )}
-                      </TableCell>
-                    </TableRow>
-                    {/* Category subtotal row */}
-                    <TableRow className="bg-warning/10 border-b-2 border-warning/30">
-                      <TableCell colSpan={3} className="font-semibold text-right text-[10px] sm:text-sm px-1 sm:px-4">
-                        {category.name} 총 비용
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-primary text-[10px] sm:text-sm px-1 sm:px-4">
-                        ₩{getCategoryTotal(category.id).toLocaleString()}
-                      </TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  </React.Fragment>
+                      </React.Fragment>
+                    )}
+                  </SortableCategory>
                 );
               })}
-              {/* Overall total row */}
               <TableRow className="bg-primary/20 border-t-4 border-primary">
                 <TableCell colSpan={4} className="font-bold text-right text-xs sm:text-base px-1 sm:px-4">
                   총계
@@ -719,9 +807,14 @@ export function BudgetTable({
             </TableBody>
           </Table>
         </SortableContext>
+        
+        <DragOverlay>
+          {draggingCategory && (
+            <DragOverlayCategory category={draggingCategory} />
+          )}
+        </DragOverlay>
       </DndContext>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -744,6 +837,3 @@ export function BudgetTable({
     </div>
   );
 }
-
-// Add React import for Fragment
-import React from 'react';

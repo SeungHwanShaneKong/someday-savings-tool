@@ -174,129 +174,131 @@ export default function BudgetFlow() {
         </div>
       </header>
 
-      {/* Tabs section - Budget Options */}
-      <div className="bg-secondary/50 border-b border-border">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center gap-2 py-3 overflow-x-auto">
-            {budgets.map((budget) => (
-              <div
-                key={budget.id}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all
-                  ${activeBudgetId === budget.id 
-                    ? 'bg-primary text-primary-foreground shadow-md' 
-                    : 'bg-background hover:bg-muted border border-border'
-                  }
-                `}
-                onClick={() => setActiveBudgetId(budget.id)}
-              >
-                {editingBudgetId === budget.id ? (
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Input
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      className="h-7 w-24 text-sm bg-white text-foreground"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveEdit();
-                        if (e.key === 'Escape') handleCancelEdit();
-                      }}
-                    />
-                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSaveEdit}>
-                      <Check className="h-3 w-3" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelEdit}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="font-medium text-sm whitespace-nowrap">{budget.name}</span>
-                    {activeBudgetId === budget.id && (
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6 hover:bg-primary-foreground/20"
-                          onClick={() => handleStartEdit(budget.id, budget.name)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        {budgets.length > 1 && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-6 w-6 hover:bg-destructive/20"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>예산 삭제</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  "{budget.name}"을(를) 정말 삭제하시겠어요? 이 작업은 되돌릴 수 없어요.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>취소</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => deleteBudget(budget.id)}
-                                  className="bg-destructive hover:bg-destructive/90"
-                                >
-                                  삭제
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-1 whitespace-nowrap"
+      {/* Tabs section - Budget Options (hidden in comparison mode) */}
+      {viewMode === 'table' && (
+        <div className="bg-secondary/50 border-b border-border">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="flex items-center gap-2 py-3 overflow-x-auto">
+              {budgets.map((budget) => (
+                <div
+                  key={budget.id}
+                  className={`
+                    flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all
+                    ${activeBudgetId === budget.id 
+                      ? 'bg-primary text-primary-foreground shadow-md' 
+                      : 'bg-background hover:bg-muted border border-border'
+                    }
+                  `}
+                  onClick={() => setActiveBudgetId(budget.id)}
                 >
-                  <Plus className="h-4 w-4" />
-                  옵션 추가
-                  <ChevronDown className="h-3 w-3 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-popover z-50">
-                <DropdownMenuItem onClick={handleCreateBudget}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  새 옵션 추가
-                </DropdownMenuItem>
-                {budgets.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
-                      기존 옵션 복사
+                  {editingBudgetId === budget.id ? (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="h-7 w-24 text-sm bg-white text-foreground"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEdit();
+                          if (e.key === 'Escape') handleCancelEdit();
+                        }}
+                      />
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSaveEdit}>
+                        <Check className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelEdit}>
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                    {budgets.map(budget => (
-                      <DropdownMenuItem 
-                        key={budget.id}
-                        onClick={() => handleCopyBudget(budget.id)}
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        {budget.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  ) : (
+                    <>
+                      <span className="font-medium text-sm whitespace-nowrap">{budget.name}</span>
+                      {activeBudgetId === budget.id && (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-6 w-6 hover:bg-primary-foreground/20"
+                            onClick={() => handleStartEdit(budget.id, budget.name)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          {budgets.length > 1 && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-6 w-6 hover:bg-destructive/20"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>예산 삭제</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    "{budget.name}"을(를) 정말 삭제하시겠어요? 이 작업은 되돌릴 수 없어요.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>취소</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => deleteBudget(budget.id)}
+                                    className="bg-destructive hover:bg-destructive/90"
+                                  >
+                                    삭제
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 whitespace-nowrap"
+                  >
+                    <Plus className="h-4 w-4" />
+                    옵션 추가
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="bg-popover z-50">
+                  <DropdownMenuItem onClick={handleCreateBudget}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    새 옵션 추가
+                  </DropdownMenuItem>
+                  {budgets.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
+                        기존 옵션 복사
+                      </div>
+                      {budgets.map(budget => (
+                        <DropdownMenuItem 
+                          key={budget.id}
+                          onClick={() => handleCopyBudget(budget.id)}
+                        >
+                          <Copy className="h-4 w-4 mr-2" />
+                          {budget.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main content */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">

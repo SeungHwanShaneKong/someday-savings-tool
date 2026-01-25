@@ -18,8 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Check, X, Users } from 'lucide-react';
+import { Plus, Pencil, Check, X, Users, Trash2 } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -57,7 +67,7 @@ interface BudgetTableProps {
   onNotesChange: (itemId: string, notes: string) => void;
   onRenameItem?: (itemId: string, newName: string) => void;
   onAddCustomItem?: (categoryId: string, name: string) => void;
-  onDeleteCustomItem?: (itemId: string) => void;
+  onDeleteItem?: (itemId: string) => void;
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
 }
 
@@ -68,7 +78,7 @@ export function BudgetTable({
   onNotesChange,
   onRenameItem,
   onAddCustomItem,
-  onDeleteCustomItem,
+  onDeleteItem,
   onCostSplitChange
 }: BudgetTableProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
@@ -80,6 +90,8 @@ export function BudgetTable({
   const [perPersonPopover, setPerPersonPopover] = useState<string | null>(null);
   const [tempUnitPrice, setTempUnitPrice] = useState<string>('');
   const [tempQuantity, setTempQuantity] = useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string; name: string } | null>(null);
   
   // For handling Korean IME input properly
   const [tempNotes, setTempNotes] = useState<{ [key: string]: string }>({});
@@ -263,14 +275,17 @@ export function BudgetTable({
                   <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </Button>
               )}
-              {item && isCustom && onDeleteCustomItem && (
+              {item && onDeleteItem && (
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 text-destructive flex-shrink-0"
-                  onClick={() => onDeleteCustomItem(item.id)}
+                  onClick={() => {
+                    setItemToDelete({ id: item.id, name: displayName });
+                    setDeleteDialogOpen(true);
+                  }}
                 >
-                  <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                  <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </Button>
               )}
             </div>
@@ -480,14 +495,17 @@ export function BudgetTable({
                                 <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                               </Button>
                             )}
-                            {onDeleteCustomItem && (
+                            {onDeleteItem && (
                               <Button
                                 size="icon"
                                 variant="ghost"
                                 className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 text-destructive flex-shrink-0"
-                                onClick={() => onDeleteCustomItem(item.id)}
+                                onClick={() => {
+                                  setItemToDelete({ id: item.id, name: item.custom_name || item.sub_category });
+                                  setDeleteDialogOpen(true);
+                                }}
                               >
-                                <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                                <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                               </Button>
                             )}
                           </div>
@@ -620,6 +638,33 @@ export function BudgetTable({
           </TableRow>
         </TableBody>
       </Table>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>항목을 삭제하시겠습니까?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{itemToDelete?.name}" 항목을 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setItemToDelete(null)}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (itemToDelete && onDeleteItem) {
+                  onDeleteItem(itemToDelete.id);
+                }
+                setItemToDelete(null);
+                setDeleteDialogOpen(false);
+              }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

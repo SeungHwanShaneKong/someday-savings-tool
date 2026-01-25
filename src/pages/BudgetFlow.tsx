@@ -50,6 +50,7 @@ export default function BudgetFlow() {
     updateCostSplit,
     addCustomItem,
     deleteCustomItem,
+    deleteItem,
     getTotal,
     getBudgetsForComparison,
   } = useMultipleBudgets();
@@ -265,7 +266,7 @@ export default function BudgetFlow() {
                 onRenameItem={renameItem}
                 onCostSplitChange={updateCostSplit}
                 onAddCustomItem={addCustomItem}
-                onDeleteCustomItem={deleteCustomItem}
+                onDeleteItem={deleteItem}
               />
             </div>
 

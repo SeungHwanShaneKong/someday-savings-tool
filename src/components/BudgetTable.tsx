@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { BUDGET_CATEGORIES, formatKoreanWon, SubCategory } from '@/lib/budget-categories';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -80,6 +80,40 @@ export function BudgetTable({
   const [perPersonPopover, setPerPersonPopover] = useState<string | null>(null);
   const [tempUnitPrice, setTempUnitPrice] = useState<string>('');
   const [tempQuantity, setTempQuantity] = useState<string>('');
+  
+  // For handling Korean IME input properly
+  const [tempNotes, setTempNotes] = useState<{ [key: string]: string }>({});
+  const isComposingRef = useRef<{ [key: string]: boolean }>({});
+
+  const handleNotesChange = (itemId: string, value: string) => {
+    setTempNotes(prev => ({ ...prev, [itemId]: value }));
+  };
+
+  const handleNotesBlur = (itemId: string, originalNotes: string | null) => {
+    const newNotes = tempNotes[itemId];
+    // Only save if the value actually changed
+    if (newNotes !== undefined && newNotes !== (originalNotes || '')) {
+      onNotesChange(itemId, newNotes);
+    }
+    // Clear temp notes for this item
+    setTempNotes(prev => {
+      const updated = { ...prev };
+      delete updated[itemId];
+      return updated;
+    });
+  };
+
+  const handleNotesFocus = (itemId: string, currentNotes: string | null) => {
+    setTempNotes(prev => ({ ...prev, [itemId]: currentNotes || '' }));
+  };
+
+  const handleCompositionStart = (itemId: string) => {
+    isComposingRef.current[itemId] = true;
+  };
+
+  const handleCompositionEnd = (itemId: string) => {
+    isComposingRef.current[itemId] = false;
+  };
 
   const getItem = (categoryId: string, subCategoryId: string) => {
     return items.find(item => item.category === categoryId && item.sub_category === subCategoryId);
@@ -354,8 +388,12 @@ export function BudgetTable({
         <TableCell>
           <Input
             type="text"
-            value={item?.notes || ''}
-            onChange={(e) => item && onNotesChange(item.id, e.target.value)}
+            value={item ? (tempNotes[item.id] !== undefined ? tempNotes[item.id] : (item.notes || '')) : ''}
+            onChange={(e) => item && handleNotesChange(item.id, e.target.value)}
+            onFocus={() => item && handleNotesFocus(item.id, item.notes)}
+            onBlur={() => item && handleNotesBlur(item.id, item.notes)}
+            onCompositionStart={() => item && handleCompositionStart(item.id)}
+            onCompositionEnd={() => item && handleCompositionEnd(item.id)}
             className="h-8 text-sm border-0 bg-transparent focus:bg-background"
             placeholder="메모 입력..."
           />
@@ -501,8 +539,12 @@ export function BudgetTable({
                       <TableCell>
                         <Input
                           type="text"
-                          value={item.notes || ''}
-                          onChange={(e) => onNotesChange(item.id, e.target.value)}
+                          value={tempNotes[item.id] !== undefined ? tempNotes[item.id] : (item.notes || '')}
+                          onChange={(e) => handleNotesChange(item.id, e.target.value)}
+                          onFocus={() => handleNotesFocus(item.id, item.notes)}
+                          onBlur={() => handleNotesBlur(item.id, item.notes)}
+                          onCompositionStart={() => handleCompositionStart(item.id)}
+                          onCompositionEnd={() => handleCompositionEnd(item.id)}
                           className="h-8 text-sm border-0 bg-transparent focus:bg-background"
                           placeholder="메모 입력..."
                         />

@@ -100,6 +100,22 @@ export const BUDGET_CATEGORIES: Category[] = [
       { id: 'bride-hanbok', name: '신부 한복', placeholder: '신부 한복' },
     ],
   },
+  {
+    id: 'miscellaneous',
+    name: '기타 사항',
+    icon: '📋',
+    description: '기타 결혼 관련 비용을 입력해주세요',
+    hint: '분류되지 않은 기타 비용',
+    subCategories: [
+      { id: 'bouquet', name: '부케', placeholder: '신부 부케' },
+      { id: 'video', name: '영상 촬영', placeholder: '본식 영상 촬영' },
+      { id: 'snap', name: '스냅 촬영', placeholder: '본식 스냅 촬영' },
+      { id: 'officiant', name: '주례/사회', placeholder: '주례비, 사회비' },
+      { id: 'transportation', name: '교통/차량', placeholder: '웨딩카, 교통비' },
+      { id: 'thank-you-gifts', name: '답례품', placeholder: '하객 답례품' },
+      { id: 'misc-other', name: '기타', placeholder: '기타 비용' },
+    ],
+  },
 ];
 
 export const getCategoryById = (id: string) => 

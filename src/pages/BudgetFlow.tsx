@@ -80,6 +80,7 @@ export default function BudgetFlow() {
     resetBudget,
     restoreFromSnapshot,
     deleteSnapshot,
+    isFullBackupData,
   } = useMultipleBudgets();
 
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
@@ -219,10 +220,22 @@ export default function BudgetFlow() {
                     ) : (
                       <div className="space-y-3">
                         {snapshots.map((snapshot) => {
-                          const snapshotTotal = snapshot.snapshot_data.reduce(
-                            (sum, item) => sum + item.amount,
-                            0
-                          );
+                          // Calculate total - handle both legacy and new format
+                          let snapshotTotal = 0;
+                          let budgetCount = 0;
+                          
+                          if (isFullBackupData(snapshot.snapshot_data)) {
+                            const fullData = snapshot.snapshot_data;
+                            budgetCount = fullData.budgets.length;
+                            snapshotTotal = fullData.budgets.reduce((total, budget) => 
+                              total + budget.items.reduce((sum, item) => sum + item.amount, 0), 0
+                            );
+                          } else {
+                            snapshotTotal = snapshot.snapshot_data.reduce(
+                              (sum, item) => sum + item.amount, 0
+                            );
+                          }
+                          
                           return (
                             <div
                               key={snapshot.id}
@@ -236,6 +249,11 @@ export default function BudgetFlow() {
                                   <p className="text-xs text-muted-foreground mt-1">
                                     {new Date(snapshot.created_at).toLocaleString('ko-KR')}
                                   </p>
+                                  {budgetCount > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {budgetCount}개 옵션 포함
+                                    </p>
+                                  )}
                                   <p className="text-sm text-primary font-medium mt-2">
                                     총액: {formatKoreanWon(snapshotTotal)}
                                   </p>
@@ -300,10 +318,10 @@ export default function BudgetFlow() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>모든 입력값 초기화</AlertDialogTitle>
+                    <AlertDialogTitle>처음 상태로 초기화</AlertDialogTitle>
                     <AlertDialogDescription>
-                      모든 금액, 메모, 결제 상태가 초기화됩니다. 
-                      현재 데이터는 자동으로 백업되어 "버전 기록"에서 복원할 수 있어요.
+                      모든 옵션 탭이 삭제되고 기본 카테고리로 구성된 "옵션 1"만 새로 생성됩니다.
+                      현재 모든 데이터는 자동으로 백업되어 "버전 기록"에서 복원할 수 있어요.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>

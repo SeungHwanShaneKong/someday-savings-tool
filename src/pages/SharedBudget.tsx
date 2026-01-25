@@ -32,15 +32,15 @@ export default function SharedBudget() {
       }
 
       try {
-        // Get the shared budget
-        const { data: sharedBudget, error: shareError } = await supabase
-          .from('shared_budgets')
-          .select('budget_id')
-          .eq('share_token', token)
-          .eq('is_active', true)
-          .maybeSingle();
+        // Get the shared budget using secure RPC function
+        const { data: sharedBudgetData, error: shareError } = await supabase
+          .rpc('get_shared_budget_by_token', { p_share_token: token });
 
         if (shareError) throw shareError;
+        
+        // The function returns an array, get the first result
+        const sharedBudget = sharedBudgetData && sharedBudgetData.length > 0 ? sharedBudgetData[0] : null;
+        
         if (!sharedBudget) {
           setError('공유 링크가 만료되었거나 존재하지 않아요');
           setLoading(false);

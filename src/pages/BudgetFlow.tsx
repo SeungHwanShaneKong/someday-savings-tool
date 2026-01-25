@@ -18,6 +18,7 @@ import {
   Table2 
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
+import { LogoutButton } from '@/components/LogoutButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -147,6 +148,7 @@ export default function BudgetFlow() {
               >
                 요약 보기
               </Button>
+              <LogoutButton />
             </div>
           </div>
         </div>

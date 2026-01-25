@@ -576,28 +576,7 @@ export function useMultipleBudgets() {
     if (!user) return false;
 
     try {
-      // Step 1: Create comprehensive backup of ALL budgets
-      if (saveSnapshot && budgets.length > 0) {
-        const hasAnyData = Object.values(allBudgetsItems).some(
-          items => items.some(item => item.amount > 0 || item.notes || item.is_custom)
-        );
-        
-        if (hasAnyData) {
-          await createFullBackupSnapshot();
-        }
-      }
-
-      // Step 2: Delete all budget items for all budgets
-      for (const budget of budgets) {
-        await supabase.from('budget_items').delete().eq('budget_id', budget.id);
-      }
-
-      // Step 3: Delete all budgets
-      for (const budget of budgets) {
-        await supabase.from('budgets').delete().eq('id', budget.id);
-      }
-
-      // Step 4: Create fresh "옵션 1" with default categories
+      // Step 1: Create fresh "옵션 1" with default categories FIRST (for snapshot reference)
       const { data: newBudget, error: createError } = await supabase
         .from('budgets')
         .insert({ user_id: user.id, name: '옵션 1' })
@@ -606,7 +585,64 @@ export function useMultipleBudgets() {
 
       if (createError) throw createError;
 
-      // Step 5: Initialize with empty items for all categories in correct order
+      // Step 2: Create comprehensive backup of ALL old budgets using new budget as reference
+      if (saveSnapshot && budgets.length > 0) {
+        const hasAnyData = Object.values(allBudgetsItems).some(
+          items => items.some(item => item.amount > 0 || item.notes || item.is_custom)
+        );
+        
+        if (hasAnyData) {
+          const snapshotName = `초기화 전 백업 (${new Date().toLocaleString('ko-KR')})`;
+          
+          // Collect all items from all OLD budgets
+          const allItemsData: FullBackupData = {
+            budgets: budgets.map(budget => ({
+              id: budget.id,
+              name: budget.name,
+              items: allBudgetsItems[budget.id] || [],
+            }))
+          };
+
+          // Use the NEW budget id for the snapshot so it won't be orphaned
+          const { data: snapshotData, error: snapshotError } = await supabase
+            .from('budget_snapshots')
+            .insert({
+              budget_id: newBudget.id, // Use NEW budget so it persists
+              user_id: user.id,
+              name: snapshotName,
+              snapshot_data: JSON.parse(JSON.stringify(allItemsData)),
+            })
+            .select()
+            .single();
+
+          if (snapshotError) {
+            console.error('Snapshot creation failed:', snapshotError);
+          } else {
+            const typedSnapshot: BudgetSnapshot = {
+              ...snapshotData,
+              snapshot_data: snapshotData.snapshot_data as unknown as FullBackupData
+            };
+            setSnapshots(prev => [typedSnapshot, ...prev]);
+            
+            toast({
+              title: '백업이 생성되었어요',
+              description: snapshotName,
+            });
+          }
+        }
+      }
+
+      // Step 3: Delete all OLD budget items
+      for (const budget of budgets) {
+        await supabase.from('budget_items').delete().eq('budget_id', budget.id);
+      }
+
+      // Step 4: Delete all OLD budgets
+      for (const budget of budgets) {
+        await supabase.from('budgets').delete().eq('id', budget.id);
+      }
+
+      // Step 5: Initialize new budget with empty items for all categories in correct order
       const initialItems: Omit<ExtendedBudgetItem, 'id'>[] = [];
       BUDGET_CATEGORIES.forEach(category => {
         category.subCategories.forEach(sub => {

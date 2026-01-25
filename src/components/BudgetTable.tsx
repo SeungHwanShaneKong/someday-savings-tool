@@ -210,6 +210,16 @@ export function BudgetTable({
                   <Pencil className="h-3 w-3" />
                 </Button>
               )}
+              {item && onDeleteCustomItem && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                  onClick={() => onDeleteCustomItem(item.id)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
             </div>
           )}
         </TableCell>
@@ -343,65 +353,105 @@ export function BudgetTable({
                   return renderItemRow(category, subCat, subIndex, false, item);
                 })}
                 {/* Custom items */}
-                {customItems.map((item) => (
-                  <TableRow 
-                    key={`${category.id}-${item.sub_category}`}
-                    className="hover:bg-muted/50 transition-colors"
-                  >
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={item.is_paid}
-                        onCheckedChange={() => onTogglePaid(item.id)}
-                        className="data-[state=checked]:bg-success data-[state=checked]:border-success"
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex items-center gap-1 group">
-                        <span>{item.custom_name || item.sub_category}</span>
-                        {onRenameItem && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleStartRename(item.id, item.custom_name || item.sub_category)}
+                {customItems.map((item) => {
+                  const cellKey = `${category.id}-${item.sub_category}`;
+                  const isEditing = editingCell === cellKey;
+                  const isRenamingThis = editingName === item.id;
+                  
+                  return (
+                    <TableRow 
+                      key={cellKey}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={item.is_paid}
+                          onCheckedChange={() => onTogglePaid(item.id)}
+                          className="data-[state=checked]:bg-success data-[state=checked]:border-success"
+                        />
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {isRenamingThis ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              value={tempName}
+                              onChange={(e) => setTempName(e.target.value)}
+                              className="h-7 text-sm w-24"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveRename(item.id);
+                                if (e.key === 'Escape') handleCancelRename();
+                              }}
+                            />
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => handleSaveRename(item.id)}>
+                              <Check className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelRename}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 group">
+                            <span>{item.custom_name || item.sub_category}</span>
+                            {onRenameItem && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleStartRename(item.id, item.custom_name || item.sub_category)}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            )}
+                            {onDeleteCustomItem && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
+                                onClick={() => onDeleteCustomItem(item.id)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isEditing ? (
+                          <Input
+                            type="text"
+                            value={tempValue}
+                            onChange={(e) => setTempValue(e.target.value)}
+                            onBlur={() => handleAmountBlur(category.id, item.sub_category)}
+                            onKeyDown={(e) => handleKeyDown(e, category.id, item.sub_category)}
+                            className="h-8 text-right text-sm w-28"
+                            autoFocus
+                            placeholder="0"
+                          />
+                        ) : (
+                          <button
+                            onClick={() => handleAmountClick(category.id, item.sub_category, item.amount)}
+                            className={cn(
+                              "text-right px-2 py-1 rounded hover:bg-muted transition-colors text-sm",
+                              item.amount ? "text-foreground font-medium" : "text-muted-foreground"
+                            )}
                           >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
+                            {item.amount ? `₩${item.amount.toLocaleString()}` : '-'}
+                          </button>
                         )}
-                        {onDeleteCustomItem && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                            onClick={() => onDeleteCustomItem(item.id)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <button
-                        onClick={() => handleAmountClick(category.id, item.sub_category, item.amount)}
-                        className={cn(
-                          "text-right px-2 py-1 rounded hover:bg-muted transition-colors text-sm",
-                          item.amount ? "text-foreground font-medium" : "text-muted-foreground"
-                        )}
-                      >
-                        {item.amount ? `₩${item.amount.toLocaleString()}` : '-'}
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="text"
-                        value={item.notes || ''}
-                        onChange={(e) => onNotesChange(item.id, e.target.value)}
-                        className="h-8 text-sm border-0 bg-transparent focus:bg-background"
-                        placeholder="메모 입력..."
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="text"
+                          value={item.notes || ''}
+                          onChange={(e) => onNotesChange(item.id, e.target.value)}
+                          className="h-8 text-sm border-0 bg-transparent focus:bg-background"
+                          placeholder="메모 입력..."
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {/* Add custom item row */}
                 <TableRow className="hover:bg-muted/30">
                   <TableCell colSpan={4}>

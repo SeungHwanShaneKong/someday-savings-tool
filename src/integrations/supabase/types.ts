@@ -19,6 +19,7 @@ export type Database = {
           amount: number
           budget_id: string
           category: string
+          cost_split: string | null
           created_at: string
           custom_name: string | null
           id: string
@@ -34,6 +35,7 @@ export type Database = {
           amount?: number
           budget_id: string
           category: string
+          cost_split?: string | null
           created_at?: string
           custom_name?: string | null
           id?: string
@@ -49,6 +51,7 @@ export type Database = {
           amount?: number
           budget_id?: string
           category?: string
+          cost_split?: string | null
           created_at?: string
           custom_name?: string | null
           id?: string

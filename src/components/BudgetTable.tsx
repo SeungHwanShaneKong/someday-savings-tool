@@ -11,6 +11,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Plus, Pencil, Check, X, Users } from 'lucide-react';
 import {
@@ -18,6 +25,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+export type CostSplitType = 'groom' | 'bride' | 'together' | '-';
 
 export interface ExtendedBudgetItem {
   id: string;
@@ -31,7 +40,15 @@ export interface ExtendedBudgetItem {
   quantity?: number | null;
   custom_name?: string | null;
   is_custom?: boolean;
+  cost_split?: CostSplitType;
 }
+
+export const COST_SPLIT_OPTIONS: { value: CostSplitType; label: string }[] = [
+  { value: '-', label: '-' },
+  { value: 'groom', label: '신랑' },
+  { value: 'bride', label: '신부' },
+  { value: 'together', label: '같이' },
+];
 
 interface BudgetTableProps {
   items: ExtendedBudgetItem[];
@@ -41,6 +58,7 @@ interface BudgetTableProps {
   onRenameItem?: (itemId: string, newName: string) => void;
   onAddCustomItem?: (categoryId: string, name: string) => void;
   onDeleteCustomItem?: (itemId: string) => void;
+  onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
 }
 
 export function BudgetTable({ 
@@ -50,7 +68,8 @@ export function BudgetTable({
   onNotesChange,
   onRenameItem,
   onAddCustomItem,
-  onDeleteCustomItem
+  onDeleteCustomItem,
+  onCostSplitChange
 }: BudgetTableProps) {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
@@ -313,6 +332,25 @@ export function BudgetTable({
             </div>
           )}
         </TableCell>
+        <TableCell className="w-20">
+          {item && onCostSplitChange && (
+            <Select
+              value={item.cost_split || '-'}
+              onValueChange={(value: CostSplitType) => onCostSplitChange(item.id, value)}
+            >
+              <SelectTrigger className="h-8 text-xs w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COST_SPLIT_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </TableCell>
         <TableCell>
           <Input
             type="text"
@@ -335,6 +373,7 @@ export function BudgetTable({
             <TableHead className="font-bold text-foreground w-16 text-center">완료</TableHead>
             <TableHead className="font-bold text-foreground w-40">항목</TableHead>
             <TableHead className="font-bold text-foreground text-right w-40">비용(₩)</TableHead>
+            <TableHead className="font-bold text-foreground w-20 text-center">분담</TableHead>
             <TableHead className="font-bold text-foreground w-48">메모</TableHead>
           </TableRow>
         </TableHeader>
@@ -440,6 +479,25 @@ export function BudgetTable({
                           </button>
                         )}
                       </TableCell>
+                      <TableCell className="w-20">
+                        {onCostSplitChange && (
+                          <Select
+                            value={item.cost_split || '-'}
+                            onValueChange={(value: CostSplitType) => onCostSplitChange(item.id, value)}
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {COST_SPLIT_OPTIONS.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Input
                           type="text"
@@ -454,7 +512,7 @@ export function BudgetTable({
                 })}
                 {/* Add custom item row */}
                 <TableRow className="hover:bg-muted/30">
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     {addingToCategory === category.id ? (
                       <div className="flex items-center gap-2">
                         <Input
@@ -493,7 +551,7 @@ export function BudgetTable({
                 </TableRow>
                 {/* Category subtotal row */}
                 <TableRow className="bg-warning/10 border-b-2 border-warning/30">
-                  <TableCell colSpan={3} className="font-semibold text-right text-sm">
+                  <TableCell colSpan={4} className="font-semibold text-right text-sm">
                     {category.name} 총 비용
                   </TableCell>
                   <TableCell className="text-right font-bold text-primary">
@@ -506,7 +564,7 @@ export function BudgetTable({
           })}
           {/* Overall total row */}
           <TableRow className="bg-primary/20 border-t-4 border-primary">
-            <TableCell colSpan={3} className="font-bold text-right text-base">
+            <TableCell colSpan={4} className="font-bold text-right text-base">
               총계
             </TableCell>
             <TableCell className="text-right font-bold text-lg text-primary">

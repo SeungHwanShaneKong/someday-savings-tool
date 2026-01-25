@@ -209,6 +209,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_shared_budget_by_token: {
+        Args: { p_share_token: string }
+        Returns: {
+          budget_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

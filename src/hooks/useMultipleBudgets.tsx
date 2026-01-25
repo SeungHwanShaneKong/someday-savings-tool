@@ -522,49 +522,62 @@ export function useMultipleBudgets() {
     }
   };
 
-  // Reset all budget items to zero
+  // Reset budget to initial state (delete all items and recreate from BUDGET_CATEGORIES)
   const resetBudget = async (saveSnapshot = true) => {
     if (!activeBudgetId || !user) return false;
 
     try {
-      // Save snapshot before reset if requested
-      if (saveSnapshot && items.some(item => item.amount > 0)) {
+      // Save snapshot before reset if requested and there's data worth saving
+      if (saveSnapshot && items.some(item => item.amount > 0 || item.notes || item.is_custom)) {
         await createSnapshot();
       }
 
-      // Reset all items to zero
-      const { error } = await supabase
+      // Delete ALL existing items for this budget
+      const { error: deleteError } = await supabase
         .from('budget_items')
-        .update({
-          amount: 0,
-          is_paid: false,
-          notes: null,
-          unit_price: null,
-          quantity: null,
-        })
+        .delete()
         .eq('budget_id', activeBudgetId);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
 
-      // Update local state
-      const resetItems = items.map(item => ({
-        ...item,
-        amount: 0,
-        is_paid: false,
-        notes: null,
-        unit_price: null,
-        quantity: null,
-      }));
+      // Recreate items from BUDGET_CATEGORIES (initial state)
+      const initialItems: Omit<ExtendedBudgetItem, 'id'>[] = [];
+      BUDGET_CATEGORIES.forEach(category => {
+        category.subCategories.forEach(sub => {
+          initialItems.push({
+            budget_id: activeBudgetId,
+            category: category.id,
+            sub_category: sub.id,
+            amount: 0,
+            is_paid: false,
+            notes: null,
+            unit_price: null,
+            quantity: null,
+            custom_name: null,
+            is_custom: false,
+            cost_split: '-',
+          });
+        });
+      });
 
-      setItems(resetItems);
+      const { data: insertedItems, error: insertError } = await supabase
+        .from('budget_items')
+        .insert(initialItems)
+        .select();
+
+      if (insertError) throw insertError;
+
+      const typedItems = (insertedItems || []) as ExtendedBudgetItem[];
+      
+      setItems(typedItems);
       setAllBudgetsItems(prev => ({
         ...prev,
-        [activeBudgetId]: resetItems
+        [activeBudgetId]: typedItems
       }));
 
       toast({
-        title: '모든 입력값이 초기화되었어요',
-        description: '이전 데이터는 스냅샷에 저장되었습니다.',
+        title: '초기 상태로 초기화되었어요',
+        description: '모든 카테고리가 기본 항목으로 복원되었습니다.',
       });
 
       return true;
@@ -594,30 +607,42 @@ export function useMultipleBudgets() {
 
       const snapshotData = snapshot.snapshot_data;
 
-      // Update each item in database
-      for (const savedItem of snapshotData) {
-        const currentItem = items.find(i => i.id === savedItem.id);
-        if (currentItem) {
-          await supabase
-            .from('budget_items')
-            .update({
-              amount: savedItem.amount,
-              is_paid: savedItem.is_paid,
-              notes: savedItem.notes,
-              unit_price: savedItem.unit_price,
-              quantity: savedItem.quantity,
-              cost_split: savedItem.cost_split,
-              custom_name: savedItem.custom_name,
-            })
-            .eq('id', savedItem.id);
-        }
-      }
+      // Delete all current items for this budget
+      const { error: deleteError } = await supabase
+        .from('budget_items')
+        .delete()
+        .eq('budget_id', activeBudgetId);
 
-      // Update local state
-      setItems(snapshotData);
+      if (deleteError) throw deleteError;
+
+      // Insert items from snapshot with new IDs
+      const itemsToInsert = snapshotData.map(item => ({
+        budget_id: activeBudgetId,
+        category: item.category,
+        sub_category: item.sub_category,
+        amount: item.amount,
+        is_paid: item.is_paid,
+        notes: item.notes,
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        custom_name: item.custom_name,
+        is_custom: item.is_custom || false,
+        cost_split: item.cost_split || '-',
+      }));
+
+      const { data: insertedItems, error: insertError } = await supabase
+        .from('budget_items')
+        .insert(itemsToInsert)
+        .select();
+
+      if (insertError) throw insertError;
+
+      const typedItems = (insertedItems || []) as ExtendedBudgetItem[];
+      
+      setItems(typedItems);
       setAllBudgetsItems(prev => ({
         ...prev,
-        [activeBudgetId]: snapshotData
+        [activeBudgetId]: typedItems
       }));
 
       toast({

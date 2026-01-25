@@ -6,6 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Budget } from './useBudget';
 import { ExtendedBudgetItem } from '@/components/BudgetTable';
 
+export interface BudgetSnapshot {
+  id: string;
+  budget_id: string;
+  user_id: string;
+  name: string;
+  snapshot_data: ExtendedBudgetItem[];
+  created_at: string;
+}
+
 export function useMultipleBudgets() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -14,6 +23,7 @@ export function useMultipleBudgets() {
   const [items, setItems] = useState<ExtendedBudgetItem[]>([]);
   const [allBudgetsItems, setAllBudgetsItems] = useState<Record<string, ExtendedBudgetItem[]>>({});
   const [loading, setLoading] = useState(true);
+  const [snapshots, setSnapshots] = useState<BudgetSnapshot[]>([]);
 
   // Fetch all budgets for the user
   const fetchBudgets = useCallback(async () => {
@@ -445,6 +455,211 @@ export function useMultipleBudgets() {
     }));
   };
 
+  // Fetch snapshots for active budget
+  const fetchSnapshots = useCallback(async () => {
+    if (!activeBudgetId || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('budget_snapshots')
+        .select('*')
+        .eq('budget_id', activeBudgetId)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const typedSnapshots = (data || []).map(item => ({
+        ...item,
+        snapshot_data: item.snapshot_data as unknown as ExtendedBudgetItem[]
+      }));
+      setSnapshots(typedSnapshots);
+    } catch (error: any) {
+      console.error('Failed to fetch snapshots:', error);
+    }
+  }, [activeBudgetId, user]);
+
+  // Create a snapshot before reset
+  const createSnapshot = async (name?: string) => {
+    if (!activeBudgetId || !user) return null;
+
+    try {
+      const snapshotName = name || `초기화 전 백업 (${new Date().toLocaleString('ko-KR')})`;
+      
+      const { data, error } = await supabase
+        .from('budget_snapshots')
+        .insert({
+          budget_id: activeBudgetId,
+          user_id: user.id,
+          name: snapshotName,
+          snapshot_data: JSON.parse(JSON.stringify(items)),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const typedSnapshot: BudgetSnapshot = {
+        ...data,
+        snapshot_data: data.snapshot_data as unknown as ExtendedBudgetItem[]
+      };
+
+      setSnapshots(prev => [typedSnapshot, ...prev]);
+
+      toast({
+        title: '스냅샷이 저장되었어요',
+        description: snapshotName,
+      });
+
+      return typedSnapshot;
+    } catch (error: any) {
+      toast({
+        title: '스냅샷 저장 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
+  // Reset all budget items to zero
+  const resetBudget = async (saveSnapshot = true) => {
+    if (!activeBudgetId || !user) return false;
+
+    try {
+      // Save snapshot before reset if requested
+      if (saveSnapshot && items.some(item => item.amount > 0)) {
+        await createSnapshot();
+      }
+
+      // Reset all items to zero
+      const { error } = await supabase
+        .from('budget_items')
+        .update({
+          amount: 0,
+          is_paid: false,
+          notes: null,
+          unit_price: null,
+          quantity: null,
+        })
+        .eq('budget_id', activeBudgetId);
+
+      if (error) throw error;
+
+      // Update local state
+      const resetItems = items.map(item => ({
+        ...item,
+        amount: 0,
+        is_paid: false,
+        notes: null,
+        unit_price: null,
+        quantity: null,
+      }));
+
+      setItems(resetItems);
+      setAllBudgetsItems(prev => ({
+        ...prev,
+        [activeBudgetId]: resetItems
+      }));
+
+      toast({
+        title: '모든 입력값이 초기화되었어요',
+        description: '이전 데이터는 스냅샷에 저장되었습니다.',
+      });
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: '초기화 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  // Restore from a snapshot
+  const restoreFromSnapshot = async (snapshotId: string) => {
+    if (!activeBudgetId || !user) return false;
+
+    try {
+      const snapshot = snapshots.find(s => s.id === snapshotId);
+      if (!snapshot) {
+        toast({
+          title: '스냅샷을 찾을 수 없어요',
+          variant: 'destructive',
+        });
+        return false;
+      }
+
+      const snapshotData = snapshot.snapshot_data;
+
+      // Update each item in database
+      for (const savedItem of snapshotData) {
+        const currentItem = items.find(i => i.id === savedItem.id);
+        if (currentItem) {
+          await supabase
+            .from('budget_items')
+            .update({
+              amount: savedItem.amount,
+              is_paid: savedItem.is_paid,
+              notes: savedItem.notes,
+              unit_price: savedItem.unit_price,
+              quantity: savedItem.quantity,
+              cost_split: savedItem.cost_split,
+              custom_name: savedItem.custom_name,
+            })
+            .eq('id', savedItem.id);
+        }
+      }
+
+      // Update local state
+      setItems(snapshotData);
+      setAllBudgetsItems(prev => ({
+        ...prev,
+        [activeBudgetId]: snapshotData
+      }));
+
+      toast({
+        title: '스냅샷에서 복원되었어요',
+        description: snapshot.name,
+      });
+
+      return true;
+    } catch (error: any) {
+      toast({
+        title: '복원 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  // Delete a snapshot
+  const deleteSnapshot = async (snapshotId: string) => {
+    try {
+      const { error } = await supabase
+        .from('budget_snapshots')
+        .delete()
+        .eq('id', snapshotId);
+
+      if (error) throw error;
+
+      setSnapshots(prev => prev.filter(s => s.id !== snapshotId));
+
+      toast({
+        title: '스냅샷이 삭제되었어요',
+      });
+    } catch (error: any) {
+      toast({
+        title: '스냅샷 삭제 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchBudgets();
@@ -459,8 +674,9 @@ export function useMultipleBudgets() {
   useEffect(() => {
     if (activeBudgetId) {
       fetchItems();
+      fetchSnapshots();
     }
-  }, [activeBudgetId, fetchItems]);
+  }, [activeBudgetId, fetchItems, fetchSnapshots]);
 
   return {
     budgets,
@@ -483,5 +699,11 @@ export function useMultipleBudgets() {
     getTotal,
     getBudgetsForComparison,
     refetch: fetchBudgets,
+    // New snapshot/reset functions
+    snapshots,
+    createSnapshot,
+    resetBudget,
+    restoreFromSnapshot,
+    deleteSnapshot,
   };
 }

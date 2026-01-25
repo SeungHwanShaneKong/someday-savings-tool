@@ -3,14 +3,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
 import { useToast } from '@/hooks/use-toast';
-import { BudgetItem, Budget } from './useBudget';
+import { Budget } from './useBudget';
+import { ExtendedBudgetItem } from '@/components/BudgetTable';
 
 export function useMultipleBudgets() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [activeBudgetId, setActiveBudgetId] = useState<string | null>(null);
-  const [items, setItems] = useState<BudgetItem[]>([]);
+  const [items, setItems] = useState<ExtendedBudgetItem[]>([]);
+  const [allBudgetsItems, setAllBudgetsItems] = useState<Record<string, ExtendedBudgetItem[]>>({});
   const [loading, setLoading] = useState(true);
 
   // Fetch all budgets for the user
@@ -32,6 +34,21 @@ export function useMultipleBudgets() {
         // Set first budget as active if none selected
         if (!activeBudgetId || !existingBudgets.find(b => b.id === activeBudgetId)) {
           setActiveBudgetId(existingBudgets[0].id);
+        }
+
+        // Fetch all items for all budgets (for comparison dashboard)
+        const { data: allItems, error: allItemsError } = await supabase
+          .from('budget_items')
+          .select('*')
+          .in('budget_id', existingBudgets.map(b => b.id));
+
+        if (!allItemsError && allItems) {
+          const grouped: Record<string, ExtendedBudgetItem[]> = {};
+          allItems.forEach(item => {
+            if (!grouped[item.budget_id]) grouped[item.budget_id] = [];
+            grouped[item.budget_id].push(item as ExtendedBudgetItem);
+          });
+          setAllBudgetsItems(grouped);
         }
       } else {
         // Create first budget
@@ -59,7 +76,7 @@ export function useMultipleBudgets() {
         .eq('budget_id', activeBudgetId);
 
       if (itemsError) throw itemsError;
-      setItems(budgetItems || []);
+      setItems((budgetItems || []) as ExtendedBudgetItem[]);
     } catch (error: any) {
       toast({
         title: '오류가 발생했어요',
@@ -83,7 +100,7 @@ export function useMultipleBudgets() {
       if (createError) throw createError;
 
       // Initialize with empty items for all categories
-      const initialItems: Omit<BudgetItem, 'id'>[] = [];
+      const initialItems: Omit<ExtendedBudgetItem, 'id'>[] = [];
       BUDGET_CATEGORIES.forEach(category => {
         category.subCategories.forEach(sub => {
           initialItems.push({
@@ -93,6 +110,10 @@ export function useMultipleBudgets() {
             amount: 0,
             is_paid: false,
             notes: null,
+            unit_price: null,
+            quantity: null,
+            custom_name: null,
+            is_custom: false,
           });
         });
       });
@@ -174,7 +195,7 @@ export function useMultipleBudgets() {
   };
 
   // Update item
-  const updateItem = async (itemId: string, updates: Partial<BudgetItem>) => {
+  const updateItem = async (itemId: string, updates: Partial<ExtendedBudgetItem>) => {
     try {
       const { error } = await supabase
         .from('budget_items')
@@ -197,11 +218,20 @@ export function useMultipleBudgets() {
     }
   };
 
-  // Update amount
-  const updateAmount = async (category: string, subCategory: string, amount: number) => {
+  // Update amount with optional unit price and quantity
+  const updateAmount = async (
+    category: string, 
+    subCategory: string, 
+    amount: number,
+    unitPrice?: number,
+    quantity?: number
+  ) => {
     const item = items.find(i => i.category === category && i.sub_category === subCategory);
     if (item) {
-      await updateItem(item.id, { amount });
+      const updates: Partial<ExtendedBudgetItem> = { amount };
+      if (unitPrice !== undefined) updates.unit_price = unitPrice;
+      if (quantity !== undefined) updates.quantity = quantity;
+      await updateItem(item.id, updates);
     }
   };
 
@@ -218,8 +248,84 @@ export function useMultipleBudgets() {
     await updateItem(itemId, { notes });
   };
 
+  // Rename an item
+  const renameItem = async (itemId: string, newName: string) => {
+    await updateItem(itemId, { custom_name: newName });
+  };
+
+  // Add a custom item
+  const addCustomItem = async (categoryId: string, name: string) => {
+    if (!activeBudgetId) return;
+
+    try {
+      const customSubCategoryId = `custom-${Date.now()}`;
+      const { data: newItem, error } = await supabase
+        .from('budget_items')
+        .insert({
+          budget_id: activeBudgetId,
+          category: categoryId,
+          sub_category: customSubCategoryId,
+          amount: 0,
+          is_paid: false,
+          notes: null,
+          custom_name: name,
+          is_custom: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setItems(prev => [...prev, newItem as ExtendedBudgetItem]);
+      
+      toast({
+        title: '항목이 추가되었어요',
+        description: `${name} 항목이 추가되었습니다.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: '항목 추가 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Delete a custom item
+  const deleteCustomItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('budget_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      setItems(prev => prev.filter(item => item.id !== itemId));
+      
+      toast({
+        title: '항목이 삭제되었어요',
+      });
+    } catch (error: any) {
+      toast({
+        title: '삭제 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Get total
   const getTotal = () => items.reduce((sum, item) => sum + item.amount, 0);
+
+  // Get all budgets with their items for comparison
+  const getBudgetsForComparison = () => {
+    return budgets.map(budget => ({
+      id: budget.id,
+      name: budget.name,
+      items: allBudgetsItems[budget.id] || [],
+    }));
+  };
 
   useEffect(() => {
     if (user) {
@@ -250,7 +356,11 @@ export function useMultipleBudgets() {
     updateAmount,
     togglePaid,
     updateNotes,
+    renameItem,
+    addCustomItem,
+    deleteCustomItem,
     getTotal,
+    getBudgetsForComparison,
     refetch: fetchBudgets,
   };
 }

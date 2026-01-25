@@ -20,10 +20,14 @@ export type Database = {
           budget_id: string
           category: string
           created_at: string
+          custom_name: string | null
           id: string
+          is_custom: boolean | null
           is_paid: boolean
           notes: string | null
+          quantity: number | null
           sub_category: string
+          unit_price: number | null
           updated_at: string
         }
         Insert: {
@@ -31,10 +35,14 @@ export type Database = {
           budget_id: string
           category: string
           created_at?: string
+          custom_name?: string | null
           id?: string
+          is_custom?: boolean | null
           is_paid?: boolean
           notes?: string | null
+          quantity?: number | null
           sub_category: string
+          unit_price?: number | null
           updated_at?: string
         }
         Update: {
@@ -42,10 +50,14 @@ export type Database = {
           budget_id?: string
           category?: string
           created_at?: string
+          custom_name?: string | null
           id?: string
+          is_custom?: boolean | null
           is_paid?: boolean
           notes?: string | null
+          quantity?: number | null
           sub_category?: string
+          unit_price?: number | null
           updated_at?: string
         }
         Relationships: [

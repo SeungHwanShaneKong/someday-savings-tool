@@ -3,9 +3,10 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BudgetComparisonDashboard } from '@/components/BudgetComparisonDashboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Plus, 
   Trash2, 
@@ -13,7 +14,8 @@ import {
   Check, 
   X,
   ArrowLeft,
-  BarChart3 
+  BarChart3,
+  Table2 
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import {
@@ -43,11 +45,16 @@ export default function BudgetFlow() {
     updateAmount,
     togglePaid,
     updateNotes,
+    renameItem,
+    addCustomItem,
+    deleteCustomItem,
     getTotal,
+    getBudgetsForComparison,
   } = useMultipleBudgets();
 
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [viewMode, setViewMode] = useState<'table' | 'comparison'>('table');
 
   const handleCreateBudget = async () => {
     const newName = `옵션 ${budgets.length + 1}`;
@@ -111,23 +118,45 @@ export default function BudgetFlow() {
                 </p>
               </div>
             </div>
-            <Button
-              onClick={() => navigate('/summary')}
-              variant="outline"
-              className="gap-2"
-            >
-              <BarChart3 className="h-4 w-4" />
-              요약 보기
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* View Mode Toggle */}
+              <div className="flex items-center bg-muted rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="gap-1"
+                >
+                  <Table2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">표</span>
+                </Button>
+                <Button
+                  variant={viewMode === 'comparison' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('comparison')}
+                  className="gap-1"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">비교</span>
+                </Button>
+              </div>
+              <Button
+                onClick={() => navigate('/summary')}
+                variant="outline"
+                className="gap-2"
+              >
+                요약 보기
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Tabs section */}
+      {/* Tabs section - Budget Options */}
       <div className="bg-secondary/50 border-b border-border">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex items-center gap-2 py-3 overflow-x-auto">
-            {budgets.map((budget, index) => (
+            {budgets.map((budget) => (
               <div
                 key={budget.id}
                 className={`
@@ -220,34 +249,43 @@ export default function BudgetFlow() {
         </div>
       </div>
 
-      {/* Main content - Budget Table */}
+      {/* Main content */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
-        <div className="bg-card rounded-xl border border-border shadow-toss overflow-hidden">
-          <BudgetTable
-            items={items}
-            onAmountChange={updateAmount}
-            onTogglePaid={togglePaid}
-            onNotesChange={updateNotes}
-          />
-        </div>
+        {viewMode === 'table' ? (
+          <>
+            <div className="bg-card rounded-xl border border-border shadow-toss overflow-hidden">
+              <BudgetTable
+                items={items}
+                onAmountChange={updateAmount}
+                onTogglePaid={togglePaid}
+                onNotesChange={updateNotes}
+                onRenameItem={renameItem}
+                onAddCustomItem={addCustomItem}
+                onDeleteCustomItem={deleteCustomItem}
+              />
+            </div>
 
-        {/* Total summary card */}
-        <div className="mt-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">현재 예산 총액</p>
-              <p className="text-3xl font-bold text-primary">
-                {formatKoreanWon(getTotal())}
-              </p>
+            {/* Total summary card */}
+            <div className="mt-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">현재 예산 총액</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {formatKoreanWon(getTotal())}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground mb-1">원화</p>
+                  <p className="text-xl font-semibold text-foreground">
+                    ₩{getTotal().toLocaleString()}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground mb-1">원화</p>
-              <p className="text-xl font-semibold text-foreground">
-                ₩{getTotal().toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
+          </>
+        ) : (
+          <BudgetComparisonDashboard budgets={getBudgetsForComparison()} />
+        )}
       </main>
     </div>
   );

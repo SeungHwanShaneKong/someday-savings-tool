@@ -81,6 +81,25 @@ export const BUDGET_CATEGORIES: Category[] = [
       { id: 'other', name: '기타', placeholder: '기타 결혼 준비 비용' },
     ],
   },
+  {
+    id: 'clothing',
+    name: '의복',
+    icon: '👗',
+    description: '결혼식 의복 관련 비용을 입력해주세요',
+    hint: '드레스, 예복, 한복 등',
+    subCategories: [
+      { id: 'dress-main', name: '드레스 (본식 + 촬영)', placeholder: '본식 및 촬영용 드레스' },
+      { id: 'dress-tour', name: '드레스 투어', placeholder: '드레스 투어 비용' },
+      { id: 'groom-suit', name: '신랑 예복', placeholder: '신랑 예복 대여/구매' },
+      { id: 'groom-shoes', name: '신랑 구두', placeholder: '신랑 구두' },
+      { id: 'groom-father-suit', name: '신랑 아버지 예복', placeholder: '신랑 아버지 예복' },
+      { id: 'bride-father-suit', name: '신부 아버지 예복', placeholder: '신부 아버지 예복' },
+      { id: 'groom-mother-hanbok', name: '신랑 어머니 한복', placeholder: '신랑 어머니 한복' },
+      { id: 'bride-mother-hanbok', name: '신부 어머니 한복', placeholder: '신부 어머니 한복' },
+      { id: 'groom-hanbok', name: '신랑 한복', placeholder: '신랑 한복' },
+      { id: 'bride-hanbok', name: '신부 한복', placeholder: '신부 한복' },
+    ],
+  },
 ];
 
 export const getCategoryById = (id: string) => 

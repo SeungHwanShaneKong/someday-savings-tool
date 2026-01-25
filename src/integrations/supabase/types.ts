@@ -73,6 +73,41 @@ export type Database = {
           },
         ]
       }
+      budget_snapshots: {
+        Row: {
+          budget_id: string
+          created_at: string
+          id: string
+          name: string
+          snapshot_data: Json
+          user_id: string
+        }
+        Insert: {
+          budget_id: string
+          created_at?: string
+          id?: string
+          name?: string
+          snapshot_data: Json
+          user_id: string
+        }
+        Update: {
+          budget_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          snapshot_data?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_snapshots_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           created_at: string

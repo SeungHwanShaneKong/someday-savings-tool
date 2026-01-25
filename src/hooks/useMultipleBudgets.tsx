@@ -146,6 +146,79 @@ export function useMultipleBudgets() {
     }
   };
 
+  // Copy an existing budget to create a new one
+  const copyBudget = async (sourceBudgetId: string, newName: string) => {
+    if (!user) return null;
+
+    try {
+      // First get all items from the source budget
+      const { data: sourceItems, error: fetchError } = await supabase
+        .from('budget_items')
+        .select('*')
+        .eq('budget_id', sourceBudgetId);
+
+      if (fetchError) throw fetchError;
+
+      // Create the new budget
+      const { data: newBudget, error: createError } = await supabase
+        .from('budgets')
+        .insert({ user_id: user.id, name: newName })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // Copy all items from source to new budget
+      if (sourceItems && sourceItems.length > 0) {
+        const copiedItems = sourceItems.map(item => ({
+          budget_id: newBudget.id,
+          category: item.category,
+          sub_category: item.sub_category,
+          amount: item.amount,
+          is_paid: item.is_paid,
+          notes: item.notes,
+          unit_price: item.unit_price,
+          quantity: item.quantity,
+          custom_name: item.custom_name,
+          is_custom: item.is_custom,
+          cost_split: item.cost_split,
+        }));
+
+        const { data: insertedItems, error: insertError } = await supabase
+          .from('budget_items')
+          .insert(copiedItems)
+          .select();
+
+        if (insertError) throw insertError;
+
+        // Update local state
+        if (insertedItems) {
+          setAllBudgetsItems(prev => ({
+            ...prev,
+            [newBudget.id]: insertedItems as ExtendedBudgetItem[]
+          }));
+        }
+      }
+
+      setBudgets(prev => [...prev, newBudget]);
+      setActiveBudgetId(newBudget.id);
+
+      toast({
+        title: '예산이 복사되었어요',
+        description: `"${newName}" 옵션이 생성되었습니다.`,
+      });
+      
+      return newBudget;
+    } catch (error: any) {
+      toast({
+        title: '예산 복사 중 오류가 발생했어요',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return null;
+    }
+  };
+
   // Rename a budget
   const renameBudget = async (budgetId: string, newName: string) => {
     try {
@@ -396,6 +469,7 @@ export function useMultipleBudgets() {
     items,
     loading,
     createNewBudget,
+    copyBudget,
     renameBudget,
     deleteBudget,
     updateAmount,

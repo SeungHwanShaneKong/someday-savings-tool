@@ -15,7 +15,9 @@ import {
   X,
   ArrowLeft,
   BarChart3,
-  Table2 
+  Table2,
+  Copy,
+  ChevronDown
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -30,6 +32,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
@@ -41,6 +50,7 @@ export default function BudgetFlow() {
     items, 
     loading: budgetLoading,
     createNewBudget,
+    copyBudget,
     renameBudget,
     deleteBudget,
     updateAmount,
@@ -62,6 +72,14 @@ export default function BudgetFlow() {
   const handleCreateBudget = async () => {
     const newName = `옵션 ${budgets.length + 1}`;
     await createNewBudget(newName);
+  };
+
+  const handleCopyBudget = async (sourceBudgetId: string) => {
+    const sourceBudget = budgets.find(b => b.id === sourceBudgetId);
+    if (sourceBudget) {
+      const newName = `${sourceBudget.name} (복사본)`;
+      await copyBudget(sourceBudgetId, newName);
+    }
   };
 
   const handleStartEdit = (budgetId: string, currentName: string) => {
@@ -240,15 +258,42 @@ export default function BudgetFlow() {
                 )}
               </div>
             ))}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCreateBudget}
-              className="flex items-center gap-1 whitespace-nowrap"
-            >
-              <Plus className="h-4 w-4" />
-              옵션 추가
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Plus className="h-4 w-4" />
+                  옵션 추가
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-popover z-50">
+                <DropdownMenuItem onClick={handleCreateBudget}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  새 옵션 추가
+                </DropdownMenuItem>
+                {budgets.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
+                      기존 옵션 복사
+                    </div>
+                    {budgets.map(budget => (
+                      <DropdownMenuItem 
+                        key={budget.id}
+                        onClick={() => handleCopyBudget(budget.id)}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        {budget.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

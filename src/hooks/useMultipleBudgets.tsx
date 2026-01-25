@@ -522,99 +522,49 @@ export function useMultipleBudgets() {
     }
   };
 
-  // Full reset: delete all budgets and create fresh "옵션 1" with default categories
+  // Reset all budget items to zero
   const resetBudget = async (saveSnapshot = true) => {
-    if (!user) return false;
+    if (!activeBudgetId || !user) return false;
 
     try {
-      // Collect all items from all budgets for snapshot
-      const allItemsForSnapshot: ExtendedBudgetItem[] = [];
-      for (const budgetId of Object.keys(allBudgetsItems)) {
-        allItemsForSnapshot.push(...(allBudgetsItems[budgetId] || []));
+      // Save snapshot before reset if requested
+      if (saveSnapshot && items.some(item => item.amount > 0)) {
+        await createSnapshot();
       }
 
-      // Save snapshot before reset if requested and there's data worth saving
-      if (saveSnapshot && allItemsForSnapshot.some(item => item.amount > 0)) {
-        const snapshotName = `전체 초기화 전 백업 (${new Date().toLocaleString('ko-KR')})`;
-        
-        // Use the first budget id for snapshot reference
-        const firstBudgetId = budgets[0]?.id;
-        if (firstBudgetId) {
-          await supabase
-            .from('budget_snapshots')
-            .insert({
-              budget_id: firstBudgetId,
-              user_id: user.id,
-              name: snapshotName,
-              snapshot_data: JSON.parse(JSON.stringify(allItemsForSnapshot)),
-            });
-        }
-      }
-
-      // Delete all budget items for all budgets
-      for (const budget of budgets) {
-        await supabase.from('budget_items').delete().eq('budget_id', budget.id);
-        await supabase.from('budget_snapshots').delete().eq('budget_id', budget.id);
-      }
-
-      // Delete all budgets
-      for (const budget of budgets) {
-        await supabase.from('budgets').delete().eq('id', budget.id);
-      }
-
-      // Clear local state
-      setBudgets([]);
-      setItems([]);
-      setAllBudgetsItems({});
-      setSnapshots([]);
-      setActiveBudgetId(null);
-
-      // Create fresh "옵션 1" with default categories in correct order
-      const { data: newBudget, error: createError } = await supabase
-        .from('budgets')
-        .insert({ user_id: user.id, name: '옵션 1' })
-        .select()
-        .single();
-
-      if (createError) throw createError;
-
-      // Initialize with default items for all categories (in BUDGET_CATEGORIES order)
-      const initialItems: Omit<ExtendedBudgetItem, 'id'>[] = [];
-      BUDGET_CATEGORIES.forEach(category => {
-        category.subCategories.forEach(sub => {
-          initialItems.push({
-            budget_id: newBudget.id,
-            category: category.id,
-            sub_category: sub.id,
-            amount: 0,
-            is_paid: false,
-            notes: null,
-            unit_price: null,
-            quantity: null,
-            custom_name: null,
-            is_custom: false,
-          });
-        });
-      });
-
-      const { data: insertedItems, error: insertError } = await supabase
+      // Reset all items to zero
+      const { error } = await supabase
         .from('budget_items')
-        .insert(initialItems)
-        .select();
+        .update({
+          amount: 0,
+          is_paid: false,
+          notes: null,
+          unit_price: null,
+          quantity: null,
+        })
+        .eq('budget_id', activeBudgetId);
 
-      if (insertError) throw insertError;
+      if (error) throw error;
 
-      // Update local state with new budget
-      setBudgets([newBudget]);
-      setActiveBudgetId(newBudget.id);
-      if (insertedItems) {
-        setItems(insertedItems as ExtendedBudgetItem[]);
-        setAllBudgetsItems({ [newBudget.id]: insertedItems as ExtendedBudgetItem[] });
-      }
+      // Update local state
+      const resetItems = items.map(item => ({
+        ...item,
+        amount: 0,
+        is_paid: false,
+        notes: null,
+        unit_price: null,
+        quantity: null,
+      }));
+
+      setItems(resetItems);
+      setAllBudgetsItems(prev => ({
+        ...prev,
+        [activeBudgetId]: resetItems
+      }));
 
       toast({
-        title: '전체 초기화가 완료되었어요',
-        description: '모든 옵션이 삭제되고 새 옵션 1이 생성되었습니다.',
+        title: '모든 입력값이 초기화되었어요',
+        description: '이전 데이터는 스냅샷에 저장되었습니다.',
       });
 
       return true;

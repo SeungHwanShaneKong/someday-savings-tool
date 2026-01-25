@@ -21,8 +21,9 @@ export default function Landing() {
 
         {/* Title */}
         <h1 className="text-display text-foreground text-center mb-4 leading-tight">결혼 준비,
-꼼꼼한 셈 법,
-'웨딩 셈'<br />
+꼼꼼한 셈 법 !
+'웨딩 셈'
+        <br />
           예산부터 가볍게<br />
           시작하세요
         </h1>

@@ -257,17 +257,17 @@ export function BudgetTable({
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-4 w-4 sm:h-5 sm:w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 flex-shrink-0"
                   onClick={() => handleStartRename(item.id, displayName)}
                 >
                   <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </Button>
               )}
-              {item && onDeleteCustomItem && (
+              {item && isCustom && onDeleteCustomItem && (
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="h-4 w-4 sm:h-5 sm:w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive flex-shrink-0"
+                  className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 text-destructive flex-shrink-0"
                   onClick={() => onDeleteCustomItem(item.id)}
                 >
                   <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
@@ -474,7 +474,7 @@ export function BudgetTable({
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-4 w-4 sm:h-5 sm:w-5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 flex-shrink-0"
                                 onClick={() => handleStartRename(item.id, item.custom_name || item.sub_category)}
                               >
                                 <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
@@ -484,7 +484,7 @@ export function BudgetTable({
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-4 w-4 sm:h-5 sm:w-5 opacity-0 group-hover:opacity-100 transition-opacity text-destructive flex-shrink-0"
+                                className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 text-destructive flex-shrink-0"
                                 onClick={() => onDeleteCustomItem(item.id)}
                               >
                                 <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />

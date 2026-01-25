@@ -1,46 +1,75 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useBudget } from '@/hooks/useBudget';
-import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
-import { ProgressBar } from '@/components/ProgressBar';
-import { FloatingTotalBar } from '@/components/FloatingTotalBar';
-import { CategoryStep } from '@/components/CategoryStep';
+import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
+import { BudgetTable } from '@/components/BudgetTable';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { 
+  Plus, 
+  Trash2, 
+  Pencil, 
+  Check, 
+  X,
+  ArrowLeft,
+  BarChart3 
+} from 'lucide-react';
+import { formatKoreanWon } from '@/lib/budget-categories';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { items, loading: budgetLoading, updateAmount, getTotal } = useBudget();
-  const [currentStep, setCurrentStep] = useState(0);
+  const { 
+    budgets, 
+    activeBudgetId, 
+    setActiveBudgetId, 
+    items, 
+    loading: budgetLoading,
+    createNewBudget,
+    renameBudget,
+    deleteBudget,
+    updateAmount,
+    togglePaid,
+    updateNotes,
+    getTotal,
+  } = useMultipleBudgets();
 
-  const currentCategory = BUDGET_CATEGORIES[currentStep];
-  const totalSteps = BUDGET_CATEGORIES.length;
-  const isLastStep = currentStep === totalSteps - 1;
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
 
-  const categoryItems = items.filter(item => item.category === currentCategory?.id);
-
-  const handleAmountChange = useCallback((subCategoryId: string, amount: number) => {
-    if (currentCategory) {
-      updateAmount(currentCategory.id, subCategoryId, amount);
-    }
-  }, [currentCategory, updateAmount]);
-
-  const handleNext = () => {
-    if (isLastStep) {
-      navigate('/summary');
-    } else {
-      setCurrentStep(prev => prev + 1);
-    }
+  const handleCreateBudget = async () => {
+    const newName = `옵션 ${budgets.length + 1}`;
+    await createNewBudget(newName);
   };
 
-  const handleBack = () => {
-    if (currentStep === 0) {
-      navigate('/');
-    } else {
-      setCurrentStep(prev => prev - 1);
+  const handleStartEdit = (budgetId: string, currentName: string) => {
+    setEditingBudgetId(budgetId);
+    setEditingName(currentName);
+  };
+
+  const handleSaveEdit = async () => {
+    if (editingBudgetId && editingName.trim()) {
+      await renameBudget(editingBudgetId, editingName.trim());
     }
+    setEditingBudgetId(null);
+    setEditingName('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBudgetId(null);
+    setEditingName('');
   };
 
   // Auth check
@@ -61,75 +90,165 @@ export default function BudgetFlow() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col pb-24">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 bg-background/80 backdrop-blur-lg z-40 px-4 pt-4 pb-2">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-4">
+      <header className="sticky top-0 bg-background/95 backdrop-blur-lg z-40 border-b border-border">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/')}
+                className="rounded-full"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold">결혼 예산 시뮬레이터</h1>
+                <p className="text-sm text-muted-foreground">
+                  여러 옵션을 비교해보세요
+                </p>
+              </div>
+            </div>
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBack}
-              className="rounded-full"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <button
               onClick={() => navigate('/summary')}
-              className="text-caption text-primary font-medium"
+              variant="outline"
+              className="gap-2"
             >
-              건너뛰기
-            </button>
+              <BarChart3 className="h-4 w-4" />
+              요약 보기
+            </Button>
           </div>
-          <ProgressBar currentStep={currentStep + 1} totalSteps={totalSteps} />
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1 px-6 py-8 max-w-lg mx-auto w-full">
-        {currentCategory && (
-          <CategoryStep
-            key={currentCategory.id}
-            category={currentCategory}
-            items={categoryItems}
-            onAmountChange={handleAmountChange}
-          />
-        )}
+      {/* Tabs section */}
+      <div className="bg-secondary/50 border-b border-border">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center gap-2 py-3 overflow-x-auto">
+            {budgets.map((budget, index) => (
+              <div
+                key={budget.id}
+                className={`
+                  flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer transition-all
+                  ${activeBudgetId === budget.id 
+                    ? 'bg-primary text-primary-foreground shadow-md' 
+                    : 'bg-background hover:bg-muted border border-border'
+                  }
+                `}
+                onClick={() => setActiveBudgetId(budget.id)}
+              >
+                {editingBudgetId === budget.id ? (
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="h-7 w-24 text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit();
+                        if (e.key === 'Escape') handleCancelEdit();
+                      }}
+                    />
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSaveEdit}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelEdit}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-medium text-sm whitespace-nowrap">{budget.name}</span>
+                    {activeBudgetId === budget.id && (
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-6 w-6 hover:bg-primary-foreground/20"
+                          onClick={() => handleStartEdit(budget.id, budget.name)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        {budgets.length > 1 && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-6 w-6 hover:bg-destructive/20"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>예산 삭제</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  "{budget.name}"을(를) 정말 삭제하시겠어요? 이 작업은 되돌릴 수 없어요.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>취소</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={() => deleteBudget(budget.id)}
+                                  className="bg-destructive hover:bg-destructive/90"
+                                >
+                                  삭제
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCreateBudget}
+              className="flex items-center gap-1 whitespace-nowrap"
+            >
+              <Plus className="h-4 w-4" />
+              옵션 추가
+            </Button>
+          </div>
+        </div>
+      </div>
 
-        {/* Encouragement message */}
-        <div className="mt-8 text-center">
-          <p className="text-caption text-muted-foreground">
-            {currentStep === 0 && '차근차근 입력해볼까요? 💪'}
-            {currentStep === 1 && '잘하고 있어요! 👍'}
-            {currentStep === 2 && '벌써 절반 넘었어요! 🎉'}
-            {currentStep === 3 && '거의 다 왔어요! ✨'}
-            {currentStep === 4 && '마지막 단계예요! 🏁'}
-          </p>
+      {/* Main content - Budget Table */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+        <div className="bg-card rounded-xl border border-border shadow-toss overflow-hidden">
+          <BudgetTable
+            items={items}
+            onAmountChange={updateAmount}
+            onTogglePaid={togglePaid}
+            onNotesChange={updateNotes}
+          />
         </div>
 
-        {/* Navigation buttons */}
-        <div className="mt-8">
-          <Button
-            onClick={handleNext}
-            className="w-full h-14 text-body-lg font-semibold rounded-xl"
-          >
-            {isLastStep ? (
-              <>
-                <Check className="mr-2 h-5 w-5" />
-                완료하기
-              </>
-            ) : (
-              <>
-                다음
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </>
-            )}
-          </Button>
+        {/* Total summary card */}
+        <div className="mt-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">현재 예산 총액</p>
+              <p className="text-3xl font-bold text-primary">
+                {formatKoreanWon(getTotal())}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground mb-1">원화</p>
+              <p className="text-xl font-semibold text-foreground">
+                ₩{getTotal().toLocaleString()}
+              </p>
+            </div>
+          </div>
         </div>
       </main>
-
-      {/* Floating total bar */}
-      <FloatingTotalBar total={getTotal()} />
     </div>
   );
 }

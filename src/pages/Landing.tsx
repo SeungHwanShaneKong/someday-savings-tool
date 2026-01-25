@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-
 export default function Landing() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
-
+  const {
+    user,
+    loading
+  } = useAuth();
   const handleStart = () => {
     if (user) {
       navigate('/budget');
@@ -13,16 +14,15 @@ export default function Landing() {
       navigate('/auth');
     }
   };
-
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
+  return <div className="min-h-screen bg-background flex flex-col">
       <main className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
         {/* Hero Icon */}
         <div className="text-7xl mb-8 animate-bounce">💒</div>
 
         {/* Title */}
-        <h1 className="text-display text-foreground text-center mb-4 leading-tight">
-          결혼 준비,<br />
+        <h1 className="text-display text-foreground text-center mb-4 leading-tight">결혼 준비,
+꼼꼼한 셈 법,
+'웨딩 셈'<br />
           예산부터 가볍게<br />
           시작하세요
         </h1>
@@ -41,39 +41,31 @@ export default function Landing() {
         </div>
 
         {/* CTA Button */}
-        <Button
-          onClick={handleStart}
-          disabled={loading}
-          size="lg"
-          className="w-full max-w-sm h-14 text-body-lg font-semibold rounded-xl shadow-toss"
-        >
+        <Button onClick={handleStart} disabled={loading} size="lg" className="w-full max-w-sm h-14 text-body-lg font-semibold rounded-xl shadow-toss">
           {loading ? '로딩 중...' : user ? '예산 관리하기' : '시작하기'}
         </Button>
 
         {/* Login link for non-logged in users */}
-        {!loading && !user && (
-          <button
-            onClick={() => navigate('/auth')}
-            className="mt-4 text-body text-muted-foreground hover:text-primary transition-colors"
-          >
+        {!loading && !user && <button onClick={() => navigate('/auth')} className="mt-4 text-body text-muted-foreground hover:text-primary transition-colors">
             이미 계정이 있으신가요?
-          </button>
-        )}
+          </button>}
       </main>
 
       {/* Footer */}
       <footer className="py-6 text-center text-small text-muted-foreground">
         결혼자금 계산기 • Made with 💙
       </footer>
-    </div>
-  );
+    </div>;
 }
-
-function FeatureItem({ icon, text }: { icon: string; text: string }) {
-  return (
-    <div className="flex items-center gap-4 p-4 bg-secondary rounded-xl">
+function FeatureItem({
+  icon,
+  text
+}: {
+  icon: string;
+  text: string;
+}) {
+  return <div className="flex items-center gap-4 p-4 bg-secondary rounded-xl">
       <span className="text-2xl">{icon}</span>
       <span className="text-body text-foreground">{text}</span>
-    </div>
-  );
+    </div>;
 }

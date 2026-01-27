@@ -20,8 +20,7 @@ export default function Landing() {
         <div className="text-7xl mb-8 animate-bounce">💒</div>
 
         {/* Title */}
-        <h1 className="text-display text-foreground text-center mb-4 leading-tight">결혼 준비,
-꼼꼼한 셈 법 !
+        <h1 className="text-display text-foreground text-center mb-4 leading-tight">결혼 준비, 꼼꼼한 셈 법 ! 
 '웨딩 셈'
         <br />
           예산부터 가볍게<br />

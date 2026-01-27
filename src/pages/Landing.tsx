@@ -41,8 +41,20 @@ export default function Landing() {
           <FeatureItem icon="🔗" text="예산표 이미지 저장 & 공유" />
         </div>
 
-        {/* CTA Button */}
-        <Button onClick={handleStart} disabled={loading} size="lg" className="w-full max-w-sm h-14 text-body-lg font-semibold rounded-xl shadow-toss">
+        {/* CTA Button - Prominent with glow effect */}
+        <Button 
+          onClick={handleStart} 
+          disabled={loading} 
+          size="lg" 
+          className="w-full max-w-sm h-14 text-body-lg font-bold rounded-xl 
+            bg-gradient-to-r from-primary to-blue-600 
+            shadow-[0_4px_20px_rgba(0,100,255,0.4)] 
+            hover:shadow-[0_6px_30px_rgba(0,100,255,0.5)] 
+            hover:scale-[1.02] 
+            active:scale-[0.98]
+            transition-all duration-200 ease-out
+            animate-pulse-subtle"
+        >
           {loading ? '로딩 중...' : user ? '예산 관리하기' : '시작하기'}
         </Button>
 

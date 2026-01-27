@@ -78,8 +78,8 @@ function FeatureItem({
   icon: string;
   text: string;
 }) {
-  return <div className="flex items-center gap-4 p-4 bg-secondary rounded-xl">
-      <span className="text-2xl">{icon}</span>
-      <span className="text-body text-foreground">{text}</span>
+  return <div className="flex items-center gap-3 py-2">
+      <span className="text-xl">{icon}</span>
+      <span className="text-body text-muted-foreground">{text}</span>
     </div>;
 }

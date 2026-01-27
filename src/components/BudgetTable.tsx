@@ -452,10 +452,10 @@ export function BudgetTable({
               <TableRow className="bg-primary/10 border-b-2 border-primary/20">
                 <TableHead className="font-bold text-foreground w-16 sm:w-24 px-1 sm:px-4 text-center text-sm sm:text-base">구분</TableHead>
                 <TableHead className="font-bold text-foreground w-10 sm:w-14 text-center px-1 sm:px-2 text-sm sm:text-base">완료</TableHead>
-                <TableHead className="font-bold text-foreground w-auto min-w-[21px] sm:min-w-[35px] px-1 sm:px-3 text-center text-sm sm:text-base">항목</TableHead>
+                <TableHead className="font-bold text-foreground w-auto min-w-[14px] sm:min-w-[24px] px-1 sm:px-2 text-center text-sm sm:text-base">항목</TableHead>
                 <TableHead className="font-bold text-foreground text-center w-40 sm:w-56 px-1 sm:px-2 text-sm sm:text-base">비용</TableHead>
                 <TableHead className="font-bold text-foreground w-14 sm:w-20 text-center px-1 sm:px-2 text-sm sm:text-base">분담</TableHead>
-                <TableHead className="font-bold text-foreground w-24 sm:w-40 px-1 sm:px-3 text-center text-sm sm:text-base">메모</TableHead>
+                <TableHead className="font-bold text-foreground w-48 sm:w-80 px-1 sm:px-3 text-center text-sm sm:text-base">메모</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

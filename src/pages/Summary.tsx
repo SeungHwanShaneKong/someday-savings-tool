@@ -549,23 +549,25 @@ export default function Summary() {
 
       {/* Share dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="max-w-sm mx-auto rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-center">공유 링크가 생성되었어요!</DialogTitle>
-            <DialogDescription className="text-center">
+        <DialogContent className="max-w-sm mx-4 sm:mx-auto p-6 bg-card border-border shadow-2xl">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-center text-xl font-bold text-foreground">
+              공유 링크가 생성되었어요!
+            </DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground">
               링크를 복사해서 공유해보세요
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            <div className="flex items-center gap-2 p-3 bg-secondary rounded-xl">
-              <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-caption text-foreground truncate flex-1">{shareUrl}</span>
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-secondary border border-border rounded-xl">
+              <LinkIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm text-foreground truncate flex-1 font-medium">{shareUrl}</span>
             </div>
             <Button
               onClick={handleCopyLink}
-              className="w-full h-12 mt-4 gap-2"
+              className="w-full h-12 gap-2 text-base font-semibold rounded-xl shadow-lg"
             >
-              <Check className="h-4 w-4" />
+              <Check className="h-5 w-5" />
               링크 복사하기
             </Button>
           </div>

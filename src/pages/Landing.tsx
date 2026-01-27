@@ -46,10 +46,11 @@ export default function Landing() {
           onClick={handleStart} 
           disabled={loading} 
           size="lg" 
-          className="w-full max-w-sm h-14 text-body-lg font-bold rounded-xl 
-            bg-gradient-to-r from-primary to-blue-600 
-            shadow-[0_4px_20px_rgba(0,100,255,0.4)] 
-            hover:shadow-[0_6px_30px_rgba(0,100,255,0.5)] 
+          className="w-full max-w-sm h-16 text-lg font-bold rounded-xl 
+            bg-gradient-to-r from-blue-700 to-blue-600 
+            text-white
+            shadow-[0_4px_20px_rgba(0,80,200,0.5)] 
+            hover:shadow-[0_6px_30px_rgba(0,80,200,0.6)] 
             hover:scale-[1.02] 
             active:scale-[0.98]
             transition-all duration-200 ease-out

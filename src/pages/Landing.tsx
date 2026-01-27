@@ -33,10 +33,8 @@ export default function Landing() {
         </div>
 
         {/* Subtitle */}
-        <p className="text-body-lg text-muted-foreground text-center mb-12 max-w-sm">
-          복잡한 결혼 준비, 깔끔하게 정리된 예산 계획으로
-          한결 가벼워져요
-        </p>
+        <p className="text-body-lg text-muted-foreground text-center mb-12 max-w-sm">복잡한 결혼 준비,
+깔끔하게 정리된 예산 계획으로 한결 가벼워져요</p>
 
         {/* Features */}
         <div className="w-full max-w-sm space-y-3 mb-12">
@@ -46,11 +44,7 @@ export default function Landing() {
         </div>
 
         {/* CTA Button - Prominent with glow effect */}
-        <Button 
-          onClick={handleStart} 
-          disabled={loading} 
-          size="lg" 
-          className="w-full max-w-sm h-16 text-lg font-bold rounded-xl 
+        <Button onClick={handleStart} disabled={loading} size="lg" className="w-full max-w-sm h-16 text-lg font-bold rounded-xl 
             bg-gradient-to-r from-blue-700 to-blue-600 
             text-white
             shadow-[0_4px_20px_rgba(0,80,200,0.5)] 
@@ -58,8 +52,7 @@ export default function Landing() {
             hover:scale-[1.02] 
             active:scale-[0.98]
             transition-all duration-200 ease-out
-            animate-pulse-subtle"
-        >
+            animate-pulse-subtle">
           {loading ? '로딩 중...' : user ? '예산 관리하기' : '시작하기'}
         </Button>
 

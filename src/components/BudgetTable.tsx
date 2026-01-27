@@ -349,10 +349,10 @@ export function BudgetTable({
               <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
             </div>
           </TableCell>}
-        <TableCell className="text-center px-1 sm:px-4">
+        <TableCell className="text-center px-1 sm:px-2">
           <Checkbox checked={item.is_paid || false} onCheckedChange={() => onTogglePaid(item.id)} className="data-[state=checked]:bg-success data-[state=checked]:border-success h-4 w-4 sm:h-5 sm:w-5" />
         </TableCell>
-        <TableCell className="text-xs sm:text-sm px-1 sm:px-4">
+        <TableCell className="text-xs sm:text-sm px-1 sm:px-2">
           {isRenamingThis ? <div className="flex items-center gap-1">
               <Input value={tempName} onChange={e => setTempName(e.target.value)} className="h-6 sm:h-7 text-xs sm:text-sm w-16 sm:w-24" autoFocus onKeyDown={e => {
             if (e.key === 'Enter') handleSaveRename(item.id);
@@ -380,7 +380,7 @@ export function BudgetTable({
                 </Button>}
             </div>}
         </TableCell>
-        <TableCell className="text-right px-1 sm:px-4">
+        <TableCell className="text-center px-1 sm:px-2">
           <div className="flex items-center justify-end gap-0.5 sm:gap-1">
             {isPerPersonItem && <Popover open={perPersonPopover === cellKey} onOpenChange={open => {
             if (open) {
@@ -418,8 +418,8 @@ export function BudgetTable({
                   </div>
                 </PopoverContent>
               </Popover>}
-            {isEditing ? <Input type="text" inputMode="numeric" value={tempValue} onChange={e => handleAmountChange(e.target.value)} onBlur={() => handleAmountBlur(category.id, subCat.id)} onKeyDown={e => handleKeyDown(e, category.id, subCat.id)} className="h-6 sm:h-8 text-right text-[10px] sm:text-sm w-16 sm:w-28" autoFocus placeholder="0" /> : <button onClick={() => handleAmountClick(category.id, subCat.id, item.amount || 0)} className={cn("text-right px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-muted transition-colors text-[10px] sm:text-sm", item.amount ? "text-foreground font-medium" : "text-muted-foreground")}>
-                {item.amount ? `₩${item.amount.toLocaleString()}` : '-'}
+            {isEditing ? <Input type="text" inputMode="numeric" value={tempValue} onChange={e => handleAmountChange(e.target.value)} onBlur={() => handleAmountBlur(category.id, subCat.id)} onKeyDown={e => handleKeyDown(e, category.id, subCat.id)} className="h-6 sm:h-8 text-right text-[10px] sm:text-sm w-20 sm:w-28" autoFocus placeholder="금액 입력" /> : <button onClick={() => handleAmountClick(category.id, subCat.id, item.amount || 0)} className={cn("text-right px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-muted transition-colors text-[10px] sm:text-sm", item.amount ? "text-foreground font-medium" : "text-muted-foreground/60 italic")}>
+                {item.amount ? `₩${item.amount.toLocaleString()}` : '금액 입력'}
               </button>}
           </div>
           {item.unit_price && item.quantity && <div className="text-[9px] sm:text-xs text-muted-foreground mt-0.5">
@@ -450,12 +450,12 @@ export function BudgetTable({
           <Table className="min-w-[600px] sm:min-w-full text-xs sm:text-sm">
             <TableHeader>
               <TableRow className="bg-primary/10 border-b-2 border-primary/20">
-                <TableHead className="font-bold text-foreground w-16 sm:w-24 px-1 sm:px-4">구분</TableHead>
-                <TableHead className="font-bold text-foreground w-10 sm:w-16 text-center px-1 sm:px-4">완료</TableHead>
-                <TableHead className="font-bold text-foreground w-24 sm:w-40 px-1 sm:px-4">항목</TableHead>
-                <TableHead className="font-bold text-foreground text-right w-24 sm:w-40 px-1 sm:px-4">비용</TableHead>
-                <TableHead className="font-bold text-foreground w-14 sm:w-20 text-center px-1 sm:px-4">분담</TableHead>
-                <TableHead className="font-bold text-foreground w-28 sm:w-48 px-1 sm:px-4">메모</TableHead>
+                <TableHead className="font-bold text-foreground w-16 sm:w-24 px-1 sm:px-4 text-center text-sm sm:text-base">구분</TableHead>
+                <TableHead className="font-bold text-foreground w-10 sm:w-14 text-center px-1 sm:px-2 text-sm sm:text-base">완료</TableHead>
+                <TableHead className="font-bold text-foreground w-auto min-w-[120px] sm:min-w-[200px] px-1 sm:px-3 text-center text-sm sm:text-base">항목</TableHead>
+                <TableHead className="font-bold text-foreground text-center w-20 sm:w-28 px-1 sm:px-2 text-sm sm:text-base">비용</TableHead>
+                <TableHead className="font-bold text-foreground w-14 sm:w-20 text-center px-1 sm:px-2 text-sm sm:text-base">분담</TableHead>
+                <TableHead className="font-bold text-foreground w-24 sm:w-40 px-1 sm:px-3 text-center text-sm sm:text-base">메모</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

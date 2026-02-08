@@ -32,29 +32,31 @@ export default function SharedBudget() {
       }
 
       try {
-        // Get the shared budget using secure RPC function
-        const { data: sharedBudgetData, error: shareError } = await supabase
-          .rpc('get_shared_budget_by_token', { p_share_token: token });
+        // Get the shared budget items using secure RPC function
+        // This function bypasses RLS and returns items for valid share tokens
+        const { data: budgetItems, error: itemsError } = await supabase
+          .rpc('get_shared_budget_items_by_token', { p_share_token: token });
 
-        if (shareError) throw shareError;
+        if (itemsError) throw itemsError;
         
-        // The function returns an array, get the first result
-        const sharedBudget = sharedBudgetData && sharedBudgetData.length > 0 ? sharedBudgetData[0] : null;
-        
-        if (!sharedBudget) {
+        if (!budgetItems || budgetItems.length === 0) {
           setError('공유 링크가 만료되었거나 존재하지 않아요');
           setLoading(false);
           return;
         }
 
-        // Get the budget items
-        const { data: budgetItems, error: itemsError } = await supabase
-          .from('budget_items')
-          .select('*')
-          .eq('budget_id', sharedBudget.budget_id);
+        // Map the RPC response to match BudgetItem interface
+        const mappedItems: BudgetItem[] = budgetItems.map((item: any) => ({
+          id: `${item.budget_id}-${item.sub_category}`,
+          budget_id: item.budget_id,
+          category: item.category,
+          sub_category: item.sub_category,
+          amount: item.amount,
+          is_paid: item.is_paid,
+          notes: item.notes,
+        }));
 
-        if (itemsError) throw itemsError;
-        setItems(budgetItems || []);
+        setItems(mappedItems);
       } catch (err: any) {
         setError(err.message || '데이터를 불러오는 중 오류가 발생했어요');
       } finally {

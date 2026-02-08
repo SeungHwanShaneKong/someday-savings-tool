@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
-import { Home } from 'lucide-react';
+import { Home, Lock, Sparkles } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BudgetItem {
   id: string;
@@ -16,12 +17,20 @@ interface BudgetItem {
   notes: string | null;
 }
 
+interface SharedBudgetData {
+  items: BudgetItem[];
+  budgetOwnerId: string | null;
+}
+
 export default function SharedBudget() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const [items, setItems] = useState<BudgetItem[]>([]);
+  const { user } = useAuth();
+  const [data, setData] = useState<SharedBudgetData>({ items: [], budgetOwnerId: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const isOwner = user && data.budgetOwnerId && user.id === data.budgetOwnerId;
 
   useEffect(() => {
     const fetchSharedBudget = async () => {
@@ -56,7 +65,10 @@ export default function SharedBudget() {
           notes: item.notes,
         }));
 
-        setItems(mappedItems);
+        setData({
+          items: mappedItems,
+          budgetOwnerId: budgetItems[0]?.budget_owner_id || null,
+        });
       } catch (err: any) {
         setError(err.message || '데이터를 불러오는 중 오류가 발생했어요');
       } finally {
@@ -67,9 +79,9 @@ export default function SharedBudget() {
     fetchSharedBudget();
   }, [token]);
 
-  const total = items.reduce((sum, item) => sum + item.amount, 0);
+  const total = data.items.reduce((sum, item) => sum + item.amount, 0);
   const getCategoryTotal = (categoryId: string) => 
-    items.filter(item => item.category === categoryId).reduce((sum, item) => sum + item.amount, 0);
+    data.items.filter(item => item.category === categoryId).reduce((sum, item) => sum + item.amount, 0);
 
   if (loading) {
     return (
@@ -98,70 +110,165 @@ export default function SharedBudget() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="px-4 py-6 text-center">
-        <h1 className="text-heading text-foreground">공유된 결혼 예산</h1>
-        <p className="text-caption text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
-      </header>
-
-      {/* Main content */}
-      <main className="flex-1 px-6 pb-8 max-w-lg mx-auto w-full">
-        <div className="bg-card rounded-2xl shadow-toss-lg p-6">
-          {/* Donut chart */}
-          <BudgetDonutChart items={items} />
-
-          {/* Category breakdown */}
-          <div className="mt-8 space-y-3">
-            {BUDGET_CATEGORIES.map(category => {
-              const categoryTotal = getCategoryTotal(category.id);
-              if (categoryTotal === 0) return null;
-              
-              const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
-              
-              return (
-                <div 
-                  key={category.id}
-                  className="flex items-center justify-between p-3 bg-secondary rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{category.icon}</span>
-                    <span className="text-body font-medium">{category.name}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-body font-semibold">{formatKoreanWon(categoryTotal)}</span>
-                    <span className="text-caption text-muted-foreground ml-2">({percentage}%)</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Total */}
-          <div className="mt-6 p-4 bg-primary/10 rounded-xl">
-            <div className="flex items-center justify-between">
-              <span className="text-body-lg font-medium text-primary">총 예상 비용</span>
-              <span className="text-heading font-bold text-primary">{formatKoreanWon(total)}</span>
-            </div>
+  // Non-owner view: Static snapshot with conversion banner
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Conversion Banner */}
+        <div className="bg-primary text-primary-foreground px-4 py-3">
+          <div className="max-w-[400px] mx-auto flex items-center gap-3">
+            <Sparkles className="h-5 w-5 flex-shrink-0" />
+            <p className="text-sm font-medium">
+              더 상세한 예산 관리를 원하시면 웨딩셈에 가입하세요
+            </p>
           </div>
         </div>
 
-        {/* CTA */}
-        <div className="mt-8 text-center">
-          <p className="text-caption text-muted-foreground mb-4">
-            나도 결혼 예산을 정리해볼까요?
+        {/* Header */}
+        <header className="px-4 py-5 text-center">
+          <h1 className="text-lg font-semibold text-foreground">공유된 결혼 예산</h1>
+          <p className="text-xs text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
+        </header>
+
+        {/* Main content - Slim vertical card */}
+        <main className="flex-1 px-4 pb-6">
+          <div className="max-w-[400px] mx-auto w-full">
+            {/* Static snapshot indicator */}
+            <div className="flex items-center justify-center gap-2 mb-4 text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              <span className="text-xs">읽기 전용 스냅샷</span>
+            </div>
+
+            <div className="bg-card rounded-2xl shadow-lg p-5 pointer-events-none select-none">
+              {/* Donut chart - smaller for slim layout */}
+              <div className="scale-90 origin-top">
+                <BudgetDonutChart items={data.items} />
+              </div>
+
+              {/* Category breakdown - vertical stacking */}
+              <div className="mt-6 space-y-2">
+                {BUDGET_CATEGORIES.map(category => {
+                  const categoryTotal = getCategoryTotal(category.id);
+                  if (categoryTotal === 0) return null;
+                  
+                  const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
+                  
+                  return (
+                    <div 
+                      key={category.id}
+                      className="flex items-center justify-between p-2.5 bg-secondary/50 rounded-xl"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">{category.icon}</span>
+                        <span className="text-sm font-medium">{category.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-semibold">{formatKoreanWon(categoryTotal)}</span>
+                        <span className="text-xs text-muted-foreground ml-1.5">({percentage}%)</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Total */}
+              <div className="mt-5 p-3.5 bg-primary/10 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-primary">총 예상 비용</span>
+                  <span className="text-lg font-bold text-primary">{formatKoreanWon(total)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-muted-foreground mb-3">
+                나도 결혼 예산을 정리해볼까요?
+              </p>
+              <Button onClick={() => navigate('/')} size="sm" className="gap-2">
+                <Sparkles className="h-4 w-4" />
+                무료로 시작하기
+              </Button>
+            </div>
+          </div>
+        </main>
+
+        {/* Fixed CTA Footer */}
+        <footer className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border py-3 px-4">
+          <p className="text-center text-xs text-muted-foreground">
+            네이버나 구글에서 '<span className="font-semibold text-primary">웨딩셈</span>'을 검색해 보세요.
           </p>
-          <Button onClick={() => navigate('/')} className="gap-2">
-            <Home className="h-4 w-4" />
-            시작하기
-          </Button>
+        </footer>
+      </div>
+    );
+  }
+
+  // Owner view: Full interactive page (existing design but slimmer)
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <header className="px-4 py-5 text-center">
+        <h1 className="text-lg font-semibold text-foreground">공유된 결혼 예산</h1>
+        <p className="text-xs text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
+      </header>
+
+      {/* Main content - Slim vertical card */}
+      <main className="flex-1 px-4 pb-6">
+        <div className="max-w-[400px] mx-auto w-full">
+          <div className="bg-card rounded-2xl shadow-lg p-5">
+            {/* Donut chart - smaller for slim layout */}
+            <div className="scale-90 origin-top">
+              <BudgetDonutChart items={data.items} />
+            </div>
+
+            {/* Category breakdown - vertical stacking */}
+            <div className="mt-6 space-y-2">
+              {BUDGET_CATEGORIES.map(category => {
+                const categoryTotal = getCategoryTotal(category.id);
+                if (categoryTotal === 0) return null;
+                
+                const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
+                
+                return (
+                  <div 
+                    key={category.id}
+                    className="flex items-center justify-between p-2.5 bg-secondary/50 rounded-xl"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{category.icon}</span>
+                      <span className="text-sm font-medium">{category.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold">{formatKoreanWon(categoryTotal)}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">({percentage}%)</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Total */}
+            <div className="mt-5 p-3.5 bg-primary/10 rounded-xl">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-primary">총 예상 비용</span>
+                <span className="text-lg font-bold text-primary">{formatKoreanWon(total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CTA */}
+          <div className="mt-6 text-center">
+            <Button onClick={() => navigate('/summary')} variant="outline" size="sm" className="gap-2">
+              <Home className="h-4 w-4" />
+              내 대시보드로 가기
+            </Button>
+          </div>
         </div>
       </main>
 
       {/* Fixed CTA Footer */}
-      <footer className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border py-4 px-6">
-        <p className="text-center text-small text-muted-foreground">
+      <footer className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border py-3 px-4">
+        <p className="text-center text-xs text-muted-foreground">
           네이버나 구글에서 '<span className="font-semibold text-primary">웨딩셈</span>'을 검색해 보세요.
         </p>
       </footer>

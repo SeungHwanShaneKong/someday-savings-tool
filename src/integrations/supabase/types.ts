@@ -252,6 +252,7 @@ export type Database = {
         Returns: {
           amount: number
           budget_id: string
+          budget_owner_id: string
           category: string
           cost_split: string
           custom_name: string

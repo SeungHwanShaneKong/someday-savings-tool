@@ -43,18 +43,11 @@ const handler = async (req: Request): Promise<Response> => {
       { auth: { persistSession: false } }
     );
 
-    // Create client with user's token to verify ownership
-    const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: { persistSession: false }
-      }
-    );
-
-    // Get the current user
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    // Extract the JWT token from Authorization header
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Verify the user using admin client
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !user) {
       console.error("User authentication failed:", userError);
       return new Response(
@@ -74,25 +67,18 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Verify the user owns this budget
-    const { data: budget, error: budgetError } = await supabaseUser
+    // Verify the user owns this budget using admin client
+    const { data: budget, error: budgetError } = await supabaseAdmin
       .from('budgets')
       .select('id, user_id, name')
       .eq('id', budgetId)
+      .eq('user_id', user.id)
       .single();
 
     if (budgetError || !budget) {
       console.error("Budget not found or access denied:", budgetError);
       return new Response(
         JSON.stringify({ error: "Budget not found or access denied" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (budget.user_id !== user.id) {
-      console.error("User is not the budget owner");
-      return new Response(
-        JSON.stringify({ error: "Only the budget owner can send invitations" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

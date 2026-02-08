@@ -79,12 +79,40 @@ export function CollaborationPanel({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<CollaboratorRole>('editor');
   const [isSending, setIsSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  // Email validation
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInviteEmail(value);
+    
+    // Clear error when user starts typing
+    if (emailError) {
+      setEmailError(null);
+    }
+  };
 
   const handleSendInvitation = async () => {
-    if (!inviteEmail.trim()) return;
+    const trimmedEmail = inviteEmail.trim();
     
+    if (!trimmedEmail) {
+      setEmailError('이메일 주소를 입력해주세요');
+      return;
+    }
+    
+    if (!validateEmail(trimmedEmail)) {
+      setEmailError('올바른 이메일 형식이 아니에요 (예: example@gmail.com)');
+      return;
+    }
+    
+    setEmailError(null);
     setIsSending(true);
-    const result = await sendInvitation(inviteEmail.trim(), inviteRole);
+    const result = await sendInvitation(trimmedEmail, inviteRole);
     setIsSending(false);
     
     if (result.success) {
@@ -136,16 +164,25 @@ export function CollaborationPanel({
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="invite-email">이메일 주소</Label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-1">
                     <Input
                       id="invite-email"
                       type="email"
                       placeholder="example@gmail.com"
                       value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      className="flex-1"
+                      onChange={handleEmailChange}
+                      className={cn("flex-1", emailError && "border-destructive focus-visible:ring-destructive")}
                       disabled={isSending}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !isSending) {
+                          e.preventDefault();
+                          handleSendInvitation();
+                        }
+                      }}
                     />
+                    {emailError && (
+                      <p className="text-xs text-destructive">{emailError}</p>
+                    )}
                   </div>
                 </div>
                 

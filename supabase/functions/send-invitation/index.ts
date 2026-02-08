@@ -17,6 +17,12 @@ interface InvitationRequest {
   inviterName: string;
 }
 
+// Email validation helper
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 const handler = async (req: Request): Promise<Response> => {
   console.log("send-invitation function called");
   
@@ -61,8 +67,18 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Validate required fields
     if (!email || !budgetId || !role) {
+      console.error("Missing required fields:", { email: !!email, budgetId: !!budgetId, role: !!role });
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "필수 정보가 누락되었어요" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate email format
+    if (!isValidEmail(email)) {
+      console.error("Invalid email format:", email);
+      return new Response(
+        JSON.stringify({ error: "올바른 이메일 형식이 아니에요" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -78,7 +94,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (budgetError || !budget) {
       console.error("Budget not found or access denied:", budgetError);
       return new Response(
-        JSON.stringify({ error: "Budget not found or access denied" }),
+        JSON.stringify({ error: "예산을 찾을 수 없거나 접근 권한이 없어요" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -98,13 +114,6 @@ const handler = async (req: Request): Promise<Response> => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Check if user is already a collaborator
-    const { data: existingUser } = await supabaseAdmin
-      .from('budget_collaborators')
-      .select('id')
-      .eq('budget_id', budgetId)
-      .maybeSingle();
 
     // Check by email if the user exists
     const { data: targetUser } = await supabaseAdmin.auth.admin.listUsers();
@@ -142,7 +151,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (invitationError) {
       console.error("Failed to create invitation:", invitationError);
       return new Response(
-        JSON.stringify({ error: "Failed to create invitation" }),
+        JSON.stringify({ error: "초대장 생성에 실패했어요" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -170,7 +179,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Send invitation email
-    const inviteUrl = `${Deno.env.get("SUPABASE_URL")?.replace('.supabase.co', '.lovable.app') || 'https://someday-savings-tool.lovable.app'}/budget?invite=${invitation.token}`;
+    const inviteUrl = `https://someday-savings-tool.lovable.app/budget?invite=${invitation.token}`;
     
     const roleText = role === 'editor' ? '편집자' : '조회자';
     
@@ -221,20 +230,83 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
 
-      console.log("Email sent successfully:", emailResponse);
-    } catch (emailError: any) {
-      console.error("Failed to send email:", emailError);
-      // Don't fail the whole request, the invitation is still created
+      console.log("Resend API response:", JSON.stringify(emailResponse));
+      
+      // Check if email was actually sent (Resend returns data.id on success)
+      if (emailResponse.data?.id) {
+        console.log("Email sent successfully with ID:", emailResponse.data.id);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            invitation_id: invitation.id,
+            email_sent: true,
+            message: "초대장을 보냈어요"
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else if (emailResponse.error) {
+        console.error("Resend API error:", emailResponse.error);
+        
+        // Rollback: Delete the invitation if email failed
+        console.log("Rolling back invitation due to email failure...");
+        await supabaseAdmin
+          .from('budget_invitations')
+          .delete()
+          .eq('id', invitation.id);
+        
+        // Also delete the notification if it was created
+        if (invitedUser) {
+          await supabaseAdmin
+            .from('notifications')
+            .delete()
+            .eq('user_id', invitedUser.id);
+        }
+        
+        // Return error to user with helpful message
+        let userFacingError = "이메일 발송에 실패했어요. 잠시 후 다시 시도해주세요.";
+        if (emailResponse.error.message?.includes("verify a domain")) {
+          userFacingError = "이메일 서비스 설정이 필요해요. 관리자에게 문의해주세요. (Resend 도메인 검증 필요)";
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            error: userFacingError,
+            details: emailResponse.error.message 
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      // Fallback: if no data.id and no error, still return success with in-app notification
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          invitation_id: invitation.id,
+          email_sent: false,
+          message: invitedUser ? "앱 내 알림으로 초대를 보냈어요" : "초대장을 생성했어요"
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+      
+    } catch (emailCatchError: any) {
+      console.error("Failed to send email (exception):", emailCatchError);
+      
+      // Rollback: Delete the invitation
+      console.log("Rolling back invitation due to email exception...");
+      await supabaseAdmin
+        .from('budget_invitations')
+        .delete()
+        .eq('id', invitation.id);
+      
+      return new Response(
+        JSON.stringify({ 
+          error: "이메일 발송 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+          details: emailCatchError.message 
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        invitation_id: invitation.id,
-        message: "초대장을 보냈어요" 
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
 
   } catch (error: any) {
     console.error("Error in send-invitation function:", error);

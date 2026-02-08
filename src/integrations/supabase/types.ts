@@ -14,91 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      budget_collaborators: {
-        Row: {
-          budget_id: string
-          created_at: string
-          id: string
-          invited_by: string
-          role: Database["public"]["Enums"]["collaborator_role"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          budget_id: string
-          created_at?: string
-          id?: string
-          invited_by: string
-          role?: Database["public"]["Enums"]["collaborator_role"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          budget_id?: string
-          created_at?: string
-          id?: string
-          invited_by?: string
-          role?: Database["public"]["Enums"]["collaborator_role"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "budget_collaborators_budget_id_fkey"
-            columns: ["budget_id"]
-            isOneToOne: false
-            referencedRelation: "budgets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      budget_invitations: {
-        Row: {
-          budget_id: string
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          invited_by: string
-          responded_at: string | null
-          role: Database["public"]["Enums"]["collaborator_role"]
-          status: Database["public"]["Enums"]["invitation_status"]
-          token: string
-        }
-        Insert: {
-          budget_id: string
-          created_at?: string
-          email: string
-          expires_at?: string
-          id?: string
-          invited_by: string
-          responded_at?: string | null
-          role?: Database["public"]["Enums"]["collaborator_role"]
-          status?: Database["public"]["Enums"]["invitation_status"]
-          token?: string
-        }
-        Update: {
-          budget_id?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          invited_by?: string
-          responded_at?: string | null
-          role?: Database["public"]["Enums"]["collaborator_role"]
-          status?: Database["public"]["Enums"]["invitation_status"]
-          token?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "budget_invitations_budget_id_fkey"
-            columns: ["budget_id"]
-            isOneToOne: false
-            referencedRelation: "budgets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       budget_items: {
         Row: {
           amount: number
@@ -223,39 +138,6 @@ export type Database = {
         }
         Relationships: []
       }
-      notifications: {
-        Row: {
-          created_at: string
-          data: Json | null
-          id: string
-          is_read: boolean
-          message: string | null
-          title: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          data?: Json | null
-          id?: string
-          is_read?: boolean
-          message?: string | null
-          title: string
-          type: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          data?: Json | null
-          id?: string
-          is_read?: boolean
-          message?: string | null
-          title?: string
-          type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       page_views: {
         Row: {
           created_at: string
@@ -365,11 +247,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_budget_invitation: { Args: { p_token: string }; Returns: Json }
-      get_budget_role: {
-        Args: { p_budget_id: string; p_user_id?: string }
-        Returns: string
-      }
       get_shared_budget_items_by_token: {
         Args: { p_share_token: string }
         Returns: {
@@ -397,8 +274,6 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
-      collaborator_role: "owner" | "editor" | "viewer"
-      invitation_status: "pending" | "accepted" | "declined" | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -527,8 +402,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      collaborator_role: ["owner", "editor", "viewer"],
-      invitation_status: ["pending", "accepted", "declined", "expired"],
     },
   },
 } as const

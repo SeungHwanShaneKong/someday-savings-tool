@@ -52,7 +52,6 @@ interface BudgetTableProps {
   onAddCustomItem?: (categoryId: string, name: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
-  readOnly?: boolean;
 }
 
 // Sortable category component that handles the dragging logic
@@ -137,8 +136,7 @@ export function BudgetTable({
   onRenameItem,
   onAddCustomItem,
   onDeleteItem,
-  onCostSplitChange,
-  readOnly = false
+  onCostSplitChange
 }: BudgetTableProps) {
   const {
     orderedCategories,

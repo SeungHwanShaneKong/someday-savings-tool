@@ -22,9 +22,7 @@ import {
   Copy,
   ChevronDown,
   RotateCcw,
-  History,
-  Clock,
-  Undo2
+  History
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -46,15 +44,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { VersionHistorySheet } from '@/components/VersionHistorySheet';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function BudgetFlow() {
@@ -217,146 +207,23 @@ export default function BudgetFlow() {
               </div>
 
               {/* History Sheet - Snapshots */}
-              <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-                <SheetTrigger asChild>
+              <VersionHistorySheet
+                isOpen={isHistoryOpen}
+                onOpenChange={setIsHistoryOpen}
+                snapshots={snapshots}
+                canUndoRestore={canUndoRestore}
+                isRestoring={isRestoring}
+                onRestore={handleRestore}
+                onDelete={deleteSnapshot}
+                onUndoRestore={undoLastRestore}
+                isFullBackupData={isFullBackupData}
+                trigger={
                   <Button variant="outline" size="sm" className="gap-1">
                     <History className="h-4 w-4" />
                     <span className="hidden sm:inline">버전 기록</span>
                   </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>버전 기록</SheetTitle>
-                    <SheetDescription>
-                      초기화 전 저장된 데이터로 복원할 수 있어요
-                    </SheetDescription>
-                  </SheetHeader>
-                  
-                  {/* Undo Last Restore Button */}
-                  {canUndoRestore && (
-                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm">
-                          <p className="font-medium text-primary">마지막 복원 실행 취소</p>
-                          <p className="text-xs text-muted-foreground">복원 전 상태로 돌아갑니다</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            await undoLastRestore();
-                            setIsHistoryOpen(false);
-                          }}
-                          disabled={isRestoring}
-                          className="gap-1"
-                        >
-                          <Undo2 className="h-3 w-3" />
-                          취소
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <ScrollArea className="h-[calc(100vh-200px)] mt-4">
-                    {snapshots.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <Clock className="h-12 w-12 mb-4 opacity-50" />
-                        <p className="text-center">저장된 버전이 없어요</p>
-                        <p className="text-sm text-center mt-1">
-                          초기화하면 자동으로 백업됩니다
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {snapshots.map((snapshot) => {
-                          // Calculate total - handle both legacy and new format
-                          let snapshotTotal = 0;
-                          let budgetCount = 0;
-                          
-                          if (isFullBackupData(snapshot.snapshot_data)) {
-                            const fullData = snapshot.snapshot_data;
-                            budgetCount = fullData.budgets.length;
-                            snapshotTotal = fullData.budgets.reduce((total, budget) => 
-                              total + budget.items.reduce((sum, item) => sum + item.amount, 0), 0
-                            );
-                          } else {
-                            snapshotTotal = snapshot.snapshot_data.reduce(
-                              (sum, item) => sum + item.amount, 0
-                            );
-                          }
-                          
-                          return (
-                            <div
-                              key={snapshot.id}
-                              className="p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-sm truncate">
-                                    {snapshot.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    {new Date(snapshot.created_at).toLocaleString('ko-KR')}
-                                  </p>
-                                  {budgetCount > 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                      {budgetCount}개 옵션 포함
-                                    </p>
-                                  )}
-                                  <p className="text-sm text-primary font-medium mt-2">
-                                    총액: {formatKoreanWon(snapshotTotal)}
-                                  </p>
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => handleRestore(snapshot.id)}
-                                    disabled={isRestoring}
-                                    className="gap-1"
-                                  >
-                                    <RotateCcw className="h-3 w-3" />
-                                    복원
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="gap-1 text-destructive hover:text-destructive"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                        삭제
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>버전 삭제</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          이 버전을 삭제하면 복원할 수 없어요. 정말 삭제하시겠어요?
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>취소</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => deleteSnapshot(snapshot.id)}
-                                          className="bg-destructive hover:bg-destructive/90"
-                                        >
-                                          삭제
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </ScrollArea>
-                </SheetContent>
-              </Sheet>
+                }
+              />
 
               {/* Reset Button */}
               <AlertDialog>

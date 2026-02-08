@@ -9,7 +9,6 @@ import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import BudgetFlow from "./pages/BudgetFlow";
 import Summary from "./pages/Summary";
-import Checklist from "./pages/Checklist";
 import SharedBudget from "./pages/SharedBudget";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -25,7 +24,6 @@ function AppRoutes() {
       <Route path="/auth" element={<Auth />} />
       <Route path="/budget" element={<BudgetFlow />} />
       <Route path="/summary" element={<Summary />} />
-      <Route path="/checklist" element={<Checklist />} />
       <Route path="/shared/:token" element={<SharedBudget />} />
       <Route path="/admin" element={<Admin />} />
       <Route path="*" element={<NotFound />} />

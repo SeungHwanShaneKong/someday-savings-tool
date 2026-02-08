@@ -74,9 +74,11 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Validate email format
-    if (!isValidEmail(email)) {
-      console.error("Invalid email format:", email);
+    if (!isValidEmail(normalizedEmail)) {
+      console.error("Invalid email format:", normalizedEmail);
       return new Response(
         JSON.stringify({ error: "올바른 이메일 형식이 아니에요" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -99,26 +101,11 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if there's already a pending invitation
-    const { data: existingInvitation } = await supabaseAdmin
-      .from('budget_invitations')
-      .select('id')
-      .eq('budget_id', budgetId)
-      .eq('email', email.toLowerCase())
-      .eq('status', 'pending')
-      .maybeSingle();
-
-    if (existingInvitation) {
-      return new Response(
-        JSON.stringify({ error: "이미 이 이메일로 초대장을 보냈어요" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Check by email if the user exists
+    // Check by email if the user exists in the system
     const { data: targetUser } = await supabaseAdmin.auth.admin.listUsers();
-    const invitedUser = targetUser?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const invitedUser = targetUser?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
     
+    // Check if user is already a collaborator (시나리오 03: Accepted)
     if (invitedUser) {
       const { data: isCollaborator } = await supabaseAdmin
         .from('budget_collaborators')
@@ -128,38 +115,103 @@ const handler = async (req: Request): Promise<Response> => {
         .maybeSingle();
 
       if (isCollaborator) {
+        console.log("User is already a collaborator:", normalizedEmail);
         return new Response(
-          JSON.stringify({ error: "이 사용자는 이미 협업자예요" }),
+          JSON.stringify({ error: "이 사용자는 이미 협업 중이에요" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     }
 
-    // Create invitation record
-    const { data: invitation, error: invitationError } = await supabaseAdmin
+    // Check for existing pending invitation (시나리오 02: Pending - Upsert)
+    const { data: existingInvitation } = await supabaseAdmin
       .from('budget_invitations')
-      .insert({
-        budget_id: budgetId,
-        email: email.toLowerCase(),
-        role: role,
-        invited_by: user.id,
-        status: 'pending',
-      })
-      .select()
-      .single();
+      .select('id, token, created_at')
+      .eq('budget_id', budgetId)
+      .eq('email', normalizedEmail)
+      .eq('status', 'pending')
+      .maybeSingle();
 
-    if (invitationError) {
-      console.error("Failed to create invitation:", invitationError);
-      return new Response(
-        JSON.stringify({ error: "초대장 생성에 실패했어요" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let invitation: any;
+    let isResend = false;
+
+    if (existingInvitation) {
+      // Update existing invitation (refresh expiry and token)
+      console.log("Updating existing pending invitation:", existingInvitation.id);
+      isResend = true;
+      
+      const newToken = crypto.randomUUID();
+      const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      
+      const { data: updatedInvitation, error: updateError } = await supabaseAdmin
+        .from('budget_invitations')
+        .update({
+          role: role,
+          token: newToken,
+          expires_at: newExpiry,
+          invited_by: user.id,
+        })
+        .eq('id', existingInvitation.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error("Failed to update invitation:", updateError);
+        return new Response(
+          JSON.stringify({ error: "초대장 갱신에 실패했어요" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      invitation = updatedInvitation;
+      console.log("Invitation updated:", invitation);
+    } else {
+      // Create new invitation (시나리오 01: 신규 초대)
+      console.log("Creating new invitation for:", normalizedEmail);
+      
+      const { data: newInvitation, error: invitationError } = await supabaseAdmin
+        .from('budget_invitations')
+        .insert({
+          budget_id: budgetId,
+          email: normalizedEmail,
+          role: role,
+          invited_by: user.id,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (invitationError) {
+        console.error("Failed to create invitation:", invitationError);
+        
+        // Handle unique constraint violation gracefully
+        if (invitationError.code === '23505') {
+          return new Response(
+            JSON.stringify({ error: "이미 처리 중인 초대가 있어요. 잠시 후 다시 시도해주세요." }),
+            { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ error: "초대장 생성에 실패했어요" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      invitation = newInvitation;
+      console.log("Invitation created:", invitation);
     }
-
-    console.log("Invitation created:", invitation);
 
     // Create in-app notification if user exists
     if (invitedUser) {
+      // Delete existing notification first to avoid duplicates
+      await supabaseAdmin
+        .from('notifications')
+        .delete()
+        .eq('user_id', invitedUser.id)
+        .eq('type', 'invitation')
+        .like('data->>budget_id', budgetId);
+      
       await supabaseAdmin
         .from('notifications')
         .insert({
@@ -180,13 +232,12 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send invitation email
     const inviteUrl = `https://wedsem.org/budget?invite=${invitation.token}`;
-    
     const roleText = role === 'editor' ? '편집자' : '조회자';
     
     try {
       const emailResponse = await resend.emails.send({
         from: "웨딩셈 <noreply@wedsem.org>",
-        to: [email],
+        to: [normalizedEmail],
         subject: `[웨딩셈] ${inviterName}님이 결혼 예산을 공유했어요`,
         html: `
           <!DOCTYPE html>
@@ -232,40 +283,37 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log("Resend API response:", JSON.stringify(emailResponse));
       
-      // Check if email was actually sent (Resend returns data.id on success)
+      // Check if email was actually sent
       if (emailResponse.data?.id) {
         console.log("Email sent successfully with ID:", emailResponse.data.id);
+        
+        const message = isResend ? "초대장을 재전송했어요" : "초대장을 보냈어요";
         
         return new Response(
           JSON.stringify({ 
             success: true, 
             invitation_id: invitation.id,
             email_sent: true,
-            message: "초대장을 보냈어요"
+            is_resend: isResend,
+            message: message
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } else if (emailResponse.error) {
         console.error("Resend API error:", emailResponse.error);
         
-        // Rollback: Delete the invitation if email failed
-        console.log("Rolling back invitation due to email failure...");
-        await supabaseAdmin
-          .from('budget_invitations')
-          .delete()
-          .eq('id', invitation.id);
-        
-        // Also delete the notification if it was created
-        if (invitedUser) {
+        // Rollback: Delete the invitation if email failed (only for new invitations)
+        if (!isResend) {
+          console.log("Rolling back new invitation due to email failure...");
           await supabaseAdmin
-            .from('notifications')
+            .from('budget_invitations')
             .delete()
-            .eq('user_id', invitedUser.id);
+            .eq('id', invitation.id);
         }
         
         // Return error to user with helpful message
         let userFacingError = "이메일 발송에 실패했어요. 잠시 후 다시 시도해주세요.";
-        if (emailResponse.error.message?.includes("verify a domain")) {
+        if (emailResponse.error.message?.includes("verify a domain") || emailResponse.error.message?.includes("not verified")) {
           userFacingError = "이메일 서비스 설정이 필요해요. 관리자에게 문의해주세요. (Resend 도메인 검증 필요)";
         }
         
@@ -278,13 +326,15 @@ const handler = async (req: Request): Promise<Response> => {
         );
       }
       
-      // Fallback: if no data.id and no error, still return success with in-app notification
+      // Fallback: success with in-app notification only
+      const message = isResend ? "초대장을 재전송했어요 (앱 내 알림)" : "초대장을 생성했어요";
       return new Response(
         JSON.stringify({ 
           success: true, 
           invitation_id: invitation.id,
           email_sent: false,
-          message: invitedUser ? "앱 내 알림으로 초대를 보냈어요" : "초대장을 생성했어요"
+          is_resend: isResend,
+          message: invitedUser ? message : "초대장을 생성했어요"
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -292,12 +342,14 @@ const handler = async (req: Request): Promise<Response> => {
     } catch (emailCatchError: any) {
       console.error("Failed to send email (exception):", emailCatchError);
       
-      // Rollback: Delete the invitation
-      console.log("Rolling back invitation due to email exception...");
-      await supabaseAdmin
-        .from('budget_invitations')
-        .delete()
-        .eq('id', invitation.id);
+      // Rollback: Delete the invitation only for new ones
+      if (!isResend) {
+        console.log("Rolling back new invitation due to email exception...");
+        await supabaseAdmin
+          .from('budget_invitations')
+          .delete()
+          .eq('id', invitation.id);
+      }
       
       return new Response(
         JSON.stringify({ 

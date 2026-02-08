@@ -179,13 +179,13 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Send invitation email
-    const inviteUrl = `https://someday-savings-tool.lovable.app/budget?invite=${invitation.token}`;
+    const inviteUrl = `https://wedsem.org/budget?invite=${invitation.token}`;
     
     const roleText = role === 'editor' ? '편집자' : '조회자';
     
     try {
       const emailResponse = await resend.emails.send({
-        from: "웨딩셈 <noreply@resend.dev>",
+        from: "웨딩셈 <noreply@wedsem.org>",
         to: [email],
         subject: `[웨딩셈] ${inviterName}님이 결혼 예산을 공유했어요`,
         html: `

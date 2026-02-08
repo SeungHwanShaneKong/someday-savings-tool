@@ -5,6 +5,7 @@ import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
 import { BudgetTableMobile } from '@/components/BudgetTableMobile';
 import { BudgetComparisonDashboard } from '@/components/BudgetComparisonDashboard';
+import { WeddingCountdown } from '@/components/WeddingCountdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -156,6 +157,11 @@ export default function BudgetFlow() {
       {/* Header - Mobile Optimized */}
       <header className="sticky top-0 bg-background/95 backdrop-blur-lg z-40 border-b border-border">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          {/* Top Row: D-Day Countdown (if set) */}
+          <div className="flex items-center justify-center mb-2 sm:mb-3">
+            <WeddingCountdown />
+          </div>
+          
           {/* Mobile: Two rows, Desktop: Single row */}
           <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
             {/* Top Row: Back + Title */}

@@ -116,6 +116,7 @@ export type Database = {
           updated_at: string
           user_id: string
           wedding_date: string | null
+          wedding_time: string | null
         }
         Insert: {
           created_at?: string
@@ -124,6 +125,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           wedding_date?: string | null
+          wedding_time?: string | null
         }
         Update: {
           created_at?: string
@@ -132,6 +134,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           wedding_date?: string | null
+          wedding_time?: string | null
         }
         Relationships: []
       }

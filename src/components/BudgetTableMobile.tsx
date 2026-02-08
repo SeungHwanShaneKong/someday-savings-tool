@@ -359,7 +359,7 @@ export function BudgetTableMobile({
                           const isEditing = editingCell === cellKey;
                           const isRenamingThis = editingName === item.id;
                           const displayName = item.custom_name || subCat.name;
-                          const isPerPersonItem = category.id === 'wedding-hall' && subCat.id === 'meal-cost';
+                          const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
                           
                           return (
                             <div key={item.id} className="p-3 space-y-2">
@@ -429,7 +429,7 @@ export function BudgetTableMobile({
                               
                               {/* Row 2: Amount + Per Person Button */}
                               <div className="flex items-center gap-2 pl-7">
-                                {isPerPersonItem && (
+                                {isMealCostItem && (
                                   <Popover
                                     open={perPersonPopover === cellKey}
                                     onOpenChange={open => {

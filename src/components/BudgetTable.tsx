@@ -334,7 +334,7 @@ export function BudgetTable({
     const isEditing = editingCell === cellKey;
     const isRenamingThis = editingName === item.id;
     const displayName = item.custom_name || subCat.name;
-    const isPerPersonItem = category.id === 'wedding-hall' && subCat.id === 'meal-cost';
+    const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
     return <TableRow key={cellKey} className={cn("hover:bg-muted/50 transition-colors", isFirstInCategory && "border-t-2 border-primary/10")}>
         {subIndex === 0 && <TableCell rowSpan={totalRowsForCategory} className="font-semibold bg-secondary/50 align-top pt-2 sm:pt-4 px-1 sm:px-4">
             <div className="flex flex-col items-center gap-1">
@@ -378,7 +378,7 @@ export function BudgetTable({
         </TableCell>
         <TableCell className="text-center px-1 sm:px-2">
           <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-            {isPerPersonItem && <Popover open={perPersonPopover === cellKey} onOpenChange={open => {
+            {isMealCostItem && <Popover open={perPersonPopover === cellKey} onOpenChange={open => {
             if (open) {
               setPerPersonPopover(cellKey);
               setTempUnitPrice(item.unit_price?.toString() || '');

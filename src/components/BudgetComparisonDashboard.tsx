@@ -93,21 +93,24 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
   };
 
   return (
-    <div className="space-y-6">
-      {/* Total Comparison Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Total Comparison Cards - Mobile: 2 cols, Tablet+: 4 cols */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         {budgetTotals.map((budget, index) => (
           <Card key={budget.name} className={index === 0 ? 'ring-2 ring-primary' : ''}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
                 {budget.name}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" style={{ color: COLORS[index % COLORS.length] }}>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div 
+                className="text-lg sm:text-2xl font-bold truncate" 
+                style={{ color: COLORS[index % COLORS.length] }}
+              >
                 {formatKoreanWon(budget.total)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate">
                 ₩{budget.total.toLocaleString()}
               </p>
             </CardContent>
@@ -118,23 +121,23 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
       {/* Difference Summary */}
       {budgets.length > 1 && (
         <Card className="bg-gradient-to-r from-primary/5 to-primary/10">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="text-center md:text-left">
-                <p className="text-sm text-muted-foreground">최저 vs 최고 차이</p>
-                <p className="text-3xl font-bold text-primary">{formatKoreanWon(difference)}</p>
+          <CardContent className="p-4 sm:pt-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+              <div className="text-center sm:text-left">
+                <p className="text-xs sm:text-sm text-muted-foreground">최저 vs 최고 차이</p>
+                <p className="text-xl sm:text-3xl font-bold text-primary">{formatKoreanWon(difference)}</p>
               </div>
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm">
                 <div className="text-center">
-                  <p className="text-muted-foreground">최저</p>
-                  <p className="font-semibold text-success">{minBudget.name}</p>
-                  <p className="text-xs">{formatKoreanWon(minBudget.total)}</p>
+                  <p className="text-muted-foreground text-[10px] sm:text-xs">최저</p>
+                  <p className="font-semibold text-success text-xs sm:text-sm">{minBudget.name}</p>
+                  <p className="text-[10px] sm:text-xs">{formatKoreanWon(minBudget.total)}</p>
                 </div>
-                <div className="text-2xl text-muted-foreground">→</div>
+                <div className="text-lg sm:text-2xl text-muted-foreground">→</div>
                 <div className="text-center">
-                  <p className="text-muted-foreground">최고</p>
-                  <p className="font-semibold text-destructive">{maxBudget.name}</p>
-                  <p className="text-xs">{formatKoreanWon(maxBudget.total)}</p>
+                  <p className="text-muted-foreground text-[10px] sm:text-xs">최고</p>
+                  <p className="font-semibold text-destructive text-xs sm:text-sm">{maxBudget.name}</p>
+                  <p className="text-[10px] sm:text-xs">{formatKoreanWon(maxBudget.total)}</p>
                 </div>
               </div>
             </div>
@@ -144,23 +147,25 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
 
       {/* Total Comparison Bar Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">옵션별 총 예산 비교</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">옵션별 총 예산 비교</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-64">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <div className="h-48 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={budgetTotals} layout="vertical">
                 <XAxis 
                   type="number" 
                   tickFormatter={(value) => formatKoreanWon(value)}
-                  fontSize={12}
+                  fontSize={10}
+                  tick={{ fontSize: 10 }}
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
-                  width={80}
-                  fontSize={12}
+                  width={60}
+                  fontSize={10}
+                  tick={{ fontSize: 10 }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="total" radius={[0, 4, 4, 0]}>
@@ -176,27 +181,30 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
 
       {/* Category Comparison Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">카테고리별 비교</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">카테고리별 비교</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="h-96">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <div className="h-64 sm:h-96">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={categoryComparison}>
                 <XAxis 
                   dataKey="category" 
-                  fontSize={11}
+                  fontSize={9}
+                  tick={{ fontSize: 9 }}
                   angle={-45}
                   textAnchor="end"
-                  height={80}
+                  height={60}
+                  interval={0}
                 />
                 <YAxis 
                   tickFormatter={(value) => formatKoreanWon(value)}
-                  fontSize={11}
-                  width={70}
+                  fontSize={9}
+                  tick={{ fontSize: 9 }}
+                  width={50}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend wrapperStyle={{ fontSize: '10px' }} />
                 {budgets.map((budget, index) => (
                   <Bar 
                     key={budget.id}
@@ -213,19 +221,19 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
 
       {/* Detailed Category Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">카테고리별 상세 비교</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">카테고리별 상세 비교</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <table className="w-full text-xs sm:text-sm min-w-[300px]">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-3">카테고리</th>
+                  <th className="text-left py-2 px-2 sm:px-3">카테고리</th>
                   {budgets.map((budget, index) => (
                     <th 
                       key={budget.id} 
-                      className="text-right py-2 px-3"
+                      className="text-right py-2 px-2 sm:px-3 whitespace-nowrap"
                       style={{ color: COLORS[index % COLORS.length] }}
                     >
                       {budget.name}
@@ -236,21 +244,22 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
               <tbody>
                 {categoryComparison.map((row) => (
                   <tr key={row.category} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-3">
-                      <span className="mr-2">{row.icon}</span>
-                      {row.category}
+                    <td className="py-2 px-2 sm:px-3 whitespace-nowrap">
+                      <span className="mr-1 sm:mr-2">{row.icon}</span>
+                      <span className="hidden sm:inline">{row.category}</span>
+                      <span className="sm:hidden text-[10px]">{row.category}</span>
                     </td>
                     {budgets.map((budget) => (
-                      <td key={budget.id} className="text-right py-2 px-3 font-medium">
+                      <td key={budget.id} className="text-right py-2 px-2 sm:px-3 font-medium whitespace-nowrap text-[10px] sm:text-sm">
                         {row[budget.name] > 0 ? formatKoreanWon(row[budget.name]) : '-'}
                       </td>
                     ))}
                   </tr>
                 ))}
                 <tr className="bg-primary/10 font-bold">
-                  <td className="py-2 px-3">총계</td>
+                  <td className="py-2 px-2 sm:px-3">총계</td>
                   {budgets.map((budget) => (
-                    <td key={budget.id} className="text-right py-2 px-3 text-primary">
+                    <td key={budget.id} className="text-right py-2 px-2 sm:px-3 text-primary text-[10px] sm:text-sm whitespace-nowrap">
                       {formatKoreanWon(budgetTotals.find(b => b.name === budget.name)?.total || 0)}
                     </td>
                   ))}
@@ -263,19 +272,19 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
 
       {/* Cost Split Summary */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">분담별 비용 비교</CardTitle>
+        <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+          <CardTitle className="text-base sm:text-lg">분담별 비용 비교</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <table className="w-full text-xs sm:text-sm min-w-[300px]">
               <thead>
                 <tr className="border-b">
-                  <th className="text-left py-2 px-3">분담</th>
+                  <th className="text-left py-2 px-2 sm:px-3">분담</th>
                   {budgets.map((budget, index) => (
                     <th 
                       key={budget.id} 
-                      className="text-right py-2 px-3"
+                      className="text-right py-2 px-2 sm:px-3 whitespace-nowrap"
                       style={{ color: COLORS[index % COLORS.length] }}
                     >
                       {budget.name}
@@ -296,9 +305,9 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
                   
                   return (
                     <tr key={splitOpt.value} className="border-b hover:bg-muted/50">
-                      <td className="py-2 px-3">
+                      <td className="py-2 px-2 sm:px-3 whitespace-nowrap">
                         <span 
-                          className="inline-block w-3 h-3 rounded-full mr-2"
+                          className="inline-block w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"
                           style={{ backgroundColor: COST_SPLIT_COLORS[splitOpt.value] }}
                         />
                         {splitOpt.label}
@@ -306,7 +315,7 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
                       {splitTotals.map((st, idx) => (
                         <td 
                           key={st.budgetId} 
-                          className="text-right py-2 px-3 font-medium"
+                          className="text-right py-2 px-2 sm:px-3 font-medium whitespace-nowrap text-[10px] sm:text-sm"
                         >
                           {st.total > 0 ? formatKoreanWon(st.total) : '-'}
                         </td>

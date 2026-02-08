@@ -15,6 +15,8 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import { CSS } from '@dnd-kit/utilities';
 import { useCategoryOrder } from '@/hooks/useCategoryOrder';
 import { ExtendedBudgetItem, CostSplitType, COST_SPLIT_OPTIONS } from './BudgetTable';
+import { AverageCostTooltip } from './AverageCostTooltip';
+import { hasAverageCost } from '@/lib/average-costs';
 
 interface BudgetTableMobileProps {
   items: ExtendedBudgetItem[];
@@ -392,13 +394,20 @@ export function BudgetTableMobile({
                                   </div>
                                 ) : (
                                   <>
-                                    <span className={cn(
-                                      "text-sm flex-1",
+                                    <div className={cn(
+                                      "flex items-center gap-1 flex-1 min-w-0",
                                       item.is_paid && "line-through text-muted-foreground"
                                     )}>
-                                      {displayName}
-                                    </span>
-                                    <div className="flex items-center gap-1">
+                                      <span className="text-sm truncate">{displayName}</span>
+                                      {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
+                                        <AverageCostTooltip 
+                                          categoryId={category.id} 
+                                          subCategoryId={subCat.id}
+                                          className="flex-shrink-0"
+                                        />
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
                                       {onRenameItem && (
                                         <Button
                                           size="icon"

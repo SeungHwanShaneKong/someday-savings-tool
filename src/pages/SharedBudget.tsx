@@ -101,7 +101,7 @@ export default function SharedBudget() {
       {/* Header */}
       <header className="px-4 py-6 text-center">
         <h1 className="text-heading text-foreground">공유된 결혼 예산</h1>
-        <p className="text-caption text-muted-foreground mt-1">결혼자금 계산기로 작성되었어요</p>
+        <p className="text-caption text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
       </header>
 
       {/* Main content */}
@@ -157,9 +157,11 @@ export default function SharedBudget() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="py-6 text-center text-small text-muted-foreground">
-        결혼자금 계산기 • Made with 💙
+      {/* Fixed CTA Footer */}
+      <footer className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border py-4 px-6">
+        <p className="text-center text-small text-muted-foreground">
+          네이버나 구글에서 '<span className="font-semibold text-primary">웨딩셈</span>'을 검색해 보세요.
+        </p>
       </footer>
     </div>
   );

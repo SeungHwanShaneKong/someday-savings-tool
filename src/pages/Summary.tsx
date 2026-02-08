@@ -18,7 +18,6 @@ import {
   ArrowLeft, 
   Download, 
   Share2, 
-  ClipboardList,
   Check,
   Link as LinkIcon,
   TrendingDown,
@@ -112,13 +111,49 @@ export default function Summary() {
     if (!summaryRef.current) return;
     
     try {
-      const canvas = await html2canvas(summaryRef.current, {
+      // Clone the element and add CTA footer for image export
+      const originalElement = summaryRef.current;
+      const clonedElement = originalElement.cloneNode(true) as HTMLElement;
+      
+      // Create CTA footer
+      const ctaFooter = document.createElement('div');
+      ctaFooter.style.cssText = `
+        text-align: center;
+        padding: 24px 16px 16px 16px;
+        margin-top: 24px;
+        border-top: 1px solid #e5e7eb;
+        background: linear-gradient(to bottom, transparent, rgba(0,100,255,0.03));
+      `;
+      ctaFooter.innerHTML = `
+        <p style="font-size: 13px; color: #6b7280; margin: 0; font-family: 'Pretendard Variable', sans-serif;">
+          네이버나 구글에서 '<strong style="color: #0064ff;">웨딩셈</strong>'을 검색해 보세요.
+        </p>
+      `;
+      clonedElement.appendChild(ctaFooter);
+      
+      // Temporarily add to DOM for rendering
+      clonedElement.style.position = 'absolute';
+      clonedElement.style.left = '-9999px';
+      clonedElement.style.width = `${originalElement.offsetWidth}px`;
+      document.body.appendChild(clonedElement);
+      
+      // Viewport-aware scale factor
+      const isMobile = window.innerWidth < 768;
+      const scale = isMobile ? 2 : 2.5;
+      
+      const canvas = await html2canvas(clonedElement, {
         backgroundColor: '#ffffff',
-        scale: 2,
+        scale,
+        useCORS: true,
+        logging: false,
+        windowWidth: originalElement.offsetWidth,
       });
       
+      // Clean up cloned element
+      document.body.removeChild(clonedElement);
+      
       const link = document.createElement('a');
-      link.download = '결혼예산_요약.png';
+      link.download = '웨딩셈_예산요약.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
       
@@ -517,32 +552,23 @@ export default function Summary() {
         )}
 
         {/* Action buttons */}
-        <div className="space-y-3 mt-6">
+        <div className="grid grid-cols-2 gap-3 mt-6">
           <Button
             onClick={handleDownloadImage}
             variant="outline"
-            className="w-full h-14 text-body font-medium rounded-xl gap-2"
+            className="h-14 text-body font-medium rounded-xl gap-2"
           >
             <Download className="h-5 w-5" />
-            이미지로 저장
+            이미지 저장
           </Button>
           
           <Button
             onClick={handleGenerateShareLink}
             disabled={isGeneratingShare}
-            variant="outline"
-            className="w-full h-14 text-body font-medium rounded-xl gap-2"
+            className="h-14 text-body font-medium rounded-xl gap-2"
           >
             <Share2 className="h-5 w-5" />
-            {isGeneratingShare ? '링크 생성 중...' : '링크 공유하기'}
-          </Button>
-          
-          <Button
-            onClick={() => navigate('/checklist')}
-            className="w-full h-14 text-body font-medium rounded-xl gap-2"
-          >
-            <ClipboardList className="h-5 w-5" />
-            체크리스트 보기
+            {isGeneratingShare ? '생성 중...' : '링크 공유'}
           </Button>
         </div>
       </main>

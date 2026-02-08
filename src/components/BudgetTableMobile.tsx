@@ -27,6 +27,7 @@ interface BudgetTableMobileProps {
   onAddCustomItem?: (categoryId: string, name: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
+  readOnly?: boolean;
 }
 
 // Sortable category for mobile
@@ -83,7 +84,8 @@ export function BudgetTableMobile({
   onRenameItem,
   onAddCustomItem,
   onDeleteItem,
-  onCostSplitChange
+  onCostSplitChange,
+  readOnly = false
 }: BudgetTableMobileProps) {
   const { orderedCategories, reorderCategories } = useCategoryOrder();
   

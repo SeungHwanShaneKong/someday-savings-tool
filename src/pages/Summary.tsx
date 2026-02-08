@@ -19,6 +19,7 @@ import {
   Download, 
   Share2, 
   Check,
+  Copy,
   Link as LinkIcon,
   TrendingDown,
   TrendingUp,
@@ -585,17 +586,23 @@ export default function Summary() {
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 space-y-4">
-            <div className="flex items-center gap-3 p-4 bg-secondary border border-border rounded-xl">
-              <LinkIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm text-foreground truncate flex-1 font-medium">{shareUrl}</span>
+            <div className="flex items-center gap-2 p-3 bg-secondary border border-border rounded-xl">
+              <LinkIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span 
+                className="text-sm text-foreground font-mono flex-1 overflow-hidden whitespace-nowrap text-ellipsis max-w-[200px] sm:max-w-[260px]"
+                title={shareUrl}
+              >
+                {shareUrl}
+              </span>
+              <Button
+                onClick={handleCopyLink}
+                size="sm"
+                className="h-10 min-w-[80px] gap-1.5 text-sm font-semibold rounded-lg shadow-md flex-shrink-0"
+              >
+                <Copy className="h-4 w-4" />
+                복사
+              </Button>
             </div>
-            <Button
-              onClick={handleCopyLink}
-              className="w-full h-12 gap-2 text-base font-semibold rounded-xl shadow-lg"
-            >
-              <Check className="h-5 w-5" />
-              링크 복사하기
-            </Button>
           </div>
         </DialogContent>
       </Dialog>

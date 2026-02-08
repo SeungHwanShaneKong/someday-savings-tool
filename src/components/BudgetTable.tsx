@@ -14,6 +14,8 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useCategoryOrder } from '@/hooks/useCategoryOrder';
+import { AverageCostTooltip } from './AverageCostTooltip';
+import { hasAverageCost } from '@/lib/average-costs';
 // Export types for mobile component
 export type CostSplitType = 'groom' | 'bride' | 'together' | '-';
 
@@ -362,6 +364,9 @@ export function BudgetTable({
               </Button>
             </div> : <div className="flex items-center gap-1 group">
               <span className="break-keep text-[10px] sm:text-base">{displayName}</span>
+              {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
+                <AverageCostTooltip categoryId={category.id} subCategoryId={subCat.id} />
+              )}
               {onRenameItem && <Button size="icon" variant="ghost" className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 flex-shrink-0" onClick={() => handleStartRename(item.id, displayName)}>
                   <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </Button>}

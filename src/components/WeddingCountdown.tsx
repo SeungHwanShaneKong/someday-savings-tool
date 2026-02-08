@@ -117,11 +117,20 @@ export function WeddingCountdown() {
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
             <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              size="lg"
+              className={cn(
+                "gap-2 px-5 py-3 h-auto min-h-[48px]",
+                "text-base sm:text-lg font-bold",
+                "bg-primary",
+                "text-primary-foreground",
+                "shadow-[0_4px_16px_hsl(var(--primary)/0.35)]",
+                "hover:shadow-[0_6px_24px_hsl(var(--primary)/0.5)]",
+                "hover:scale-[1.02] hover:bg-primary/90 active:scale-[0.98]",
+                "transition-all duration-200 ease-out",
+                "rounded-xl"
+              )}
             >
-              <CalendarDays className="h-4 w-4" />
+              <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6" />
               <span className="hidden sm:inline">결혼 일정을 입력해 주세요</span>
               <span className="sm:hidden">D-Day 설정</span>
             </Button>

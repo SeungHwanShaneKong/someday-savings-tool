@@ -5,6 +5,7 @@ import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
 import { useToast } from '@/hooks/use-toast';
 import { Budget } from './useBudget';
 import { ExtendedBudgetItem } from '@/components/BudgetTable';
+import { useVersionRecovery } from './useVersionRecovery';
 
 // Snapshot data can be either:
 // - Legacy: ExtendedBudgetItem[] (single budget)
@@ -31,6 +32,9 @@ export function useMultipleBudgets() {
   const [allBudgetsItems, setAllBudgetsItems] = useState<Record<string, ExtendedBudgetItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<BudgetSnapshot[]>([]);
+
+  // Use the optimized version recovery hook
+  const versionRecovery = useVersionRecovery();
 
   // Fetch all budgets for the user
   const fetchBudgets = useCallback(async () => {
@@ -697,117 +701,80 @@ export function useMultipleBudgets() {
     return data && typeof data === 'object' && 'budgets' in data && Array.isArray((data as FullBackupData).budgets);
   };
 
-  // Restore from a snapshot (handles both legacy and new format)
+  // Optimized restore from a snapshot (handles both legacy and new format)
   const restoreFromSnapshot = async (snapshotId: string) => {
     if (!user) return false;
 
-    try {
-      const snapshot = snapshots.find(s => s.id === snapshotId);
-      if (!snapshot) {
-        toast({
-          title: '스냅샷을 찾을 수 없어요',
-          variant: 'destructive',
-        });
-        return false;
-      }
-
-      const snapshotData = snapshot.snapshot_data;
-
-      // Check if this is the new full backup format
-      if (isFullBackupData(snapshotData)) {
-        // Delete all current budgets and items
-        for (const budget of budgets) {
-          await supabase.from('budget_items').delete().eq('budget_id', budget.id);
-          await supabase.from('budgets').delete().eq('id', budget.id);
-        }
-
-        // Recreate all budgets from snapshot
-        const newBudgets: Budget[] = [];
-        const newAllBudgetsItems: Record<string, ExtendedBudgetItem[]> = {};
-
-        for (const savedBudget of snapshotData.budgets) {
-          // Create budget
-          const { data: newBudget, error: budgetError } = await supabase
-            .from('budgets')
-            .insert({ user_id: user.id, name: savedBudget.name })
-            .select()
-            .single();
-
-          if (budgetError) throw budgetError;
-          newBudgets.push(newBudget);
-
-          // Create items for this budget
-          const itemsToInsert = savedBudget.items.map(item => ({
-            budget_id: newBudget.id,
-            category: item.category,
-            sub_category: item.sub_category,
-            amount: item.amount,
-            is_paid: item.is_paid,
-            notes: item.notes,
-            unit_price: item.unit_price,
-            quantity: item.quantity,
-            custom_name: item.custom_name,
-            is_custom: item.is_custom,
-            cost_split: item.cost_split,
-          }));
-
-          const { data: insertedItems, error: itemsError } = await supabase
-            .from('budget_items')
-            .insert(itemsToInsert)
-            .select();
-
-          if (itemsError) throw itemsError;
-          newAllBudgetsItems[newBudget.id] = (insertedItems || []) as ExtendedBudgetItem[];
-        }
-
-        // Update state
-        setBudgets(newBudgets);
-        setActiveBudgetId(newBudgets[0]?.id || null);
-        setItems(newAllBudgetsItems[newBudgets[0]?.id] || []);
-        setAllBudgetsItems(newAllBudgetsItems);
-      } else {
-        // Legacy format: just update items for current budget
-        if (!activeBudgetId) return false;
-
-        for (const savedItem of snapshotData) {
-          const currentItem = items.find(i => i.id === savedItem.id);
-          if (currentItem) {
-            await supabase
-              .from('budget_items')
-              .update({
-                amount: savedItem.amount,
-                is_paid: savedItem.is_paid,
-                notes: savedItem.notes,
-                unit_price: savedItem.unit_price,
-                quantity: savedItem.quantity,
-                cost_split: savedItem.cost_split,
-                custom_name: savedItem.custom_name,
-              })
-              .eq('id', savedItem.id);
-          }
-        }
-
-        setItems(snapshotData);
-        setAllBudgetsItems(prev => ({
-          ...prev,
-          [activeBudgetId]: snapshotData
-        }));
-      }
-
+    const snapshot = snapshots.find(s => s.id === snapshotId);
+    if (!snapshot) {
       toast({
-        title: '스냅샷에서 복원되었어요',
-        description: snapshot.name,
-      });
-
-      return true;
-    } catch (error: any) {
-      toast({
-        title: '복원 중 오류가 발생했어요',
-        description: error.message,
+        title: '스냅샷을 찾을 수 없어요',
         variant: 'destructive',
       });
       return false;
     }
+
+    const snapshotData = snapshot.snapshot_data;
+
+    // Check if this is the new full backup format
+    if (isFullBackupData(snapshotData)) {
+      // Use optimized version recovery
+      const success = await versionRecovery.restoreFullBackup(
+        snapshotData,
+        budgets,
+        allBudgetsItems,
+        true, // Create undo backup
+        (newBudgets, newActiveBudgetId, newItems, newAllBudgetsItems, undoBackup) => {
+          setBudgets(newBudgets);
+          setActiveBudgetId(newActiveBudgetId);
+          setItems(newItems);
+          setAllBudgetsItems(newAllBudgetsItems);
+          if (undoBackup) {
+            setSnapshots(prev => [undoBackup, ...prev]);
+          }
+        }
+      );
+      return success;
+    } else {
+      // Legacy format: use optimized legacy restore
+      if (!activeBudgetId) return false;
+      
+      const success = await versionRecovery.restoreLegacyBackup(
+        snapshotData,
+        activeBudgetId,
+        items,
+        (newItems) => {
+          setItems(newItems);
+          setAllBudgetsItems(prev => ({
+            ...prev,
+            [activeBudgetId]: newItems
+          }));
+        }
+      );
+
+      if (success) {
+        toast({
+          title: '스냅샷에서 복원되었어요',
+          description: snapshot.name,
+        });
+      }
+
+      return success;
+    }
+  };
+
+  // Undo last restoration
+  const undoLastRestore = async () => {
+    return await versionRecovery.undoLastRestore(
+      budgets,
+      allBudgetsItems,
+      (newBudgets, newActiveBudgetId, newItems, newAllBudgetsItems) => {
+        setBudgets(newBudgets);
+        setActiveBudgetId(newActiveBudgetId);
+        setItems(newItems);
+        setAllBudgetsItems(newAllBudgetsItems);
+      }
+    );
   };
 
   // Delete a snapshot
@@ -880,5 +847,10 @@ export function useMultipleBudgets() {
     restoreFromSnapshot,
     deleteSnapshot,
     isFullBackupData,
+    // Optimized version recovery
+    undoLastRestore,
+    isRestoring: versionRecovery.isRestoring,
+    restoreProgress: versionRecovery.progress,
+    canUndoRestore: versionRecovery.canUndo,
   };
 }

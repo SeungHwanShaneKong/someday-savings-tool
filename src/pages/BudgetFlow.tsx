@@ -6,6 +6,7 @@ import { BudgetTable } from '@/components/BudgetTable';
 import { BudgetTableMobile } from '@/components/BudgetTableMobile';
 import { BudgetComparisonDashboard } from '@/components/BudgetComparisonDashboard';
 import { WeddingCountdown } from '@/components/WeddingCountdown';
+import { RestoreProgressIndicator } from '@/components/RestoreProgressIndicator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,7 +23,8 @@ import {
   ChevronDown,
   RotateCcw,
   History,
-  Clock
+  Clock,
+  Undo2
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -84,6 +86,11 @@ export default function BudgetFlow() {
     restoreFromSnapshot,
     deleteSnapshot,
     isFullBackupData,
+    // Optimized version recovery
+    undoLastRestore,
+    isRestoring,
+    restoreProgress,
+    canUndoRestore,
   } = useMultipleBudgets();
 
   const isMobile = useIsMobile();
@@ -154,6 +161,9 @@ export default function BudgetFlow() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
+      {/* Restore Progress Indicator */}
+      <RestoreProgressIndicator progress={restoreProgress} />
+      
       {/* Header - Mobile Optimized */}
       <header className="sticky top-0 bg-background/95 backdrop-blur-lg z-40 border-b border-border">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
@@ -221,7 +231,33 @@ export default function BudgetFlow() {
                       초기화 전 저장된 데이터로 복원할 수 있어요
                     </SheetDescription>
                   </SheetHeader>
-                  <ScrollArea className="h-[calc(100vh-150px)] mt-4">
+                  
+                  {/* Undo Last Restore Button */}
+                  {canUndoRestore && (
+                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm">
+                          <p className="font-medium text-primary">마지막 복원 실행 취소</p>
+                          <p className="text-xs text-muted-foreground">복원 전 상태로 돌아갑니다</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            await undoLastRestore();
+                            setIsHistoryOpen(false);
+                          }}
+                          disabled={isRestoring}
+                          className="gap-1"
+                        >
+                          <Undo2 className="h-3 w-3" />
+                          취소
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <ScrollArea className="h-[calc(100vh-200px)] mt-4">
                     {snapshots.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                         <Clock className="h-12 w-12 mb-4 opacity-50" />
@@ -276,6 +312,7 @@ export default function BudgetFlow() {
                                     size="sm"
                                     variant="secondary"
                                     onClick={() => handleRestore(snapshot.id)}
+                                    disabled={isRestoring}
                                     className="gap-1"
                                   >
                                     <RotateCcw className="h-3 w-3" />

@@ -14,7 +14,9 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useCategoryOrder } from '@/hooks/useCategoryOrder';
+// Export types for mobile component
 export type CostSplitType = 'groom' | 'bride' | 'together' | '-';
+
 export interface ExtendedBudgetItem {
   id: string;
   budget_id: string;
@@ -29,22 +31,16 @@ export interface ExtendedBudgetItem {
   is_custom?: boolean;
   cost_split?: CostSplitType;
 }
+
 export const COST_SPLIT_OPTIONS: {
   value: CostSplitType;
   label: string;
-}[] = [{
-  value: '-',
-  label: '-'
-}, {
-  value: 'groom',
-  label: '신랑'
-}, {
-  value: 'bride',
-  label: '신부'
-}, {
-  value: 'together',
-  label: '같이'
-}];
+}[] = [
+  { value: '-', label: '-' },
+  { value: 'groom', label: '신랑' },
+  { value: 'bride', label: '신부' },
+  { value: 'together', label: '같이' }
+];
 interface BudgetTableProps {
   items: ExtendedBudgetItem[];
   onAmountChange: (category: string, subCategory: string, amount: number, unitPrice?: number, quantity?: number) => void;

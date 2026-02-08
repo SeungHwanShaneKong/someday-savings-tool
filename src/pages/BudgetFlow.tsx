@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
+import { BudgetTableMobile } from '@/components/BudgetTableMobile';
 import { BudgetComparisonDashboard } from '@/components/BudgetComparisonDashboard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
@@ -83,6 +85,7 @@ export default function BudgetFlow() {
     isFullBackupData,
   } = useMultipleBudgets();
 
+  const isMobile = useIsMobile();
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'comparison'>('table');
@@ -149,28 +152,32 @@ export default function BudgetFlow() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
+      {/* Header - Mobile Optimized */}
       <header className="sticky top-0 bg-background/95 backdrop-blur-lg z-40 border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+          {/* Mobile: Two rows, Desktop: Single row */}
+          <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
+            {/* Top Row: Back + Title */}
+            <div className="flex items-center gap-2 sm:gap-4">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/')}
-                className="rounded-full"
+                className="rounded-full h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
-              <div>
-                <h1 className="text-xl font-bold">결혼 예산 시뮬레이터</h1>
-                <p className="text-sm text-muted-foreground">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-xl font-bold truncate">결혼 예산 시뮬레이터</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
                   여러 옵션을 비교해보세요
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            
+            {/* Bottom Row on Mobile: Action Buttons */}
+            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
               {/* View Mode Toggle */}
               <div className="flex items-center bg-muted rounded-lg p-1">
                 <Button
@@ -340,9 +347,11 @@ export default function BudgetFlow() {
               <Button
                 onClick={() => navigate('/summary')}
                 variant="outline"
-                className="gap-2"
+                size="sm"
+                className="gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
               >
-                요약 보기
+                <span className="hidden sm:inline">요약 보기</span>
+                <span className="sm:hidden">요약</span>
               </Button>
               <LogoutButton />
             </div>
@@ -352,9 +361,9 @@ export default function BudgetFlow() {
 
       {/* Tabs section - Budget Options (hidden in comparison mode) */}
       {viewMode === 'table' && (
-        <div className="bg-secondary/50 border-b border-border">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex items-center gap-2 py-3 overflow-x-auto">
+        <div className="bg-secondary/50 border-b border-border overflow-x-hidden">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 py-2 sm:py-3 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
               {budgets.map((budget) => (
                 <div
                   key={budget.id}
@@ -477,11 +486,11 @@ export default function BudgetFlow() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 overflow-x-hidden">
         {viewMode === 'table' ? (
           <>
-            <div className="bg-card rounded-xl border border-border shadow-toss overflow-hidden">
-              <BudgetTable
+            {isMobile ? (
+              <BudgetTableMobile
                 items={items}
                 onAmountChange={updateAmount}
                 onTogglePaid={togglePaid}
@@ -491,25 +500,40 @@ export default function BudgetFlow() {
                 onAddCustomItem={addCustomItem}
                 onDeleteItem={deleteItem}
               />
-            </div>
+            ) : (
+              <>
+                <div className="bg-card rounded-xl border border-border shadow-toss overflow-hidden">
+                  <BudgetTable
+                    items={items}
+                    onAmountChange={updateAmount}
+                    onTogglePaid={togglePaid}
+                    onNotesChange={updateNotes}
+                    onRenameItem={renameItem}
+                    onCostSplitChange={updateCostSplit}
+                    onAddCustomItem={addCustomItem}
+                    onDeleteItem={deleteItem}
+                  />
+                </div>
 
-            {/* Total summary card */}
-            <div className="mt-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">현재 예산 총액</p>
-                  <p className="text-3xl font-bold text-primary">
-                    {formatKoreanWon(getTotal())}
-                  </p>
+                {/* Total summary card - Desktop Only */}
+                <div className="mt-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-6 border border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">현재 예산 총액</p>
+                      <p className="text-3xl font-bold text-primary">
+                        {formatKoreanWon(getTotal())}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">원화</p>
+                      <p className="text-xl font-semibold text-foreground">
+                        ₩{getTotal().toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground mb-1">원화</p>
-                  <p className="text-xl font-semibold text-foreground">
-                    ₩{getTotal().toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </>
         ) : (
           <BudgetComparisonDashboard budgets={getBudgetsForComparison()} />

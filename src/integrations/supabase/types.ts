@@ -247,10 +247,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_shared_budget_by_token: {
+      get_shared_budget_items_by_token: {
         Args: { p_share_token: string }
         Returns: {
+          amount: number
           budget_id: string
+          category: string
+          cost_split: string
+          custom_name: string
+          is_custom: boolean
+          is_paid: boolean
+          notes: string
+          quantity: number
+          sub_category: string
+          unit_price: number
         }[]
       }
       has_role: {

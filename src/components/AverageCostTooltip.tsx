@@ -57,19 +57,22 @@ export function AverageCostTooltip({
         <PopoverTrigger asChild>
           <button 
             className={cn(
-              "inline-flex items-center justify-center p-0.5 rounded-full",
-              "text-muted-foreground/60 hover:text-primary/80",
+              "inline-flex items-center justify-center",
+              "w-6 h-6 rounded-full",
+              "bg-primary/10 hover:bg-primary/20",
+              "text-primary hover:text-primary",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
-              "transition-colors touch-manipulation",
+              "transition-all duration-150 touch-manipulation",
+              "ml-1",
               className
             )}
             aria-label={`평균 비용 정보: ${averageCost.amount === 0 ? '무료' : formatKoreanWon(averageCost.amount)}${averageCost.note ? `, ${averageCost.note}` : ''}`}
           >
-            <Info className="h-3 w-3" aria-hidden="true" />
+            <Info className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </PopoverTrigger>
         <PopoverContent 
-          className="w-auto max-w-[200px] p-3 z-50" 
+          className="w-auto max-w-[220px] p-3 z-50" 
           align="start"
           side="top"
           sideOffset={8}
@@ -88,10 +91,13 @@ export function AverageCostTooltip({
         <TooltipTrigger asChild>
           <button 
             className={cn(
-              "inline-flex items-center justify-center p-0.5 rounded-full",
-              "text-muted-foreground/60 hover:text-primary/80",
+              "inline-flex items-center justify-center",
+              "w-5 h-5 rounded-full",
+              "bg-primary/10 hover:bg-primary/20",
+              "text-primary hover:text-primary",
               "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
-              "transition-colors",
+              "transition-all duration-150",
+              "ml-1",
               className
             )}
             aria-label={`평균 비용 정보: ${averageCost.amount === 0 ? '무료' : formatKoreanWon(averageCost.amount)}${averageCost.note ? `, ${averageCost.note}` : ''}`}

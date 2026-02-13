@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
@@ -89,6 +90,7 @@ export default function BudgetFlow() {
   const [viewMode, setViewMode] = useState<'table' | 'comparison'>('table');
   const [isResetting, setIsResetting] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [showDonation, setShowDonation] = useState(false);
 
   const handleCreateBudget = async () => {
     const newName = `옵션 ${budgets.length + 1}`;
@@ -449,6 +451,10 @@ export default function BudgetFlow() {
           <BudgetComparisonDashboard budgets={getBudgetsForComparison()} />
         )}
       </main>
+
+      {/* Coffee Donation */}
+      <CoffeeDonationFab onClick={() => setShowDonation(true)} />
+      <CoffeeDonationModal open={showDonation} onOpenChange={setShowDonation} />
     </div>
   );
 }

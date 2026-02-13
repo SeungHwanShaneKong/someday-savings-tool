@@ -4,6 +4,12 @@
  * Google OAuth는 "disallowed_useragent" 정책에 따라 인앱 웹뷰에서의
  * 로그인을 차단합니다. 이 유틸리티는 주요 인앱 브라우저를 감지하고
  * 사용자를 시스템 기본 브라우저로 유도합니다.
+ * 
+ * iOS 탈출 전략 우선순위:
+ *   1. 카카오톡 전용 스킴: kakaotalk://web/openExternal
+ *   2. x-safari-https:// 스킴: Safari를 직접 호출
+ *   3. shortcuts:// 폴백: 구형 iOS(17 이하)에서 작동
+ *   4. 브릿지 UI: 수동 안내 (최종 폴백)
  */
 
 export interface BrowserInfo {
@@ -29,7 +35,7 @@ const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
   { pattern: /Threads/i, name: 'Threads' },
   { pattern: /musical_ly|TikTok|BytedanceWebview/i, name: 'TikTok' },
   { pattern: /Line\//i, name: 'LINE' },
-  // 네이버 계열 앱 (네이버, 밴드, 카페, 블로그, 웨일 인앱 등)
+  // 네이버 계열 앱
   { pattern: /NAVER\(inapp|NAVERSEARCH|NaverBand|NaverCafe|NaverBlog|whale/i, name: '네이버' },
   // 한국 인기 앱
   { pattern: /DaumApps|Daum/i, name: '다음/카카오' },
@@ -42,7 +48,7 @@ const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
   { pattern: /SamsungBrowser\/.*CrossApp/i, name: 'Samsung Internet (앱 내)' },
   { pattern: /Twitter|X-Twitter/i, name: 'X (Twitter)' },
   { pattern: /Snapchat/i, name: 'Snapchat' },
-  // 일반적인 웹뷰 감지 (마지막 폴백 — 다른 패턴에 매치되지 않을 때만 작동)
+  // 일반적인 웹뷰 감지 (마지막 폴백)
   { pattern: /wv\)|WebView/i, name: '인앱 브라우저' },
 ];
 
@@ -85,19 +91,10 @@ export function isKakaoTalkInAppBrowser(): boolean {
 }
 
 /**
- * 외부 브라우저로 현재 페이지 열기
- * 
- * iOS 전략 (우선순위 순):
- *   1. 카카오톡 전용 스킴: kakaotalk://web/openExternal
- *   2. Shortcuts 폴백 전략: 존재하지 않는 Shortcut 실행 시도 →
- *      실패 시 x-error 콜백으로 Safari에서 URL이 열림
- *      (iOS/iPadOS/macOS 전체에서 작동하는 가장 신뢰성 높은 방법)
- * 
- * Android 전략:
- *   intent:// 스킴으로 Chrome 강제 호출
+ * 외부 브라우저로 현재 페이지 열기 (동기 - 즉시 1회 시도)
  * 
  * @param url 열려는 URL (기본값: 현재 페이지)
- * @returns 리다이렉트 시도 성공 여부
+ * @returns 리다이렉트 시도 여부 (실제 성공은 비동기로만 확인 가능)
  */
 export function openInExternalBrowser(url?: string): boolean {
   const targetUrl = url || window.location.href;
@@ -109,33 +106,25 @@ export function openInExternalBrowser(url?: string): boolean {
 
   try {
     if (isAndroid) {
-      // Android: intent 스킴을 사용하여 Chrome 등 외부 브라우저로 열기
-      // package=com.android.chrome이 없으면 기본 브라우저가 열림
+      // Android: intent 스킴으로 Chrome 강제 호출
       const intentUrl = `intent://${targetUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end`;
       window.location.href = intentUrl;
       return true;
     }
     
     if (isIOS) {
-      // iOS 전략 1: 카카오톡 전용 스킴 (카카오톡에서만 작동)
+      // iOS 전략 1: 카카오톡 전용 스킴
       if (/KAKAOTALK/i.test(navigator.userAgent)) {
         const encodedUrl = encodeURIComponent(targetUrl);
         window.location.href = `kakaotalk://web/openExternal?url=${encodedUrl}`;
         return true;
       }
       
-      // iOS 전략 2: Apple Shortcuts 폴백 전략 (가장 신뢰성 높음)
-      // 존재하지 않는 Shortcut을 실행 시도 → 실패 시 x-error 콜백으로
-      // 시스템 기본 브라우저(Safari)에서 URL이 열림
-      // 참고: https://paul.af/escape-in-app-browsers
-      const fakeShortcutName = typeof crypto !== 'undefined' && crypto.randomUUID 
-        ? crypto.randomUUID() 
-        : `escape-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const shortcutsUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(fakeShortcutName)}&x-error=${encodeURIComponent(targetUrl)}`;
-      
-      // window.location.href 사용 (replace보다 더 많은 IAB에서 작동)
-      window.location.href = shortcutsUrl;
-      
+      // iOS 전략 2: x-safari-https:// 스킴
+      // Safari를 직접 호출하는 URL 스킴. 많은 iOS 인앱 브라우저에서 작동.
+      // targetUrl이 https://example.com/path 이면 x-safari-https://example.com/path 로 변환
+      const safariUrl = targetUrl.replace(/^https:\/\//, 'x-safari-https://').replace(/^http:\/\//, 'x-safari-http://');
+      window.location.href = safariUrl;
       return true;
     }
     
@@ -144,6 +133,129 @@ export function openInExternalBrowser(url?: string): boolean {
     console.error('외부 브라우저 열기 실패:', error);
     return false;
   }
+}
+
+/**
+ * iOS 다중 탈출 전략을 순차적으로 시도하는 비동기 함수
+ * 
+ * 시도 순서:
+ *   1. 카카오톡 전용 스킴 (카카오톡인 경우)
+ *   2. x-safari-https:// 스킴 (Safari 직접 호출)
+ *   3. shortcuts:// x-callback-url (구형 iOS 폴백)
+ *   4. 모두 실패 → onFallback 콜백 호출
+ * 
+ * 각 단계에서 visibilitychange 또는 타이머로 성공 여부를 감지합니다.
+ * 
+ * @param url 열려는 URL
+ * @param onFallback 모든 방법 실패 시 호출되는 콜백 (브릿지 UI 표시용)
+ */
+export function openInExternalBrowserWithFallback(
+  url: string,
+  onFallback: () => void
+): void {
+  const info = getBrowserInfo();
+  
+  if (!info.isInAppBrowser) {
+    return;
+  }
+
+  // Android는 intent 스킴 한 번으로 충분
+  if (info.isAndroid) {
+    const intentUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end`;
+    window.location.href = intentUrl;
+    // Android intent가 실패하면 800ms 후 폴백
+    setTimeout(onFallback, 800);
+    return;
+  }
+
+  if (!info.isIOS) {
+    onFallback();
+    return;
+  }
+
+  // === iOS 다중 탈출 전략 ===
+
+  // 1단계: 카카오톡 전용 스킴
+  if (/KAKAOTALK/i.test(navigator.userAgent)) {
+    window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`;
+    // 카카오톡 스킴이 실패하면 800ms 후 2단계로
+    setTimeout(() => attemptSafariScheme(url, onFallback), 800);
+    return;
+  }
+
+  // 2단계부터 시작 (카카오톡이 아닌 경우)
+  attemptSafariScheme(url, onFallback);
+}
+
+/**
+ * x-safari-https:// 스킴 시도
+ * 실패 시 shortcuts:// 폴백으로 이동
+ */
+function attemptSafariScheme(url: string, onFallback: () => void): void {
+  // 페이지 이탈 감지: 스킴이 성공하면 document가 hidden 상태가 됨
+  let escaped = false;
+  
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      escaped = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  // x-safari-https:// 스킴 시도
+  const safariUrl = url
+    .replace(/^https:\/\//, 'x-safari-https://')
+    .replace(/^http:\/\//, 'x-safari-http://');
+  
+  window.location.href = safariUrl;
+
+  // 800ms 후 성공 여부 확인
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    
+    if (escaped) {
+      return; // Safari로 이동 성공
+    }
+
+    // 3단계: shortcuts:// 폴백 (구형 iOS 17 이하)
+    attemptShortcutsScheme(url, onFallback);
+  }, 800);
+}
+
+/**
+ * shortcuts:// x-callback-url 폴백 시도
+ * iOS 17 이하에서 작동 가능. iOS 18.1+에서는 대부분 실패.
+ */
+function attemptShortcutsScheme(url: string, onFallback: () => void): void {
+  let escaped = false;
+  
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      escaped = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  const fakeShortcutName = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `escape-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  
+  const shortcutsUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(fakeShortcutName)}&x-error=${encodeURIComponent(url)}`;
+  window.location.href = shortcutsUrl;
+
+  // 800ms 후 성공 여부 확인
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    
+    if (escaped) {
+      return; // Shortcuts로 이동 성공
+    }
+
+    // 4단계: 모든 방법 실패 → 브릿지 UI
+    onFallback();
+  }, 800);
 }
 
 /**
@@ -171,5 +283,78 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   } catch (error) {
     console.error('클립보드 복사 실패:', error);
     return false;
+  }
+}
+
+/**
+ * 앱별 Safari 전환 안내 메시지를 반환
+ */
+export function getAppSpecificGuide(detectedApp: string | null, isIOS: boolean, isAndroid: boolean): {
+  steps: string[];
+} {
+  if (isAndroid) {
+    return {
+      steps: [
+        '1. 우측 상단 ⋮ 메뉴를 탭하세요',
+        '2. "다른 브라우저로 열기"를 선택하세요',
+      ],
+    };
+  }
+
+  if (!isIOS) {
+    return {
+      steps: [
+        '1. 우측 상단 메뉴(⋮ 또는 ⋯)를 탭하세요',
+        '2. "외부 브라우저로 열기"를 선택하세요',
+      ],
+    };
+  }
+
+  // iOS 앱별 구체적 안내
+  switch (detectedApp) {
+    case 'Instagram':
+    case 'Threads':
+      return {
+        steps: [
+          '1. 우측 하단 ⋯ 아이콘을 탭하세요',
+          '2. "브라우저에서 열기" 또는 "Safari로 열기"를 선택하세요',
+        ],
+      };
+    case '카카오톡':
+      return {
+        steps: [
+          '1. 우측 하단 ⋯ 아이콘을 탭하세요',
+          '2. "다른 브라우저로 열기"를 선택하세요',
+        ],
+      };
+    case 'Facebook':
+      return {
+        steps: [
+          '1. 우측 하단 ⋯ 아이콘을 탭하세요',
+          '2. "Safari로 열기"를 선택하세요',
+        ],
+      };
+    case '네이버':
+      return {
+        steps: [
+          '1. 우측 하단 ⋯ 아이콘을 탭하세요',
+          '2. "Safari로 열기" 또는 "외부 브라우저"를 선택하세요',
+        ],
+      };
+    case 'LINE':
+      return {
+        steps: [
+          '1. 우측 하단 공유 아이콘을 탭하세요',
+          '2. "Safari로 열기"를 선택하세요',
+        ],
+      };
+    default:
+      return {
+        steps: [
+          '1. 화면 하단 또는 상단의 ⋯ / 공유 아이콘을 탭하세요',
+          '2. "Safari로 열기" 또는 "브라우저에서 열기"를 선택하세요',
+          '3. 위 방법이 없으면 URL을 복사하여 Safari에 붙여넣기',
+        ],
+      };
   }
 }

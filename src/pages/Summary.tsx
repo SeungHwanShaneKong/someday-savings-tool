@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LogoutButton } from '@/components/LogoutButton';
 import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
+import { downloadImage } from '@/lib/download-image';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
 
@@ -153,15 +154,25 @@ export default function Summary() {
       // Clean up cloned element
       document.body.removeChild(clonedElement);
       
-      const link = document.createElement('a');
-      link.download = '웨딩셈_예산요약.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      // Use multi-device download utility
+      const result = await downloadImage(canvas, '웨딩셈_예산요약.png');
       
-      toast({
-        title: '이미지가 저장되었어요! 📸',
-        description: '갤러리에서 확인해보세요',
-      });
+      const messages: Record<string, { title: string; description: string }> = {
+        downloaded: {
+          title: '이미지가 저장되었어요! 📸',
+          description: '다운로드 폴더에서 확인해보세요',
+        },
+        shared: {
+          title: '이미지가 공유되었어요! 📸',
+          description: '갤러리에서 확인해보세요',
+        },
+        opened: {
+          title: '이미지가 열렸어요! 📸',
+          description: '이미지를 길게 눌러 저장해주세요',
+        },
+      };
+      
+      toast(messages[result]);
     } catch (error) {
       toast({
         title: '이미지 저장 중 오류가 발생했어요',

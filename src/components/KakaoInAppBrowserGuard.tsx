@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { 
-  isKakaoTalkInAppBrowser, 
+  isInAppBrowser, 
   openInExternalBrowser, 
   getBrowserInfo,
   copyToClipboard 
@@ -15,14 +15,16 @@ interface KakaoInAppBrowserGuardProps {
 }
 
 /**
- * 카카오톡 인앱 브라우저에서 접근 시 외부 브라우저로 유도하는 가드 컴포넌트
- * 구글 OAuth 로그인이 인앱 브라우저에서 차단되는 문제를 해결합니다.
+ * 인앱 브라우저(카카오톡, Threads, Instagram, Facebook 등)에서 접근 시
+ * 외부 브라우저로 유도하는 가드 컴포넌트.
+ * Google OAuth의 "disallowed_useragent" 정책을 준수합니다.
  */
 export function KakaoInAppBrowserGuard({ 
   children, 
   enabled = true 
 }: KakaoInAppBrowserGuardProps) {
-  const [isKakao, setIsKakao] = useState(false);
+  const [isIAB, setIsIAB] = useState(false);
+  const [detectedApp, setDetectedApp] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showManualGuide, setShowManualGuide] = useState(false);
@@ -30,10 +32,11 @@ export function KakaoInAppBrowserGuard({
   useEffect(() => {
     if (!enabled) return;
     
-    const kakaoDetected = isKakaoTalkInAppBrowser();
-    setIsKakao(kakaoDetected);
+    const info = getBrowserInfo();
+    setIsIAB(info.isInAppBrowser);
+    setDetectedApp(info.detectedApp);
     
-    if (kakaoDetected) {
+    if (info.isInAppBrowser) {
       // 자동으로 외부 브라우저로 전환 시도
       setIsRedirecting(true);
       
@@ -50,7 +53,6 @@ export function KakaoInAppBrowserGuard({
       return () => clearTimeout(timer);
     }
   }, [enabled]);
-
   const handleCopyUrl = async () => {
     const success = await copyToClipboard(window.location.href);
     if (success) {
@@ -71,8 +73,8 @@ export function KakaoInAppBrowserGuard({
 
   const { isAndroid, isIOS } = getBrowserInfo();
 
-  // 카카오톡이 아니거나 비활성화된 경우 자식 컴포넌트 렌더링
-  if (!enabled || !isKakao) {
+  // 인앱 브라우저가 아니거나 비활성화된 경우 자식 컴포넌트 렌더링
+  if (!enabled || !isIAB) {
     return <>{children}</>;
   }
 
@@ -109,13 +111,13 @@ export function KakaoInAppBrowserGuard({
         </div>
         
         {/* 제목 */}
-        <h1 className="text-xl font-semibold text-foreground mb-2">
-          외부 브라우저에서 열어주세요
-        </h1>
-        <p className="text-muted-foreground mb-6 text-sm">
-          카카오톡 내 브라우저에서는 구글 로그인이 제한됩니다.
-          <br />
-          아래 방법으로 외부 브라우저에서 접속해주세요.
+         <h1 className="text-xl font-semibold text-foreground mb-2">
+           외부 브라우저에서 열어주세요
+         </h1>
+         <p className="text-muted-foreground mb-6 text-sm">
+           {detectedApp ? `${detectedApp} 내` : '현재'} 브라우저에서는 구글 로그인이 제한됩니다.
+           <br />
+           아래 방법으로 외부 브라우저에서 접속해주세요.
         </p>
         
         {/* 버튼들 */}

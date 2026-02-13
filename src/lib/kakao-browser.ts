@@ -1,13 +1,39 @@
 /**
- * 카카오톡 인앱 브라우저 감지 및 외부 브라우저 전환 유틸리티
+ * 인앱 브라우저 감지 및 외부 브라우저 전환 유틸리티
+ * 
+ * Google OAuth는 "disallowed_useragent" 정책에 따라 인앱 웹뷰에서의
+ * 로그인을 차단합니다. 이 유틸리티는 주요 인앱 브라우저를 감지하고
+ * 사용자를 시스템 기본 브라우저로 유도합니다.
  */
 
 export interface BrowserInfo {
+  isInAppBrowser: boolean;
+  /** @deprecated Use isInAppBrowser instead */
   isKakaoTalk: boolean;
   isAndroid: boolean;
   isIOS: boolean;
   userAgent: string;
+  /** 감지된 인앱 브라우저 이름 */
+  detectedApp: string | null;
 }
+
+/**
+ * 인앱 브라우저 감지 패턴
+ * 각 앱의 User-Agent에 포함되는 고유 문자열
+ */
+const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
+  { pattern: /KAKAOTALK/i, name: '카카오톡' },
+  { pattern: /FB_IAB|FBAV|FBAN/i, name: 'Facebook' },
+  { pattern: /Instagram/i, name: 'Instagram' },
+  { pattern: /Threads/i, name: 'Threads' },
+  { pattern: /NAVER\(inapp/i, name: '네이버' },
+  { pattern: /DaumApps/i, name: '다음' },
+  { pattern: /everytimeApp/i, name: '에브리타임' },
+  { pattern: /Line\//i, name: 'LINE' },
+  { pattern: /SamsungBrowser\/.*CrossApp/i, name: 'Samsung Internet (앱 내)' },
+  // 일반적인 웹뷰 감지 (마지막 폴백)
+  { pattern: /wv\)|WebView/i, name: '인앱 브라우저' },
+];
 
 /**
  * 현재 브라우저 환경 정보를 반환
@@ -15,19 +41,36 @@ export interface BrowserInfo {
 export function getBrowserInfo(): BrowserInfo {
   const userAgent = navigator.userAgent || '';
   
+  let detectedApp: string | null = null;
+  for (const { pattern, name } of IN_APP_BROWSER_PATTERNS) {
+    if (pattern.test(userAgent)) {
+      detectedApp = name;
+      break;
+    }
+  }
+
   return {
+    isInAppBrowser: detectedApp !== null,
     isKakaoTalk: /KAKAOTALK/i.test(userAgent),
     isAndroid: /Android/i.test(userAgent),
     isIOS: /iPhone|iPad|iPod/i.test(userAgent),
     userAgent,
+    detectedApp,
   };
 }
 
 /**
- * 카카오톡 인앱 브라우저인지 확인
+ * 인앱 브라우저인지 확인 (모든 종류)
+ */
+export function isInAppBrowser(): boolean {
+  return getBrowserInfo().isInAppBrowser;
+}
+
+/**
+ * @deprecated Use isInAppBrowser() instead
  */
 export function isKakaoTalkInAppBrowser(): boolean {
-  return getBrowserInfo().isKakaoTalk;
+  return isInAppBrowser();
 }
 
 /**
@@ -37,31 +80,31 @@ export function isKakaoTalkInAppBrowser(): boolean {
  */
 export function openInExternalBrowser(url?: string): boolean {
   const targetUrl = url || window.location.href;
-  const { isAndroid, isIOS, isKakaoTalk } = getBrowserInfo();
+  const { isAndroid, isIOS, isInAppBrowser: isIAB } = getBrowserInfo();
   
-  if (!isKakaoTalk) {
+  if (!isIAB) {
     return false;
   }
 
   try {
     if (isAndroid) {
-      // Android: intent 스킴을 사용하여 외부 브라우저로 열기
+      // Android: intent 스킴을 사용하여 Chrome 등 외부 브라우저로 열기
       const intentUrl = `intent://${targetUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end`;
       window.location.href = intentUrl;
       return true;
     }
     
     if (isIOS) {
-      // iOS: 카카오톡 외부 브라우저 스킴 사용
-      // 카카오톡에서 Safari로 열도록 유도
+      // iOS: 각 앱별 외부 브라우저 스킴 시도
       const encodedUrl = encodeURIComponent(targetUrl);
       
-      // 방법 1: 카카오톡 외부 브라우저 스킴 (일부 버전에서 작동)
-      window.location.href = `kakaotalk://web/openExternal?url=${encodedUrl}`;
+      // 카카오톡 전용 스킴
+      if (/KAKAOTALK/i.test(navigator.userAgent)) {
+        window.location.href = `kakaotalk://web/openExternal?url=${encodedUrl}`;
+      }
       
-      // 방법 2: 0.5초 후에도 페이지가 남아있으면 다른 방법 시도
+      // 폴백: 0.5초 후 직접 이동 시도
       setTimeout(() => {
-        // Safari로 직접 열기 시도
         window.location.href = targetUrl;
       }, 500);
       

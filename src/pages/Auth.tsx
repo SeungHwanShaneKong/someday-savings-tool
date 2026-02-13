@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,25 +15,29 @@ export default function Auth() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showIABGuard, setShowIABGuard] = useState(false);
 
+  // 페이지 진입 시 즉시 인앱 브라우저 감지 → Safari/Chrome으로 자동 전환 시도
+  useEffect(() => {
+    const info = getBrowserInfo();
+    if (info.isInAppBrowser) {
+      // 즉시 시스템 브라우저로 전환 시도
+      openInExternalBrowser(window.location.href);
+      // 전환 실패 시(페이지가 아직 살아있으면) 브릿지 UI 표시
+      const timer = setTimeout(() => setShowIABGuard(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Redirect if already logged in
   if (!loading && user) {
     return <Navigate to="/budget" replace />;
   }
 
   const handleGoogleSignIn = async () => {
-    // 인앱 브라우저 감지: 로그인 버튼 클릭 시점에 체크
+    // 로그인 버튼 클릭 시에도 한번 더 인앱 브라우저 체크
     const info = getBrowserInfo();
     if (info.isInAppBrowser) {
-      // Android: intent:// 스킴으로 즉시 시스템 브라우저 호출
-      if (info.isAndroid) {
-        openInExternalBrowser(window.location.href);
-        // 전환 실패 시 2초 후 브릿지 UI 노출
-        setTimeout(() => setShowIABGuard(true), 1500);
-        return;
-      }
-      // iOS: 강제 전환 제한적이므로 즉시 브릿지 UI 노출
       openInExternalBrowser(window.location.href);
-      setTimeout(() => setShowIABGuard(true), 500);
+      setTimeout(() => setShowIABGuard(true), 1500);
       return;
     }
 

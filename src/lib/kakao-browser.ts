@@ -106,18 +106,20 @@ export function openInExternalBrowser(url?: string): boolean {
     }
     
     if (isIOS) {
-      // iOS: 각 앱별 외부 브라우저 스킴 시도
-      const encodedUrl = encodeURIComponent(targetUrl);
-      
-      // 카카오톡 전용 스킴
+      // iOS 전략 1: 카카오톡 전용 스킴 (카카오톡에서만 작동)
       if (/KAKAOTALK/i.test(navigator.userAgent)) {
+        const encodedUrl = encodeURIComponent(targetUrl);
         window.location.href = `kakaotalk://web/openExternal?url=${encodedUrl}`;
+        return true;
       }
       
-      // 폴백: 0.5초 후 직접 이동 시도
-      setTimeout(() => {
-        window.location.href = targetUrl;
-      }, 500);
+      // iOS 전략 2: Shortcuts 폴백 전략
+      // 존재하지 않는 Shortcut을 실행 시도 → 실패 시 x-error 콜백으로
+      // 시스템 기본 브라우저(Safari)에서 URL이 열림
+      // iOS, iPadOS, macOS 모두에서 작동하는 가장 신뢰할 수 있는 방법
+      const fakeShortcutName = crypto.randomUUID ? crypto.randomUUID() : `escape-${Date.now()}`;
+      const shortcutsUrl = `shortcuts://x-callback-url/run-shortcut?name=${fakeShortcutName}&x-error=${encodeURIComponent(targetUrl)}`;
+      window.location.replace(shortcutsUrl);
       
       return true;
     }

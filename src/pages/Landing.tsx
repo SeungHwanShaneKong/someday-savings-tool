@@ -1,7 +1,17 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { getBrowserInfo, openInExternalBrowser } from '@/lib/kakao-browser';
+
 export default function Landing() {
+  // 랜딩 페이지 진입 시 인앱 브라우저 감지 → 즉시 시스템 브라우저로 전환
+  useEffect(() => {
+    const info = getBrowserInfo();
+    if (info.isInAppBrowser) {
+      openInExternalBrowser(window.location.href);
+    }
+  }, []);
   const navigate = useNavigate();
   const {
     user,

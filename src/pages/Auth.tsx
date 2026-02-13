@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
-import { KakaoInAppBrowserGuard } from '@/components/KakaoInAppBrowserGuard';
-import { getBrowserInfo, openInExternalBrowser } from '@/lib/kakao-browser';
+import { ArrowLeft, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { getBrowserInfo, openInExternalBrowser, copyToClipboard } from '@/lib/kakao-browser';
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -13,18 +12,31 @@ export default function Auth() {
   const { toast } = useToast();
   
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [showIABGuard, setShowIABGuard] = useState(false);
+  const [showBridgeUI, setShowBridgeUI] = useState(false);
+  const [browserInfo] = useState(() => getBrowserInfo());
+  const [copied, setCopied] = useState(false);
 
   // 페이지 진입 시 즉시 인앱 브라우저 감지 → Safari/Chrome으로 자동 전환 시도
   useEffect(() => {
-    const info = getBrowserInfo();
-    if (info.isInAppBrowser) {
-      // 즉시 시스템 브라우저로 전환 시도
+    if (browserInfo.isInAppBrowser) {
+      // 즉시 시스템 브라우저로 전환 시도 (iOS: Shortcuts, Android: intent)
       openInExternalBrowser(window.location.href);
-      // 전환 실패 시(페이지가 아직 살아있으면) 브릿지 UI 표시
-      const timer = setTimeout(() => setShowIABGuard(true), 1500);
+      // 전환이 성공하면 이 페이지는 사라짐. 실패하면 브릿지 UI 표시
+      const timer = setTimeout(() => setShowBridgeUI(true), 1500);
       return () => clearTimeout(timer);
     }
+  }, [browserInfo.isInAppBrowser]);
+
+  const handleCopyUrl = useCallback(async () => {
+    const success = await copyToClipboard(window.location.href);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, []);
+
+  const handleRetryBreakout = useCallback(() => {
+    openInExternalBrowser(window.location.href);
   }, []);
 
   // Redirect if already logged in
@@ -33,11 +45,10 @@ export default function Auth() {
   }
 
   const handleGoogleSignIn = async () => {
-    // 로그인 버튼 클릭 시에도 한번 더 인앱 브라우저 체크
-    const info = getBrowserInfo();
-    if (info.isInAppBrowser) {
+    // 로그인 버튼 클릭 시에도 인앱 브라우저 재확인
+    if (browserInfo.isInAppBrowser) {
       openInExternalBrowser(window.location.href);
-      setTimeout(() => setShowIABGuard(true), 1500);
+      setShowBridgeUI(true);
       return;
     }
 
@@ -57,12 +68,85 @@ export default function Auth() {
     }
   };
 
-  // 인앱 브라우저 브릿지 UI 노출
-  if (showIABGuard) {
+  // 인앱 브라우저 감지됨 + 자동 전환 실패 → 브릿지 UI
+  if (showBridgeUI && browserInfo.isInAppBrowser) {
     return (
-      <KakaoInAppBrowserGuard enabled={true}>
-        <div />
-      </KakaoInAppBrowserGuard>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 py-8">
+        <div className="text-center max-w-sm w-full">
+          {/* 아이콘 */}
+          <div className="mb-6">
+            <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+              <ExternalLink className="w-10 h-10 text-primary" />
+            </div>
+          </div>
+          
+          {/* 제목 */}
+          <h1 className="text-xl font-semibold text-foreground mb-2">
+            외부 브라우저에서 열어주세요
+          </h1>
+          <p className="text-muted-foreground mb-6 text-sm">
+            {browserInfo.detectedApp ? `${browserInfo.detectedApp} 내` : '현재'} 브라우저에서는 
+            Google 로그인이 제한됩니다.
+            <br />
+            아래 방법으로 Safari/Chrome에서 접속해주세요.
+          </p>
+          
+          {/* 버튼들 */}
+          <div className="space-y-3 mb-8">
+            <Button 
+              onClick={handleRetryBreakout}
+              className="w-full h-12"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              외부 브라우저로 열기
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={handleCopyUrl}
+              className="w-full h-12"
+            >
+              {copied ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-primary" />
+                  복사완료! 브라우저에 붙여넣기
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 mr-2" />
+                  URL 복사하기
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {/* 수동 가이드 */}
+          <div className="bg-muted/50 rounded-xl p-4 text-left">
+            <p className="text-sm font-medium text-foreground mb-3">
+              📱 직접 여는 방법
+            </p>
+            <ol className="text-sm text-muted-foreground space-y-2">
+              {browserInfo.isIOS ? (
+                <>
+                  <li>1. 화면 하단의 <strong>Safari로 열기</strong> 아이콘을 탭하세요</li>
+                  <li>2. 또는 우측 상단 <strong>⋯</strong> → <strong>Safari로 열기</strong></li>
+                  <li>3. 위 방법이 없으면 URL을 복사하여 Safari에 붙여넣기</li>
+                </>
+              ) : browserInfo.isAndroid ? (
+                <>
+                  <li>1. 우측 상단 <strong>⋮</strong> 메뉴를 탭하세요</li>
+                  <li>2. <strong>다른 브라우저로 열기</strong>를 선택하세요</li>
+                </>
+              ) : (
+                <>
+                  <li>1. 우측 상단 메뉴(⋮ 또는 ⋯)를 탭하세요</li>
+                  <li>2. "외부 브라우저로 열기"를 선택하세요</li>
+                </>
+              )}
+            </ol>
+          </div>
+        </div>
+      </div>
     );
   }
 

@@ -1,22 +1,19 @@
 /**
- * CoffeeDonationModal - 최적화된 후원 흐름
+ * CoffeeDonationModal — CRO-optimized donation flow
  * 
- * 송금 최적화:
- * - 토스(Toss) 딥링크: 계좌/금액/메모 자동입력 → 1클릭 송금
- * - 카카오뱅크 딥링크: 앱 즉시 실행
- * - 계좌 복사 폴백: 딥링크 미지원 환경 대응
- * 
- * CRO 트리거:
- * - FAB에 gentle-bounce 애니메이션 (4초 간격, CPU 최적화)
- * - 호버 시 scale + glow 피드백
- * - 중복 클릭 방지 (debounce)
+ * Design Philosophy:
+ * - Sophisticated warm gradient palette (amber/rose tones)
+ * - Gentle pulse animation on FAB (4s interval, GPU-accelerated)
+ * - 1-click Toss deep link (mobile) / copy-to-clipboard (desktop)
+ * - Minimal friction: preset → CTA in 2 taps
+ * - Safe area aware positioning for notch devices
  */
 import { useState, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Coffee, Heart, Copy, Check, ExternalLink, Smartphone } from 'lucide-react';
+import { Coffee, Heart, Copy, Check, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -29,17 +26,10 @@ const PRESET_AMOUNTS = [
 const BANK_NAME = '카카오뱅크';
 const ACCOUNT_NUMBER = '3333206517167';
 
-/** Toss 딥링크 — 계좌·금액·메모 자동입력, 1클릭 송금 */
 function buildTossLink(amount: number) {
   return `supertoss://send?bank=${encodeURIComponent(BANK_NAME)}&accountNo=${ACCOUNT_NUMBER}&amount=${amount}&msg=${encodeURIComponent('웨딩셈 커피 후원')}`;
 }
 
-/** Toss 웹 폴백 (앱 미설치 시) */
-function buildTossWebLink() {
-  return `https://toss.me`;
-}
-
-/** 카카오뱅크 앱 실행 */
 function buildKakaoBankLink() {
   return 'kakaobank://';
 }
@@ -78,17 +68,12 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
     setTimeout(() => setCopied(false), 2500);
   }, []);
 
-  /** 토스 딥링크 실행 + 앱 미설치 폴백 */
   const handleTossTransfer = useCallback(() => {
     if (isTransferring || finalAmount <= 0) return;
     setIsTransferring(true);
-
-    // 딥링크 시도
     window.location.href = buildTossLink(finalAmount);
 
-    // 2초 후에도 페이지에 있으면 앱 미설치로 판단 → 웹 폴백
     transferTimeoutRef.current = setTimeout(() => {
-      // 계좌 자동 복사 후 안내
       handleCopyAccount();
       toast({
         title: '토스 앱이 없어요',
@@ -97,7 +82,6 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
       setIsTransferring(false);
     }, 2000);
 
-    // 페이지 포커스 복귀 시 타임아웃 해제 (앱이 열렸다는 신호)
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         clearTimeout(transferTimeoutRef.current);
@@ -138,40 +122,52 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md mx-auto">
-        <DialogHeader className="text-center">
-          <div className="text-5xl mb-2 mx-auto animate-bounce" style={{ animationDuration: '2s', animationIterationCount: '3' }}>☕</div>
-          <DialogTitle className="text-xl">배고픈 개발자에게 커피 쏘기</DialogTitle>
-          <DialogDescription className="text-sm">
-            웨딩셈이 도움이 되셨다면, 따뜻한 커피 한 잔을 선물해주세요 💙
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md mx-auto p-0 overflow-hidden border-none">
+        {/* Warm gradient header */}
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 px-6 pt-6 pb-4">
+          <DialogHeader className="text-center space-y-2">
+            <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Coffee className="h-8 w-8 text-white" />
+            </div>
+            <DialogTitle className="text-xl font-bold">
+              개발자에게 따뜻한 커피 한 잔 ☕
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              웨딩셈이 도움이 되셨다면, 작은 응원을 보내주세요
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
-        <div className="space-y-4 pt-2">
-          {/* Preset amounts */}
-          <div className="grid grid-cols-3 gap-2">
+        <div className="px-6 pb-6 space-y-5">
+          {/* Preset amounts — card-style selection */}
+          <div className="grid grid-cols-3 gap-2.5 pt-2">
             {PRESET_AMOUNTS.map((preset) => (
               <button
                 key={preset.value}
                 onClick={() => handlePresetClick(preset.value)}
                 className={cn(
-                  'flex flex-col items-center gap-1 p-3 rounded-xl border-2 transition-all duration-200',
-                  'hover:border-primary/50 hover:bg-primary/5 active:scale-95',
+                  'relative flex flex-col items-center gap-1.5 p-3.5 rounded-2xl border-2 transition-all duration-200',
+                  'hover:shadow-md active:scale-[0.97]',
                   !isCustom && selectedAmount === preset.value
-                    ? 'border-primary bg-primary/10 shadow-sm scale-[1.02]'
-                    : 'border-border bg-card'
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20 shadow-sm'
+                    : 'border-border hover:border-amber-300 dark:hover:border-amber-700'
                 )}
               >
-                <span className="text-2xl">{preset.emoji}</span>
-                <span className="text-xs font-bold text-foreground">
+                {!isCustom && selectedAmount === preset.value && (
+                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                    <Check className="h-3 w-3 text-white" />
+                  </div>
+                )}
+                <span className="text-2xl leading-none">{preset.emoji}</span>
+                <span className="text-sm font-bold text-foreground">
                   {preset.value.toLocaleString()}원
                 </span>
-                <span className="text-[10px] text-muted-foreground">{preset.label}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{preset.label}</span>
               </button>
             ))}
           </div>
 
-          {/* Custom amount */}
+          {/* Custom amount input */}
           <div className="relative">
             <Input
               type="text"
@@ -181,8 +177,8 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
               onChange={(e) => setCustomAmount(e.target.value.replace(/[^0-9]/g, ''))}
               onFocus={handleCustomFocus}
               className={cn(
-                'h-12 text-center text-lg font-medium',
-                isCustom && 'ring-2 ring-primary border-primary'
+                'h-12 text-center text-lg font-medium rounded-xl',
+                isCustom && 'ring-2 ring-amber-500 border-amber-500'
               )}
             />
             {isCustom && customAmount && (
@@ -190,12 +186,18 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
             )}
           </div>
 
-          {/* Primary CTA: Toss 즉시 송금 (모바일) / 계좌 복사 (데스크톱) */}
+          {/* Primary CTA */}
           {isMobile ? (
             <Button
               onClick={handleTossTransfer}
               disabled={finalAmount <= 0 || isTransferring}
-              className="w-full h-14 text-base font-bold gap-2 shadow-lg bg-[hsl(220,100%,50%)] hover:bg-[hsl(220,100%,45%)] text-white"
+              className={cn(
+                'w-full h-14 text-base font-bold gap-2 rounded-xl',
+                'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600',
+                'text-white shadow-lg shadow-amber-500/25',
+                'transition-all duration-200 active:scale-[0.98]',
+                'disabled:opacity-50 disabled:shadow-none'
+              )}
             >
               <ExternalLink className="h-5 w-5" />
               {isTransferring
@@ -206,13 +208,13 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
             </Button>
           ) : (
             <Button
-              onClick={() => { handleCopyAccount(); }}
+              onClick={handleCopyAccount}
               disabled={finalAmount <= 0}
               className={cn(
-                'w-full h-14 text-base font-bold gap-2 shadow-lg transition-all',
+                'w-full h-14 text-base font-bold gap-2 rounded-xl transition-all duration-200',
                 copied
-                  ? 'bg-success hover:bg-success/90 text-success-foreground'
-                  : 'bg-[hsl(48,100%,50%)] hover:bg-[hsl(48,100%,45%)] text-[hsl(20,40%,15%)]'
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/25'
+                  : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/25'
               )}
             >
               {copied ? (
@@ -227,37 +229,37 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
           <div className="grid grid-cols-2 gap-2">
             {isMobile ? (
               <>
-                <Button variant="outline" onClick={handleKakaoBank} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5">
+                <Button variant="outline" onClick={handleKakaoBank} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5 rounded-xl">
                   <span className="text-base">🏦</span> 카카오뱅크
                 </Button>
-                <Button variant="outline" onClick={handleCopyAccount} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5">
+                <Button variant="outline" onClick={handleCopyAccount} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5 rounded-xl">
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   {copied ? '복사됨' : '계좌 복사'}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={handleTossTransfer} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5">
+                <Button variant="outline" onClick={handleTossTransfer} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5 rounded-xl">
                   <span className="text-base">💙</span> 토스로 송금
                 </Button>
-                <Button variant="outline" onClick={handleKakaoBank} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5">
+                <Button variant="outline" onClick={handleKakaoBank} disabled={finalAmount <= 0} className="h-11 text-sm font-medium gap-1.5 rounded-xl">
                   <span className="text-base">🏦</span> 카카오뱅크
                 </Button>
               </>
             )}
           </div>
 
-          {/* Account info (always visible, compact) */}
-          <div className="bg-secondary/50 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{BANK_NAME} {ACCOUNT_NUMBER}</span>
-            <button onClick={handleCopyAccount} className="text-primary font-medium hover:underline flex items-center gap-1">
+          {/* Account info strip */}
+          <div className="bg-muted/50 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+            <span className="text-muted-foreground font-medium">{BANK_NAME} {ACCOUNT_NUMBER}</span>
+            <button onClick={handleCopyAccount} className="text-amber-600 dark:text-amber-400 font-semibold hover:underline flex items-center gap-1">
               {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
               {copied ? '복사됨' : '복사'}
             </button>
           </div>
 
           <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
-            여러분의 응원이 큰 힘이 됩니다 <Heart className="inline h-3 w-3 text-destructive" />
+            여러분의 응원이 큰 힘이 됩니다 <Heart className="inline h-3 w-3 text-rose-400" />
           </p>
         </div>
       </DialogContent>
@@ -265,27 +267,47 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
   );
 }
 
-/** FAB — gentle-wiggle 애니메이션으로 시선 유도, 호버 시 glow 피드백 */
+/**
+ * CoffeeDonationFab — Premium floating action button
+ * 
+ * CRO triggers:
+ * - Warm amber-to-orange gradient with soft glow
+ * - coffee-wiggle animation (defined in tailwind.config.ts, 4s cycle)
+ * - Hover: elevated shadow + subtle scale
+ * - Touch: instant feedback via active:scale
+ * - Safe area inset for notch devices
+ * - Full label on desktop, icon-only on mobile for space efficiency
+ */
 export function CoffeeDonationFab({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        'fixed z-50',
-        'bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4',
-        'sm:bottom-8 sm:right-8',
-        'flex items-center gap-2 px-4 py-3 rounded-full',
-        'bg-[hsl(48,100%,50%)] text-[hsl(20,40%,15%)] font-semibold text-sm',
-        'shadow-lg',
-        'hover:shadow-[0_0_20px_hsl(48,100%,50%/0.5)] hover:scale-110',
+        'fixed z-50 group',
+        // Safe area positioning
+        'bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-3',
+        'sm:bottom-8 sm:right-6',
+        // Layout
+        'flex items-center gap-2 pl-4 pr-5 py-3 sm:py-3.5 rounded-full',
+        // Warm gradient background
+        'bg-gradient-to-r from-amber-500 to-orange-500',
+        'text-white font-semibold text-sm',
+        // Elevated shadow with warm glow
+        'shadow-[0_4px_20px_-4px_rgba(245,158,11,0.5)]',
+        // Hover: intensify glow + lift
+        'hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.6)] hover:scale-105',
+        // Active: tactile press
         'active:scale-95',
-        'transition-all duration-200',
+        // Smooth transitions
+        'transition-all duration-200 ease-out',
+        // Gentle wiggle animation for attention
         'animate-coffee-wiggle'
       )}
-      aria-label="개발자에게 커피 쏘기"
+      aria-label="개발자에게 커피 후원하기"
     >
-      <Coffee className="h-5 w-5" />
-      <span className="hidden sm:inline">커피 한 잔 ☕</span>
+      <Coffee className="h-5 w-5 flex-shrink-0" />
+      <span className="hidden sm:inline whitespace-nowrap">커피 한 잔 선물하기</span>
+      <span className="sm:hidden whitespace-nowrap">커피 후원</span>
     </button>
   );
 }

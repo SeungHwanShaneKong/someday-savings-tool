@@ -88,7 +88,7 @@ export function BudgetTableMobile({
   const { orderedCategories, reorderCategories } = useCategoryOrder();
   
   // Expanded categories state
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(orderedCategories.map(c => c.id)));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Editing states
   const [editingCell, setEditingCell] = useState<string | null>(null);

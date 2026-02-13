@@ -22,17 +22,27 @@ export interface BrowserInfo {
  * 각 앱의 User-Agent에 포함되는 고유 문자열
  */
 const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
+  // 주요 메신저/SNS 인앱 브라우저
   { pattern: /KAKAOTALK/i, name: '카카오톡' },
   { pattern: /FB_IAB|FBAV|FBAN/i, name: 'Facebook' },
   { pattern: /Instagram/i, name: 'Instagram' },
   { pattern: /Threads/i, name: 'Threads' },
-  { pattern: /NAVER\(inapp/i, name: '네이버' },
-  { pattern: /DaumApps/i, name: '다음' },
-  { pattern: /everytimeApp/i, name: '에브리타임' },
-  { pattern: /Line\//i, name: 'LINE' },
-  { pattern: /SamsungBrowser\/.*CrossApp/i, name: 'Samsung Internet (앱 내)' },
   { pattern: /musical_ly|TikTok|BytedanceWebview/i, name: 'TikTok' },
-  // 일반적인 웹뷰 감지 (마지막 폴백)
+  { pattern: /Line\//i, name: 'LINE' },
+  // 네이버 계열 앱 (네이버, 밴드, 카페, 블로그, 웨일 인앱 등)
+  { pattern: /NAVER\(inapp|NAVERSEARCH|NaverBand|NaverCafe|NaverBlog|whale/i, name: '네이버' },
+  // 한국 인기 앱
+  { pattern: /DaumApps|Daum/i, name: '다음/카카오' },
+  { pattern: /everytimeApp/i, name: '에브리타임' },
+  { pattern: /CoupangApp/i, name: '쿠팡' },
+  { pattern: /TossApp|toss\//i, name: '토스' },
+  { pattern: /Baemin/i, name: '배달의민족' },
+  { pattern: /Carrot|DanggnApp/i, name: '당근마켓' },
+  // 기타
+  { pattern: /SamsungBrowser\/.*CrossApp/i, name: 'Samsung Internet (앱 내)' },
+  { pattern: /Twitter|X-Twitter/i, name: 'X (Twitter)' },
+  { pattern: /Snapchat/i, name: 'Snapchat' },
+  // 일반적인 웹뷰 감지 (마지막 폴백 — 다른 패턴에 매치되지 않을 때만 작동)
   { pattern: /wv\)|WebView/i, name: '인앱 브라우저' },
 ];
 

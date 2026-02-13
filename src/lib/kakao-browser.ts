@@ -31,6 +31,7 @@ const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
   { pattern: /everytimeApp/i, name: '에브리타임' },
   { pattern: /Line\//i, name: 'LINE' },
   { pattern: /SamsungBrowser\/.*CrossApp/i, name: 'Samsung Internet (앱 내)' },
+  { pattern: /musical_ly|TikTok|BytedanceWebview/i, name: 'TikTok' },
   // 일반적인 웹뷰 감지 (마지막 폴백)
   { pattern: /wv\)|WebView/i, name: '인앱 브라우저' },
 ];

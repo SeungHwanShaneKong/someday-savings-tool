@@ -86,6 +86,16 @@ export function isKakaoTalkInAppBrowser(): boolean {
 
 /**
  * 외부 브라우저로 현재 페이지 열기
+ * 
+ * iOS 전략 (우선순위 순):
+ *   1. 카카오톡 전용 스킴: kakaotalk://web/openExternal
+ *   2. Shortcuts 폴백 전략: 존재하지 않는 Shortcut 실행 시도 →
+ *      실패 시 x-error 콜백으로 Safari에서 URL이 열림
+ *      (iOS/iPadOS/macOS 전체에서 작동하는 가장 신뢰성 높은 방법)
+ * 
+ * Android 전략:
+ *   intent:// 스킴으로 Chrome 강제 호출
+ * 
  * @param url 열려는 URL (기본값: 현재 페이지)
  * @returns 리다이렉트 시도 성공 여부
  */
@@ -100,6 +110,7 @@ export function openInExternalBrowser(url?: string): boolean {
   try {
     if (isAndroid) {
       // Android: intent 스킴을 사용하여 Chrome 등 외부 브라우저로 열기
+      // package=com.android.chrome이 없으면 기본 브라우저가 열림
       const intentUrl = `intent://${targetUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end`;
       window.location.href = intentUrl;
       return true;
@@ -113,13 +124,17 @@ export function openInExternalBrowser(url?: string): boolean {
         return true;
       }
       
-      // iOS 전략 2: Shortcuts 폴백 전략
+      // iOS 전략 2: Apple Shortcuts 폴백 전략 (가장 신뢰성 높음)
       // 존재하지 않는 Shortcut을 실행 시도 → 실패 시 x-error 콜백으로
       // 시스템 기본 브라우저(Safari)에서 URL이 열림
-      // iOS, iPadOS, macOS 모두에서 작동하는 가장 신뢰할 수 있는 방법
-      const fakeShortcutName = crypto.randomUUID ? crypto.randomUUID() : `escape-${Date.now()}`;
-      const shortcutsUrl = `shortcuts://x-callback-url/run-shortcut?name=${fakeShortcutName}&x-error=${encodeURIComponent(targetUrl)}`;
-      window.location.replace(shortcutsUrl);
+      // 참고: https://paul.af/escape-in-app-browsers
+      const fakeShortcutName = typeof crypto !== 'undefined' && crypto.randomUUID 
+        ? crypto.randomUUID() 
+        : `escape-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const shortcutsUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(fakeShortcutName)}&x-error=${encodeURIComponent(targetUrl)}`;
+      
+      // window.location.href 사용 (replace보다 더 많은 IAB에서 작동)
+      window.location.href = shortcutsUrl;
       
       return true;
     }

@@ -7,20 +7,30 @@ interface AdSenseLayoutProps {
 
 export function AdSenseLayout({ children }: AdSenseLayoutProps) {
   return (
-    <div className="flex justify-center w-full min-h-screen">
-      {/* Left ad gutter - hidden below 1280px */}
-      <aside className="hidden xl:flex flex-col items-end w-[160px] flex-shrink-0 sticky top-0 h-screen pt-24 pr-6">
-        <AdSenseSidebar className="w-[130px]" />
+    <div className="flex justify-center w-full min-h-screen overflow-x-hidden">
+      {/* Left ad gutter - visible only on wide screens (≥1280px) */}
+      <aside
+        className="hidden xl:block w-[160px] flex-shrink-0"
+        aria-label="Advertisement left"
+      >
+        <div className="sticky top-24 pt-4 pr-6">
+          <AdSenseSidebar className="w-[130px]" />
+        </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 min-w-0 max-w-6xl">
+      {/* Main content - takes full available width, capped at max-w-6xl */}
+      <div className="flex-1 min-w-0 max-w-6xl w-full">
         {children}
       </div>
 
-      {/* Right ad gutter - hidden below 1280px */}
-      <aside className="hidden xl:flex flex-col items-start w-[160px] flex-shrink-0 sticky top-0 h-screen pt-24 pl-6">
-        <AdSenseSidebar className="w-[130px]" />
+      {/* Right ad gutter - visible only on wide screens (≥1280px) */}
+      <aside
+        className="hidden xl:block w-[160px] flex-shrink-0"
+        aria-label="Advertisement right"
+      >
+        <div className="sticky top-24 pt-4 pl-6">
+          <AdSenseSidebar className="w-[130px]" />
+        </div>
       </aside>
     </div>
   );

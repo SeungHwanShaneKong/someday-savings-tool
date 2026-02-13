@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { AdSenseLayout } from "@/components/AdSenseLayout";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import BudgetFlow from "./pages/BudgetFlow";
@@ -38,7 +39,9 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppRoutes />
+          <AdSenseLayout>
+            <AppRoutes />
+          </AdSenseLayout>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

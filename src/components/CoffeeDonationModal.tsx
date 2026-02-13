@@ -306,8 +306,7 @@ export function CoffeeDonationFab({ onClick }: { onClick: () => void }) {
       aria-label="개발자에게 커피 후원하기"
     >
       <Coffee className="h-5 w-5 flex-shrink-0" />
-      <span className="hidden sm:inline whitespace-nowrap">커피 한 잔 선물하기</span>
-      <span className="sm:hidden whitespace-nowrap">커피 후원</span>
+      <span className="whitespace-nowrap">커피 한잔</span>
     </button>
   );
 }

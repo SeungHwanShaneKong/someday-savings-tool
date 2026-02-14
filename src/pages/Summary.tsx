@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LogoutButton } from '@/components/LogoutButton';
 import { supabase } from '@/integrations/supabase/client';
 import html2canvas from 'html2canvas';
-import { downloadAndCopyImage } from '@/lib/download-image';
+import { downloadImage } from '@/lib/download-image';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
 
@@ -154,18 +154,17 @@ export default function Summary() {
       // Clean up cloned element
       document.body.removeChild(clonedElement);
       
-      // Use one-stop download + clipboard copy utility
-      const { downloadResult, clipboardCopied } = await downloadAndCopyImage(canvas, '웨딩셈_예산요약.png');
+      // Use multi-device download utility
+      const result = await downloadImage(canvas, '웨딩셈_예산요약.png');
       
-      // Granular toast based on results
-      const baseMessages: Record<string, { title: string; description: string }> = {
+      const messages: Record<string, { title: string; description: string }> = {
         downloaded: {
-          title: clipboardCopied ? '이미지가 저장 및 복사되었어요! 📸' : '이미지가 저장되었어요! 📸',
-          description: clipboardCopied ? '다운로드 폴더에서 확인하거나 바로 붙여넣기하세요' : '다운로드 폴더에서 확인해보세요',
+          title: '이미지가 저장되었어요! 📸',
+          description: '다운로드 폴더에서 확인해보세요',
         },
         shared: {
-          title: clipboardCopied ? '이미지가 공유 및 복사되었어요! 📸' : '이미지가 공유되었어요! 📸',
-          description: clipboardCopied ? '갤러리에서 확인하거나 바로 붙여넣기하세요' : '갤러리에서 확인해보세요',
+          title: '이미지가 공유되었어요! 📸',
+          description: '갤러리에서 확인해보세요',
         },
         opened: {
           title: '이미지가 열렸어요! 📸',
@@ -173,7 +172,7 @@ export default function Summary() {
         },
       };
       
-      toast(baseMessages[downloadResult]);
+      toast(messages[result]);
     } catch (error) {
       toast({
         title: '이미지 저장 중 오류가 발생했어요',

@@ -398,8 +398,8 @@ export default function BudgetFlow() {
       )}
 
       {/* Main content */}
-      {/* pb-24: 모바일에서 FAB 버튼과 총계 카드 중첩 방지를 위한 하단 여백 */}
-      <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 pb-24 sm:pb-6 overflow-x-hidden">
+      {/* pb-32: 모바일/태블릿에서 FAB 버튼과 총계 카드 중첩 방지를 위한 하단 여백, lg(1024px+)부터 축소 */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 pt-4 sm:pt-6 pb-32 lg:pb-6 overflow-x-hidden">
         {viewMode === 'table' ? (
           <>
             {isMobile ? (

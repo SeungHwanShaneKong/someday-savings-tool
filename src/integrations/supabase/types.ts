@@ -394,6 +394,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_budget_collaborator: {
+        Args: { p_budget_id: string; p_user_id?: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"

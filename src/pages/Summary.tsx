@@ -66,6 +66,7 @@ export default function Summary() {
   const [shareUrl, setShareUrl] = useState('');
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [viewMode, setViewMode] = useState<'individual' | 'comparison'>('comparison');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const total = getTotal();
   const budgetsForComparison = getBudgetsForComparison();
@@ -110,7 +111,9 @@ export default function Summary() {
   }
 
   const handleDownloadImage = async () => {
-    if (!summaryRef.current) return;
+    if (!summaryRef.current || isDownloading) return;
+    
+    setIsDownloading(true);
     
     try {
       // Clone the element and add CTA footer for image export
@@ -174,10 +177,15 @@ export default function Summary() {
       
       toast(messages[result]);
     } catch (error) {
+      const message = error instanceof Error && error.message === '이미지 저장이 진행 중입니다'
+        ? '이미지 저장이 진행 중이에요. 잠시만 기다려주세요.'
+        : '이미지 저장 중 오류가 발생했어요. 다시 시도해주세요.';
       toast({
-        title: '이미지 저장 중 오류가 발생했어요',
+        title: message,
         variant: 'destructive',
       });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -569,9 +577,19 @@ export default function Summary() {
             onClick={handleDownloadImage}
             variant="outline"
             className="h-14 text-body font-medium rounded-xl gap-2"
+            disabled={isDownloading}
           >
-            <Download className="h-5 w-5" />
-            이미지 저장
+            {isDownloading ? (
+              <>
+                <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                저장 중...
+              </>
+            ) : (
+              <>
+                <Download className="h-5 w-5" />
+                이미지 저장
+              </>
+            )}
           </Button>
           
           <Button

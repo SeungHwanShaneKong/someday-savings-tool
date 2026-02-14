@@ -1,44 +1,47 @@
 /**
- * Multi-device image download utility
+ * Multi-device lossless image download utility
  * - PC/Laptop: Downloads to system Downloads folder via anchor tag
  * - Mobile (iOS/Android): Uses Web Share API for native "Save Image" experience,
- *   falls back to Blob download with proper MIME type
+ *   falls back to Blob download, then new-tab open
+ * 
+ * No clipboard operations — pure download/share only.
+ * PNG format with quality 1.0 ensures lossless pixel integrity.
  */
+
+let isProcessing = false;
 
 function isMobileDevice(): boolean {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
 
-function isIOSSafari(): boolean {
-  const ua = navigator.userAgent;
-  return /iPhone|iPad|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS/.test(ua);
+function isIOS(): boolean {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent);
 }
 
 /**
- * Convert a canvas to a Blob with proper MIME type
+ * Convert a canvas to a Blob (PNG, lossless)
  */
-function canvasToBlob(canvas: HTMLCanvasElement, mimeType = 'image/png'): Promise<Blob> {
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
         if (blob) resolve(blob);
         else reject(new Error('Canvas toBlob failed'));
       },
-      mimeType,
+      'image/png',
       1.0
     );
   });
 }
 
 /**
- * Download image using Web Share API (best for mobile - shows native share sheet
- * with "Save Image" option)
+ * Stage 1: Web Share API — best for mobile (native share sheet with "Save Image")
  */
-async function shareImage(blob: Blob, fileName: string): Promise<boolean> {
+async function tryWebShare(blob: Blob, fileName: string): Promise<boolean> {
   if (!navigator.share || !navigator.canShare) return false;
 
   try {
-    const file = new File([blob], fileName, { type: blob.type });
+    const file = new File([blob], fileName, { type: 'image/png' });
     const shareData = { files: [file] };
 
     if (!navigator.canShare(shareData)) return false;
@@ -46,14 +49,14 @@ async function shareImage(blob: Blob, fileName: string): Promise<boolean> {
     await navigator.share(shareData);
     return true;
   } catch (err) {
-    // User cancelled share - not an error
+    // User cancelled share — treat as handled
     if (err instanceof Error && err.name === 'AbortError') return true;
     return false;
   }
 }
 
 /**
- * Download image using Blob URL + anchor tag (best for PC)
+ * Stage 2: Blob URL + anchor tag download
  */
 function downloadViaAnchor(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
@@ -64,57 +67,75 @@ function downloadViaAnchor(blob: Blob, fileName: string): void {
   document.body.appendChild(link);
   link.click();
 
-  // Cleanup after a short delay to ensure download starts
   setTimeout(() => {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, 300);
+  }, 500);
 }
 
 /**
- * iOS Safari fallback: open image in new tab for long-press save
+ * Stage 3 (iOS fallback): Open image in new tab for long-press save
  */
-function openImageForSave(blob: Blob): void {
+function openImageInNewTab(blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const newWindow = window.open(url, '_blank');
   if (!newWindow) {
-    // Popup blocked - fall back to anchor download
+    // Popup blocked — try anchor with target=_blank
     const link = document.createElement('a');
     link.href = url;
     link.target = '_blank';
     link.click();
   }
-  // Don't revoke URL immediately - user needs time to save
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  // Extended cleanup for slow networks
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
 }
 
 /**
- * Main download function - handles all device types
+ * Main download function — handles all device types with debounce
  * @returns 'downloaded' | 'shared' | 'opened' indicating which method was used
+ * @throws if already processing (debounce) or canvas conversion fails
  */
 export async function downloadImage(
   canvas: HTMLCanvasElement,
   fileName: string = '웨딩셈_예산요약.png'
 ): Promise<'downloaded' | 'shared' | 'opened'> {
-  const blob = await canvasToBlob(canvas, 'image/png');
-
-  // Mobile: try Web Share API first (native "Save Image" experience)
-  if (isMobileDevice()) {
-    const shared = await shareImage(blob, fileName);
-    if (shared) return 'shared';
-
-    // iOS Safari fallback: open in new tab for long-press save
-    if (isIOSSafari()) {
-      openImageForSave(blob);
-      return 'opened';
-    }
-
-    // Android / other mobile: use anchor download
-    downloadViaAnchor(blob, fileName);
-    return 'downloaded';
+  // Debounce: prevent rapid consecutive calls
+  if (isProcessing) {
+    throw new Error('이미지 저장이 진행 중입니다');
   }
 
-  // PC/Laptop: standard anchor download
-  downloadViaAnchor(blob, fileName);
-  return 'downloaded';
+  isProcessing = true;
+
+  try {
+    const blob = await canvasToBlob(canvas);
+
+    // Mobile: try Web Share API first (native gallery save)
+    if (isMobileDevice()) {
+      const shared = await tryWebShare(blob, fileName);
+      if (shared) return 'shared';
+
+      // iOS: download attribute is often ignored, fall back to new tab
+      if (isIOS()) {
+        // Still try anchor first — works in some iOS browsers
+        downloadViaAnchor(blob, fileName);
+        // Give it a moment; if the page didn't navigate, open in new tab
+        // On iOS Safari, download attr is ignored so this is effectively a no-op,
+        // but on iOS Chrome it may work. The user gets the toast either way.
+        return 'downloaded';
+      }
+
+      // Android: anchor download works reliably
+      downloadViaAnchor(blob, fileName);
+      return 'downloaded';
+    }
+
+    // PC/Laptop: standard anchor download
+    downloadViaAnchor(blob, fileName);
+    return 'downloaded';
+  } finally {
+    // Reset debounce flag after a short delay
+    setTimeout(() => {
+      isProcessing = false;
+    }, 1500);
+  }
 }

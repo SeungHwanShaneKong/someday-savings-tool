@@ -115,7 +115,7 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center px-6 pb-20">
+      <main className="flex-1 flex flex-col items-center justify-center px-6 pt-16 pb-20">
         <div className="text-7xl mb-8 animate-bounce">💒</div>
 
         <div className="text-center mb-6 space-y-1">

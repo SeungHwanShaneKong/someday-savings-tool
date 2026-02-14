@@ -20,13 +20,16 @@ export function usePageTracking() {
   const currentPath = useRef<string>(location.pathname);
 
   useEffect(() => {
+    // Only track authenticated users to prevent anonymous session correlation
+    if (!user?.id) return;
+
     const sessionId = getSessionId();
     
     // Track page view
     const trackPageView = async () => {
       try {
         await supabase.from('page_views').insert({
-          user_id: user?.id || null,
+          user_id: user.id,
           page_path: location.pathname,
           session_id: sessionId,
           duration_seconds: 0,

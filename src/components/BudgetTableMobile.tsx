@@ -452,8 +452,17 @@ export function BudgetTableMobile({
                                     }}
                                   >
                                     <PopoverTrigger asChild>
-                                      <Button size="icon" variant="outline" className="h-8 w-8 flex-shrink-0">
+                                      {/* 식대비 입력 유도 버튼: 고대비 + glow 애니메이션 (미입력 시만 활성화) */}
+                                      <Button 
+                                        size="sm" 
+                                        className={cn(
+                                          "flex-shrink-0 gap-1.5 rounded-lg shadow-md transition-all active:scale-95",
+                                          "bg-primary text-primary-foreground hover:bg-primary/90",
+                                          item.amount === 0 && "animate-glow-pulse"
+                                        )}
+                                      >
                                         <Users className="h-4 w-4" />
+                                        <span className="text-xs font-medium">식대 계산</span>
                                       </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-64" align="start">
@@ -637,6 +646,8 @@ export function BudgetTableMobile({
           ₩{getOverallTotal().toLocaleString()}
         </div>
       </div>
+      {/* FAB 버튼과의 중첩 방지를 위한 하단 스페이서 */}
+      <div className="h-16" aria-hidden="true" />
       
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

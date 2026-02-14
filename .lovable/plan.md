@@ -1,51 +1,76 @@
 
+# 모바일 레이아웃 최적화 및 UI 시각 효과 강화
 
-# 무손실 원본 이미지 자동 저장 시스템 최적화
+## 과업 1: 커피 FAB과 예산 총계 영역 중첩 해결
 
-## 현재 상태 분석
+### 문제 분석
+- `CoffeeDonationFab`은 `fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-3 z-50`으로 화면 우하단에 고정
+- `BudgetTableMobile`의 총계 카드는 스크롤 흐름의 마지막에 위치 (스크롤 최하단에서 FAB과 겹침)
+- 두 요소의 높이가 유사하여 스크롤 최하단에서 총계 금액이 FAB 뒤에 가려짐
 
-`src/lib/download-image.ts`의 이미지 저장 로직은 이미 클립보드 복사 코드를 포함하지 않습니다. 다른 파일(Auth, Landing 등)의 클립보드 기능은 URL/계좌번호 복사용이므로 이미지 저장과 무관합니다.
+### 해결 방법
 
-현재 문제점:
-- iOS Safari에서 `download` 속성이 무시되어 이미지가 새 탭에서 열림 (사용자가 길게 눌러 저장해야 함)
-- Web Share API 실패 시 iOS 폴백이 불편함 (새 탭 열기)
-- canvas에서 Blob 변환 시 `quality: 1.0`이지만 canvas 렌더링 자체가 원본 대비 손실 가능
+#### 1-1. `src/components/BudgetTableMobile.tsx` - 총계 카드 하단 여백 추가
+- 총계 카드 아래에 FAB 높이만큼의 여백(spacer)을 추가하여 스크롤 최하단에서도 총계가 FAB 위로 완전히 노출되도록 함
+- `pb-20` (80px) 정도의 하단 패딩을 최외곽 컨테이너에 적용
 
-## 수정 계획
+#### 1-2. `src/pages/BudgetFlow.tsx` - main 영역 하단 여백
+- `main` 태그에 모바일에서 FAB을 고려한 `pb-24` 하단 패딩 추가
+- 데스크탑에서는 기존 여백 유지
 
-### 1. `src/lib/download-image.ts` - 모바일 다운로드 전략 강화
+#### 1-3. `src/components/CoffeeDonationModal.tsx` - FAB 위치 미세 조정 (선택적)
+- FAB의 `bottom` 값을 약간 높여 총계 카드와의 간격을 더 확보
 
-**변경 사항:**
-- iOS에서 Web Share API를 최우선으로 사용 (공유 시트에서 "이미지 저장" 가능)
-- Web Share 실패 시 Blob URL을 `a[download]` 태그로 시도
-- 최종 폴백으로 새 탭 열기 (길게 눌러 저장 안내)
-- `openImageForSave` 함수에서 Blob URL 해제 타이머를 60초에서 120초로 연장 (저속 네트워크 대비)
-- 연속 클릭 방지를 위한 debounce 플래그 추가
-- canvas Blob 변환 시 PNG 포맷 + quality 1.0 유지 (무손실)
+---
 
-**핵심 변경:**
+## 과업 2: 식대비 입력 버튼 시각화 강화
+
+### 대상 요소
+- `BudgetTableMobile.tsx` 내 식대비 항목의 `Users` 아이콘 버튼 (인원수 계산 팝오버 트리거)
+
+### 변경 사항
+
+#### 2-1. `src/components/BudgetTableMobile.tsx` - 식대비 버튼 디자인 강화
+- 현재: `variant="outline"` + 기본 스타일의 작은 아이콘 버튼
+- 변경:
+  - 배경을 `bg-primary text-white` (고대비 파란색)으로 변경
+  - `shadow-md` 추가로 입체감 부여
+  - `animate-pulse` 변형의 부드러운 glow 효과 적용 (한 번만 표시하고 값 입력 후 중단)
+  - 버튼 크기를 `h-8 w-8`에서 약간 키우고 `rounded-lg`로 변경
+  - 터치/탭 시 `active:scale-95` 피드백 추가
+  - 라벨 텍스트 "식대 계산" 추가하여 아이콘만 있을 때보다 용도가 명확하도록 함
+
+#### 2-2. Tailwind 커스텀 애니메이션 (기존 `tailwind.config.ts` 활용)
+- 새로운 `glow-pulse` 키프레임 추가: `box-shadow`가 부드럽게 확장/축소되는 효과
+- 식대비 버튼에 금액 미입력 상태일 때만 애니메이션 활성화 (입력 완료 시 정적 상태로 전환)
+
+---
+
+## 수정 파일 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/pages/BudgetFlow.tsx` | main 영역에 모바일 하단 여백 `pb-24` 추가 |
+| `src/components/BudgetTableMobile.tsx` | 총계 카드 아래 spacer 추가 + 식대비 버튼 고대비 디자인 및 glow 애니메이션 |
+| `tailwind.config.ts` | `glow-pulse` 키프레임/애니메이션 추가 |
+
+---
+
+## 기술 상세
+
+### 하단 여백 계산 로직
 ```text
-모바일 저장 흐름:
-1. Web Share API 시도 (iOS/Android 모두)
-   -> 성공: 갤러리 저장 완료
-2. Blob + anchor download 시도
-   -> Android: 대부분 성공
-   -> iOS: download 속성 무시될 수 있음
-3. 최종 폴백: 새 탭에서 이미지 열기
-   -> 사용자에게 "길게 눌러 저장" 안내
+FAB 높이: ~48px (py-3 + 텍스트)
+Safe area 여백: ~20px + env(safe-area-inset-bottom)
+필요 총 여백: ~96px (pb-24)
 ```
 
-### 2. `src/pages/Summary.tsx` - 토스트 메시지 및 중복 클릭 방지
-
-**변경 사항:**
-- `handleDownloadImage`에 `isDownloading` 상태 추가하여 연속 클릭 방지
-- 버튼에 로딩 상태 표시
-- 에러 발생 시 구체적 안내 메시지 제공
-
-### 기술 세부사항
-
-- `canvasToBlob`의 MIME type `image/png` + quality `1.0` 유지 (무손실 보장)
-- Blob URL cleanup을 `setTimeout`으로 안전하게 처리 (메모리 누수 방지)
-- `navigator.canShare` 체크로 Share API 지원 여부 사전 검증
-- 파일명에 한글 포함 시 `encodeURIComponent` 불필요 (File API가 자동 처리)
-
+### 식대비 버튼 glow 효과
+```text
+@keyframes glow-pulse:
+  0%, 100%: box-shadow: 0 0 0 0 rgba(0, 100, 255, 0.4)
+  50%: box-shadow: 0 0 12px 4px rgba(0, 100, 255, 0.2)
+  
+조건: item.amount === 0 일 때만 animate-glow-pulse 적용
+      금액 입력 완료 시 애니메이션 자동 중단
+```

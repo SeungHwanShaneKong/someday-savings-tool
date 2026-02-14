@@ -104,11 +104,17 @@ export default {
           "99%": { transform: "rotate(2deg) scale(1.03)" },
           "100%": { transform: "rotate(0deg) scale(1)" },
         },
+        /* 식대비 버튼 glow 효과: 미입력 상태에서 사용자 시선 유도 */
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0.4)" },
+          "50%": { boxShadow: "0 0 12px 4px hsl(var(--primary) / 0.2)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "coffee-wiggle": "coffee-wiggle 10s ease-in-out infinite",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
       },
     },
   },

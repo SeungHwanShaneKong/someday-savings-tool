@@ -1,294 +1,365 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
-import { supabase } from '@/integrations/supabase/client';
+import { useAdminKPI } from '@/hooks/useAdminKPI';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Users, FileText, Clock, TrendingUp, Eye } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown, Minus, Eye, Info } from 'lucide-react';
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend
+} from 'recharts';
+import { subDays, format } from 'date-fns';
+import {
+  KPI_DEFINITIONS, getKPIStatus, getStatusColor,
+  getDemoKPIValues, getDemoTrendData, getDemoTopPages,
+  type KPIValue, type TrendDataPoint
+} from '@/lib/kpi-definitions';
 
-interface Analytics {
-  totalUsers: number;
-  newUsersToday: number;
-  newUsersThisWeek: number;
-  totalBudgets: number;
-  totalPageViews: number;
-  avgSessionDuration: number;
-  userTrend: { date: string; count: number }[];
-  pageViewTrend: { date: string; count: number }[];
-  topPages: { page: string; views: number }[];
-}
+// ========= 기간 프리셋 =========
+const PERIOD_OPTIONS = [
+  { label: '최근 7일', value: '7' },
+  { label: '최근 30일', value: '30' },
+  { label: '최근 90일', value: '90' },
+];
+
+// ========= 차트 공통 스타일 =========
+const chartTooltipStyle = {
+  backgroundColor: 'hsl(var(--card))',
+  border: '1px solid hsl(var(--border))',
+  borderRadius: '8px',
+  fontSize: '12px',
+};
 
 export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { kpiValues, trendData, topPages, loading: dataLoading, fetchData } = useAdminKPI();
 
+  const [period, setPeriod] = useState('30');
+  const [demoMode, setDemoMode] = useState(false);
+
+  // 기간 계산
+  const { startDate, endDate } = useMemo(() => {
+    const end = new Date();
+    const start = subDays(end, parseInt(period));
+    return { startDate: start, endDate: end };
+  }, [period]);
+
+  // 인증 & 권한 체크
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-      return;
-    }
-
-    if (!adminLoading && !isAdmin) {
-      navigate('/');
-      return;
-    }
-
-    if (isAdmin) {
-      fetchAnalytics();
-    }
+    if (!authLoading && !user) { navigate('/auth'); return; }
+    if (!adminLoading && !isAdmin) { navigate('/'); return; }
   }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
-  const fetchAnalytics = async () => {
-    try {
-      const now = new Date();
-      const todayStart = startOfDay(now);
-      const weekAgo = subDays(now, 7);
-
-      // Fetch user stats from profiles
-      const { count: totalUsers } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: newUsersToday } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayStart.toISOString());
-
-      const { count: newUsersThisWeek } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', weekAgo.toISOString());
-
-      // Fetch budget stats
-      const { count: totalBudgets } = await supabase
-        .from('budgets')
-        .select('*', { count: 'exact', head: true });
-
-      // Fetch page view stats
-      const { data: pageViews } = await supabase
-        .from('page_views')
-        .select('*');
-
-      const totalPageViews = pageViews?.length || 0;
-      const avgSessionDuration = pageViews?.length 
-        ? Math.round(pageViews.reduce((acc, pv) => acc + (pv.duration_seconds || 0), 0) / pageViews.length)
-        : 0;
-
-      // Calculate user trend (last 7 days)
-      const { data: userTrendData } = await supabase
-        .from('profiles')
-        .select('created_at')
-        .gte('created_at', weekAgo.toISOString());
-
-      const userTrend = Array.from({ length: 7 }, (_, i) => {
-        const date = subDays(now, 6 - i);
-        const dateStr = format(date, 'MM/dd');
-        const count = userTrendData?.filter(u => {
-          const createdDate = new Date(u.created_at);
-          return createdDate >= startOfDay(date) && createdDate <= endOfDay(date);
-        }).length || 0;
-        return { date: dateStr, count };
-      });
-
-      // Calculate page view trend
-      const pageViewTrend = Array.from({ length: 7 }, (_, i) => {
-        const date = subDays(now, 6 - i);
-        const dateStr = format(date, 'MM/dd');
-        const count = pageViews?.filter(pv => {
-          const viewDate = new Date(pv.created_at);
-          return viewDate >= startOfDay(date) && viewDate <= endOfDay(date);
-        }).length || 0;
-        return { date: dateStr, count };
-      });
-
-      // Calculate top pages
-      const pageCount: Record<string, number> = {};
-      pageViews?.forEach(pv => {
-        pageCount[pv.page_path] = (pageCount[pv.page_path] || 0) + 1;
-      });
-      const topPages = Object.entries(pageCount)
-        .map(([page, views]) => ({ page, views }))
-        .sort((a, b) => b.views - a.views)
-        .slice(0, 5);
-
-      setAnalytics({
-        totalUsers: totalUsers || 0,
-        newUsersToday: newUsersToday || 0,
-        newUsersThisWeek: newUsersThisWeek || 0,
-        totalBudgets: totalBudgets || 0,
-        totalPageViews,
-        avgSessionDuration,
-        userTrend,
-        pageViewTrend,
-        topPages,
-      });
-    } catch (err) {
-      console.error('Error fetching analytics:', err);
-    } finally {
-      setLoading(false);
+  // 데이터 로드
+  useEffect(() => {
+    if (isAdmin && !demoMode) {
+      fetchData(startDate, endDate);
     }
+  }, [isAdmin, demoMode, startDate, endDate, fetchData]);
+
+  // 데모/실제 데이터 전환
+  const activeKPIs = demoMode ? getDemoKPIValues() : kpiValues;
+  const activeTrend = demoMode ? getDemoTrendData() : trendData;
+  const activeTopPages = demoMode ? getDemoTopPages() : topPages;
+
+  const handleRefresh = () => {
+    if (!demoMode) fetchData(startDate, endDate);
   };
 
-  if (authLoading || adminLoading || loading) {
+  if (authLoading || adminLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground">로딩 중...</div>
       </div>
     );
   }
-
-  if (!isAdmin) {
-    return null;
-  }
-
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))', 'hsl(var(--destructive))'];
+  if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* ===== 헤더 ===== */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/')}
-            className="rounded-full"
-          >
+        <div className="max-w-[1400px] mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-heading font-semibold">관리자 대시보드</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-bold truncate">관리자 KPI 대시보드 <span className="text-muted-foreground font-normal text-sm">(초안)</span></h1>
+            <p className="text-xs text-muted-foreground">운영 핵심 지표 모니터링</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={demoMode ? 'default' : 'outline'}
+              onClick={() => setDemoMode(!demoMode)}
+              className={demoMode ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : ''}
+            >
+              {demoMode ? '데모 데이터 ON' : '데모 데이터 OFF'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
+              <RefreshCw className={`h-4 w-4 ${dataLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        {/* Key Metrics */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="p-6 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span className="text-small">전체 사용자</span>
-            </div>
-            <p className="text-display font-bold text-primary">{analytics?.totalUsers || 0}</p>
-          </Card>
+      <main className="max-w-[1400px] mx-auto px-4 py-6 space-y-6">
+        {/* ===== 필터 패널 ===== */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select defaultValue="all">
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="세그먼트" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">전체</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5" />
+            <span>조회: {format(startDate, 'yyyy.MM.dd')} ~ {format(endDate, 'yyyy.MM.dd')}</span>
+          </div>
+        </div>
 
-          <Card className="p-6 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <TrendingUp className="h-4 w-4" />
-              <span className="text-small">오늘 가입</span>
-            </div>
-            <p className="text-display font-bold text-green-500">+{analytics?.newUsersToday || 0}</p>
-          </Card>
+        {demoMode && (
+          <div className="rounded-lg bg-cyan-50 dark:bg-cyan-950/20 border border-cyan-200 dark:border-cyan-800 px-4 py-2 text-xs text-cyan-700 dark:text-cyan-400">
+            ⚡ 데모 데이터 모드 — 실제 DB 대신 미리 정의된 샘플 데이터를 표시합니다.
+          </div>
+        )}
 
-          <Card className="p-6 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <FileText className="h-4 w-4" />
-              <span className="text-small">생성된 예산</span>
-            </div>
-            <p className="text-display font-bold">{analytics?.totalBudgets || 0}</p>
-          </Card>
+        {/* ===== KPI 카드 그리드 (15개) ===== */}
+        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {KPI_DEFINITIONS.map(def => {
+            const kv = activeKPIs.find(k => k.id === def.id);
+            const value = kv?.value ?? 0;
+            const change = kv?.change ?? 0;
+            const status = getKPIStatus(def, value);
+            const statusColor = getStatusColor(status);
 
-          <Card className="p-6 space-y-2">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span className="text-small">평균 체류시간</span>
-            </div>
-            <p className="text-display font-bold">{analytics?.avgSessionDuration || 0}초</p>
-          </Card>
-        </section>
-
-        {/* Charts Row */}
-        <section className="grid md:grid-cols-2 gap-6">
-          {/* User Trend */}
-          <Card className="p-6">
-            <h2 className="text-body-lg font-semibold mb-4">주간 가입자 추이</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics?.userTrend || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          {/* Page View Trend */}
-          <Card className="p-6">
-            <h2 className="text-body-lg font-semibold mb-4">주간 페이지뷰 추이</h2>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={analytics?.pageViewTrend || []}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }} 
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="hsl(var(--primary))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--primary))' }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </section>
-
-        {/* Top Pages */}
-        <Card className="p-6">
-          <h2 className="text-body-lg font-semibold mb-4 flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            인기 페이지
-          </h2>
-          <div className="space-y-3">
-            {analytics?.topPages?.length ? (
-              analytics.topPages.map((page, index) => (
-                <div key={page.page} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-small font-semibold flex items-center justify-center">
-                      {index + 1}
-                    </span>
-                    <span className="text-body">{page.page}</span>
-                  </div>
-                  <span className="text-body font-semibold">{page.views}회</span>
+            return (
+              <Card key={def.id} className="p-3 space-y-1.5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-muted-foreground">{def.id}</span>
+                  <Badge className={`text-[10px] px-1.5 py-0 ${statusColor.bg} ${statusColor.text} border ${statusColor.border}`}>
+                    {status}
+                  </Badge>
                 </div>
-              ))
-            ) : (
-              <p className="text-muted-foreground text-center py-4">아직 데이터가 없어요</p>
+                <p className="text-xs font-medium truncate">{def.name}</p>
+                <div className="flex items-end gap-1.5">
+                  <span className="text-xl font-bold tabular-nums">
+                    {typeof value === 'number' ? (def.unit === '%' ? `${value}%` : value.toLocaleString()) : value}
+                  </span>
+                  {def.unit !== '%' && <span className="text-[10px] text-muted-foreground mb-0.5">{def.unit}</span>}
+                </div>
+                <div className="flex items-center gap-1">
+                  {change > 0 ? <TrendingUp className="h-3 w-3 text-emerald-500" /> :
+                   change < 0 ? <TrendingDown className="h-3 w-3 text-red-500" /> :
+                   <Minus className="h-3 w-3 text-muted-foreground" />}
+                  <span className={`text-[10px] font-medium ${change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                    {change > 0 ? '+' : ''}{Math.round(change * 10) / 10}%
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">vs 전기</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-tight">{def.description}</p>
+              </Card>
+            );
+          })}
+        </section>
+
+        {/* ===== 트렌드 차트 (5개) ===== */}
+        <section className="space-y-4">
+          <h2 className="text-base font-bold flex items-center gap-2">
+            📊 Historical Trend — Top 5 차트
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* 차트 1: 활성 사용자 추이 */}
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold mb-3">활성 사용자 추이 (DAU / WAU / MAU)</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activeTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Line type="monotone" dataKey="dau" name="DAU" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="wau" name="WAU" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="mau" name="MAU" stroke="#06b6d4" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            {/* 차트 2: 온보딩 전환 추이 */}
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold mb-3">온보딩 전환 추이 (가입 / 생성 / 입력)</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={activeTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Bar dataKey="signups" name="가입" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="budgetCreated" name="예산 생성" fill="#10b981" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="amountEntered" name="금액 입력" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            {/* 차트 3: 리텐션 코호트 추이 */}
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold mb-3">리텐션 코호트 추이 (D1 / D7 / D30)</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activeTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Line type="monotone" dataKey="d1" name="D1" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="d7" name="D7" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="d30" name="D30" stroke="#6366f1" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            {/* 차트 4: 핵심 기능 채택률 추이 */}
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold mb-3">핵심 기능 채택률 추이</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activeTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Line type="monotone" dataKey="multiScenario" name="다중 시나리오" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="shareLink" name="공유 링크" stroke="#06b6d4" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="snapshot" name="스냅샷" stroke="#ec4899" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            {/* 차트 5: 집행률 & TTFV 추이 (full-width) */}
+            <Card className="p-4 md:col-span-2">
+              <h3 className="text-sm font-semibold mb-3">집행률 & TTFV 추이</h3>
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={activeTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" unit="%" />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" unit="분" />
+                    <Tooltip contentStyle={chartTooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Line yAxisId="left" type="monotone" dataKey="executionRate" name="집행률(%)" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Line yAxisId="right" type="monotone" dataKey="ttfv" name="TTFV(분)" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="5 5" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </div>
+        </section>
+
+        {/* ===== Top 페이지 ===== */}
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <Eye className="h-4 w-4" /> Top 페이지 (조회 기간 내)
+          </h2>
+          <div className="space-y-2">
+            {activeTopPages.length ? activeTopPages.map((page, i) => (
+              <div key={page.path} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                  <span className="text-sm font-mono">{page.path}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold tabular-nums">{page.views.toLocaleString()}회</span>
+                  <span className="text-xs text-muted-foreground w-12 text-right">{page.percentage}%</span>
+                </div>
+              </div>
+            )) : (
+              <p className="text-muted-foreground text-center py-4 text-sm">데이터 없음</p>
             )}
           </div>
         </Card>
 
-        {/* Weekly Stats Summary */}
-        <Card className="p-6 bg-primary/5 border-primary/20">
-          <h2 className="text-body-lg font-semibold mb-2">이번 주 요약</h2>
-          <p className="text-muted-foreground">
-            이번 주에 <span className="text-primary font-semibold">{analytics?.newUsersThisWeek || 0}명</span>의 새로운 사용자가 가입했고, 
-            총 <span className="text-primary font-semibold">{analytics?.totalPageViews || 0}회</span>의 페이지 조회가 있었어요.
-          </p>
+        {/* ===== 15개 핵심 지표 정의 테이블 ===== */}
+        <Card className="p-4">
+          <h2 className="text-sm font-semibold mb-3">📋 15개 핵심 지표 정의</h2>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs w-14">ID</TableHead>
+                  <TableHead className="text-xs">지표명</TableHead>
+                  <TableHead className="text-xs">계산식</TableHead>
+                  <TableHead className="text-xs w-20 text-right">현재값</TableHead>
+                  <TableHead className="text-xs w-28">임계 기준</TableHead>
+                  <TableHead className="text-xs w-14 text-center">상태</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {KPI_DEFINITIONS.map(def => {
+                  const kv = activeKPIs.find(k => k.id === def.id);
+                  const value = kv?.value ?? 0;
+                  const status = getKPIStatus(def, value);
+                  const sc = getStatusColor(status);
+                  return (
+                    <TableRow key={def.id}>
+                      <TableCell className="text-xs font-mono">{def.id}</TableCell>
+                      <TableCell className="text-xs font-medium">{def.name}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{def.formula}</TableCell>
+                      <TableCell className="text-xs text-right font-semibold tabular-nums">
+                        {def.unit === '%' ? `${value}%` : `${value.toLocaleString()}${def.unit}`}
+                      </TableCell>
+                      <TableCell className="text-[10px] text-muted-foreground">
+                        {def.thresholds
+                          ? `주의 < ${def.thresholds.warn}, 위험 < ${def.thresholds.danger}`
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={`text-[10px] px-1.5 py-0 ${sc.bg} ${sc.text} border ${sc.border}`}>
+                          {status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
+
+        <div className="text-center text-xs text-muted-foreground py-4">
+          관리자 KPI 대시보드 v1.0 — 데이터는 RLS 정책으로 보호됩니다.
+        </div>
       </main>
     </div>
   );

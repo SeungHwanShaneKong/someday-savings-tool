@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { isPreviewMode } from '@/lib/utils';
 import {
   getBrowserInfo,
   openInExternalBrowserWithFallback,
@@ -49,6 +50,11 @@ export default function Auth() {
 
   // Redirect if already logged in
   if (!loading && user) {
+    return <Navigate to="/budget" replace />;
+  }
+
+  // Preview 모드에서는 로그인 없이 바로 /budget으로 이동
+  if (!loading && !user && isPreviewMode()) {
     return <Navigate to="/budget" replace />;
   }
 

@@ -81,6 +81,9 @@ export interface TrendDataPoint {
   snapshot?: number;
   executionRate?: number;
   ttfv?: number;
+  pv?: number;
+  loyalCount?: number;
+  avgDuration?: number;
 }
 
 export interface TopPage {
@@ -132,6 +135,9 @@ export function getDemoTrendData(): TrendDataPoint[] {
       snapshot: Math.round(5 + Math.random() * 15),
       executionRate: Math.round(25 + Math.random() * 20),
       ttfv: Math.round(20 + Math.random() * 40),
+      pv: Math.floor(300 + Math.random() * 200),
+      loyalCount: Math.floor(20 + Math.random() * 30),
+      avgDuration: Math.floor(120 + Math.random() * 180),
     };
   });
 }

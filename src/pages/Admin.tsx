@@ -14,10 +14,11 @@ import {
   BarChart3, Users, Clock
 } from 'lucide-react';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { subDays, format } from 'date-fns';
+import { subDays, startOfYear, format } from 'date-fns';
 import {
   KPI_DEFINITIONS, getKPIStatus, getStatusColor,
   getDemoKPIValues, getDemoTrendData, getDemoTopPages,
@@ -30,6 +31,7 @@ const PERIOD_OPTIONS = [
   { label: '최근 7일', value: '7' },
   { label: '최근 30일', value: '30' },
   { label: '최근 90일', value: '90' },
+  { label: '올해 전체', value: 'ytd' },
 ];
 
 // ========= 차트 공통 스타일 =========
@@ -77,7 +79,7 @@ export default function Admin() {
 
   const { startDate, endDate } = useMemo(() => {
     const end = new Date();
-    const start = subDays(end, parseInt(period));
+    const start = period === 'ytd' ? startOfYear(end) : subDays(end, parseInt(period));
     return { startDate: start, endDate: end };
   }, [period]);
 
@@ -256,7 +258,105 @@ export default function Admin() {
             </Card>
           </section>
 
-          {/* ===== KPI 카드 그리드 (15개) ===== */}
+          {/* ===== Analytics Insights — 시계열 차트 3종 ===== */}
+          <section className="space-y-4">
+            <h2 className="text-base sm:text-lg font-bold leading-relaxed">📈 Analytics Insights</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* 페이지뷰 추이 */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">페이지뷰 추이</h3>
+                <div className="h-56 sm:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={activeTrend}>
+                      <defs>
+                        <linearGradient id="gradPV" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip
+                        contentStyle={chartTooltipStyle}
+                        formatter={(value: number) => [`${value}건`, 'PV']}
+                        labelFormatter={(label) => `날짜: ${label}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '13px' }} />
+                      <Area type="monotone" dataKey="pv" name="페이지뷰" stroke="#3b82f6" strokeWidth={2} fill="url(#gradPV)" dot={false} activeDot={{ r: 6 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* 충성 고객 추이 */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">충성 고객 추이</h3>
+                <div className="h-56 sm:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={activeTrend}>
+                      <defs>
+                        <linearGradient id="gradLoyal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15} />
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip
+                        contentStyle={chartTooltipStyle}
+                        formatter={(value: number) => [`${value}명`, '충성 고객']}
+                        labelFormatter={(label) => `날짜: ${label}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '13px' }} />
+                      <Area type="monotone" dataKey="loyalCount" name="충성 고객" stroke="#8b5cf6" strokeWidth={2} fill="url(#gradLoyal)" dot={false} activeDot={{ r: 6 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* 평균 체류 시간 추이 */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">평균 체류 시간 추이</h3>
+                <div className="h-56 sm:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={activeTrend}>
+                      <defs>
+                        <linearGradient id="gradDuration" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15} />
+                          <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis
+                        tick={{ fontSize: 12 }}
+                        stroke="hsl(var(--muted-foreground))"
+                        tickFormatter={(v: number) => {
+                          const m = Math.floor(v / 60);
+                          const s = Math.round(v % 60);
+                          return `${m}:${s < 10 ? '0' : ''}${s}`;
+                        }}
+                      />
+                      <RechartsTooltip
+                        contentStyle={chartTooltipStyle}
+                        formatter={(value: number) => {
+                          const m = Math.floor(value / 60);
+                          const s = Math.round(value % 60);
+                          return [`${m}분 ${s < 10 ? '0' : ''}${s}초`, '체류 시간'];
+                        }}
+                        labelFormatter={(label) => `날짜: ${label}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '13px' }} />
+                      <Area type="monotone" dataKey="avgDuration" name="체류 시간" stroke="#f59e0b" strokeWidth={2} fill="url(#gradDuration)" dot={false} activeDot={{ r: 6 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+            </div>
+          </section>
+
           <section>
             <h2 className="text-base sm:text-lg font-bold mb-4 leading-relaxed">📊 15개 핵심 운영 지표</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">

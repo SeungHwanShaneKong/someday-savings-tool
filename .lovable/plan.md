@@ -1,139 +1,119 @@
 
-# 관리자 KPI 대시보드 전면 재구축
 
-## 개요
-현재의 간단한 관리자 대시보드를 이미지에 표시된 15개 핵심 KPI 지표 기반의 운영 대시보드로 전면 교체합니다. 데모 데이터 모드와 실제 데이터 모드를 모두 지원하며, 기간 필터, 상태 배지, 5개 트렌드 차트, Top 페이지, KPI 정의 테이블을 포함합니다.
+# 관리자 대시보드 사용성 및 데이터 시각화 고도화
 
-## 주요 기능
+## 1. 변경 범위
 
-### 1. 헤더 영역
-- 뒤로가기 버튼 + "관리자 KPI 대시보드 (초안)" 제목 + 부제
-- "데모 데이터 ON/OFF" 토글 버튼 (cyan 배경)
-- "새로고침" 버튼
+**파일**: `src/pages/Admin.tsx` (전면 개선)
 
-### 2. 필터 컨트롤 패널
-- 기간 선택: 최근 7일 / 최근 30일(기본) / 최근 90일 / 직접 지정
-- 세그먼트/플랫폼 드롭다운 (UI만 구현, 향후 확장용)
-- 초안 안내 메시지
-- 조회 기간 표시
+현재 대시보드의 3가지 핵심 문제를 해결합니다:
+- 모바일/태블릿에서 폰트가 너무 작아 가독성 저하
+- 정적 카드 나열 방식으로 인터랙션 부재
+- 상단에 핵심 요약 KPI(PV, 충성 고객, 체류 시간)가 없음
 
-### 3. KPI 카드 15개 (5열 x 3행)
-각 카드 구성: KPI ID, 지표명, 현재값, 전기 대비 변화율(%), 설명, 상태 배지(정상/주의/위험/참고)
+---
 
-| ID | 지표명 | 계산식 (실제 데이터 소스) |
-|----|--------|--------------------------|
-| K01 | 신규 가입자 수 | 기간 내 profiles 생성 수 |
-| K02 | DAU | 당일 page_views 고유 user_id 수 |
-| K03 | WAU | 최근 7일 page_views 고유 user_id 수 |
-| K04 | MAU | 최근 30일 page_views 고유 user_id 수 |
-| K05 | Stickiness | DAU / MAU x 100 |
-| K06 | D1 리텐션 | 가입 후 1일 재방문 비율 |
-| K07 | D7 리텐션 | 가입 후 7일 재방문 비율 |
-| K08 | D30 리텐션 | 가입 후 30일 재방문 비율 |
-| K09 | 가입->예산 생성(24h) | 가입 후 24시간 내 예산 생성 비율 |
-| K10 | 가입->첫 금액 입력(24h) | 가입 후 24시간 내 amount>0 비율 |
-| K11 | TTFV 중앙값 | 가입->첫 금액 입력 소요시간 중앙값(분) |
-| K12 | 다중 시나리오 사용률 | 예산 2개 이상 사용자 비율 |
-| K13 | 공유 링크 생성률 | 활성 사용자 중 shared_budgets 생성 비율 |
-| K14 | 스냅샷 사용률 | 활성 사용자 중 budget_snapshots 사용 비율 |
-| K15 | 예산 집행률 | is_paid 금액 합 / 전체 금액 합 |
+## 2. 반응형 타이포그래피 시스템
 
-### 4. 상태 배지 임계값 로직
-각 KPI에 대해 정상(초록)/주의(노란)/위험(빨간)/참고(회색) 배지를 표시. 임계값은 이미지의 "15개 핵심 지표 정의" 테이블 기준:
-- 예: K05 Stickiness: 주의 < 25, 위험 < 20
-- 예: K06 D1 리텐션: 주의 < 40, 위험 < 35
+현재 `text-[10px]`, `text-xs`, `text-sm` 위주의 폰트 크기를 전면 상향 조정합니다.
 
-### 5. Historical Trend Top 5 차트 (Recharts)
-1. **활성 사용자 추이 (DAU/WAU/MAU)** - 3개 라인 차트
-2. **온보딩 전환 추이 (가입/생성/입력)** - 3개 바 차트
-3. **리텐션 코호트 추이 (D1/D7/D30)** - 3개 라인 차트
-4. **핵심 기능 채택률 추이** - 3개 라인 차트
-5. **집행률 & TTFV 추이** - 듀얼 Y축 라인 차트
+| 요소 | 현재 | 개선 후 |
+|------|------|---------|
+| KPI ID | text-[10px] | text-xs sm:text-sm |
+| KPI 지표명 | text-xs | text-sm sm:text-base |
+| KPI 현재값 | text-xl | text-2xl sm:text-3xl |
+| 변화율 텍스트 | text-[10px] | text-xs sm:text-sm |
+| 설명 텍스트 | text-[10px] | text-xs sm:text-sm |
+| 상태 배지 | text-[10px] | text-xs |
+| 차트 제목 | text-sm | text-base sm:text-lg |
+| 헤더 제목 | text-lg | text-xl sm:text-2xl |
+| 필터/날짜 | text-xs | text-sm |
+| 테이블 셀 | text-xs | text-sm |
 
-### 6. Top 페이지 섹션
-page_views에서 상위 5개 경로를 집계하여 리스트 표시
+줄 간격(line-height)을 `leading-relaxed`(1.625)로 설정하여 텍스트 밀집도 완화.
 
-### 7. 15개 핵심 지표 정의 테이블
-ID, 지표명, 계산식, 현재값, 임계 기준을 테이블로 표시
+---
 
-## 기술 상세
+## 3. 상단 3종 KPI 위젯 카드
 
-### 파일 구조
+필터 패널 아래, 15개 KPI 그리드 위에 3개의 대형 요약 카드를 배치합니다.
+
+### 카드 1: 페이지뷰 (PV)
+- 아이콘: `BarChart3` (lucide)
+- 데이터: 기간 내 총 page_views 수
+- 부가 정보: 일간/주간/월간 수치를 소형 텍스트로 표시
+- 전기 대비 증감률 표시
+
+### 카드 2: 충성 고객 수
+- 아이콘: `Users` (lucide)
+- 데이터: 기간 내 재방문(2회 이상 방문) 고유 사용자 수
+- 부가 정보: 전체 방문자 중 비율(%)
+- 전기 대비 증감률 표시
+
+### 카드 3: 평균 체류 시간
+- 아이콘: `Clock` (lucide)
+- 데이터: page_views의 duration_seconds 평균을 분:초로 변환
+- 부가 정보: 전일 대비 증감 표시
+- 전기 대비 증감률 표시
+
+3개 카드는 `grid-cols-1 sm:grid-cols-3` 레이아웃으로 배치하며, 각 카드에 그라데이션 배경과 큰 폰트(text-3xl~4xl)를 적용합니다.
+
+---
+
+## 4. 인터랙티브 UI/UX 요소
+
+### 호버 효과
+- KPI 카드: `hover:shadow-lg hover:scale-[1.02] transition-all duration-200`
+- 상단 KPI 위젯: `hover:shadow-xl` + 배경 밝기 변화
+- Top 페이지 행: `hover:bg-muted/50`
+
+### 툴팁
+- 각 KPI 카드에 `Tooltip` 컴포넌트 래핑
+- 트리거: KPI 이름 또는 Info 아이콘 호버/터치
+- 내용: 계산식(formula) + 임계 기준 설명
+
+### 차트 인터랙션
+- Recharts `activeDot` 크기 증가 (r=6)
+- 차트 높이를 h-52에서 h-64로 확대
+- 차트 폰트 크기 10px에서 12px로 상향
+
+---
+
+## 5. useAdminKPI 훅 확장
+
+기존 훅에 3개의 새로운 계산값을 추가합니다:
+
 ```
-src/pages/Admin.tsx          -- 전면 재작성 (메인 대시보드)
-src/hooks/useAdminKPI.tsx    -- 신규: KPI 데이터 페칭 커스텀 훅
-src/lib/kpi-definitions.ts   -- 신규: KPI 정의, 임계값, 데모 데이터
-```
-
-### 데이터 페칭 전략 (useAdminKPI 훅)
-- Supabase에서 profiles, page_views, budgets, budget_items, shared_budgets, budget_snapshots 테이블을 조회
-- 기간 필터(startDate, endDate)에 따라 쿼리 필터링
-- 이전 기간 대비 변화율 계산 (예: 30일 선택 시 이전 30일과 비교)
-- 일별 트렌드 데이터 생성
-
-### RLS 고려사항
-- profiles 테이블: 현재 본인만 조회 가능 -> Admin용 `SECURITY DEFINER` 함수 생성 필요
-- page_views: 이미 admin SELECT 정책 있음
-- budgets, budget_items, shared_budgets, budget_snapshots: admin SELECT 정책 추가 필요
-
-### DB 마이그레이션 필요
-Admin이 모든 테이블의 집계 데이터를 조회할 수 있도록 `SECURITY DEFINER` 함수를 생성:
-```sql
--- Admin KPI 집계 함수 (RLS 우회)
-CREATE OR REPLACE FUNCTION get_admin_kpi_data(p_start_date timestamptz, p_end_date timestamptz)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-  -- profiles count, page_views aggregation, budgets data 등을 한번에 반환
-$function$;
-```
-
-또는 더 간단하게: 필요한 테이블들에 admin SELECT RLS 정책 추가:
-```sql
--- profiles: admin 조회 허용
-CREATE POLICY "Admins can view all profiles"
-ON profiles FOR SELECT
-USING (has_role(auth.uid(), 'admin'));
-
--- budgets: admin 조회 허용
-CREATE POLICY "Admins can view all budgets"
-ON budgets FOR SELECT
-USING (has_role(auth.uid(), 'admin'));
-
--- budget_items: admin 조회 허용
-CREATE POLICY "Admins can view all budget items"
-ON budget_items FOR SELECT
-USING (has_role(auth.uid(), 'admin'));
-
--- shared_budgets: admin 조회 허용
-CREATE POLICY "Admins can view all shared budgets"
-ON shared_budgets FOR SELECT
-USING (has_role(auth.uid(), 'admin'));
-
--- budget_snapshots: admin 조회 허용
-CREATE POLICY "Admins can view all budget snapshots"
-ON budget_snapshots FOR SELECT
-USING (has_role(auth.uid(), 'admin'));
+totalPageViews: number      // 기간 내 총 PV 수
+loyalUsers: number          // 재방문(2회+) 고유 사용자 수  
+avgSessionTime: number      // 평균 체류 시간 (초)
+prevTotalPageViews: number  // 전기 PV (변화율 계산용)
+prevLoyalUsers: number      // 전기 충성 고객
+prevAvgSessionTime: number  // 전기 평균 체류 시간
 ```
 
-### 데모 데이터 모드
-"데모 데이터 ON" 버튼 토글 시 실제 DB 대신 미리 정의된 데모 데이터(이미지의 수치)를 사용하여 대시보드를 렌더링. 개발/프레젠테이션 용도.
+이미 page_views에서 `duration_seconds`를 가져오고 있으므로 추가 DB 쿼리 없이 계산 가능합니다.
 
-### 반응형 디자인
-- 데스크탑: 5열 KPI 카드 그리드
-- 태블릿: 3열
-- 모바일: 2열
-- 차트: 2열 -> 1열 반응형
+---
+
+## 6. 기술 상세
+
+### 변경 파일
+- `src/pages/Admin.tsx` -- 타이포그래피 전면 개선 + 상단 KPI 위젯 3종 추가 + 호버/툴팁 인터랙션
+- `src/hooks/useAdminKPI.tsx` -- totalPageViews, loyalUsers, avgSessionTime 계산 추가
+
+### 추가 import
+```typescript
+import { BarChart3, Users, Clock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+```
+
+### 반응형 그리드
+- 상단 KPI 위젯: `grid-cols-1 sm:grid-cols-3`
+- 15개 KPI 카드: `grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5` (모바일 1열로 변경)
+- 차트: `grid-cols-1 md:grid-cols-2` (유지)
 
 ### 보안
-- 기존 useAdmin 훅 + user_roles RLS로 접근 제어 유지
-- 모든 데이터 쿼리는 서버 측 RLS 정책으로 보호
-- 클라이언트에서 admin이 아닌 경우 즉시 리다이렉트
+- 기존 useAdmin 훅 + RLS 정책 유지
+- 추가 DB 변경 없음 (이미 이전 마이그레이션에서 admin SELECT 정책 적용 완료)
 
-## 구현 순서
-1. DB 마이그레이션: admin용 SELECT RLS 정책 추가 (5개 테이블)
-2. `src/lib/kpi-definitions.ts` 생성: KPI 메타데이터, 임계값, 데모 데이터
-3. `src/hooks/useAdminKPI.tsx` 생성: 데이터 페칭 및 KPI 계산 로직
-4. `src/pages/Admin.tsx` 전면 재작성: 새 대시보드 UI

@@ -14,7 +14,7 @@ import {
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signInWithGoogle, loading } = useAuth();
+  const { user, signInWithGoogle, loading, autoLoginInProgress } = useAuth();
   const { toast } = useToast();
   
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -149,10 +149,14 @@ export default function Auth() {
     );
   }
 
-  if (loading) {
+  if (loading || autoLoginInProgress) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">로딩 중...</div>
+        <div className="text-center">
+          <div className="animate-pulse text-muted-foreground">
+            {autoLoginInProgress ? '자동 로그인 중...' : '로딩 중...'}
+          </div>
+        </div>
       </div>
     );
   }

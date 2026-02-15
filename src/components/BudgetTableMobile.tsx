@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import React from 'react';
-import { formatKoreanWon, SubCategory, Category, calculateNetTotal } from '@/lib/budget-categories';
+import { formatKoreanWon, SubCategory, Category } from '@/lib/budget-categories';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -167,7 +167,7 @@ export function BudgetTableMobile({
   };
   
   const getOverallTotal = () => {
-    return calculateNetTotal(items);
+    return items.reduce((sum, item) => sum + item.amount, 0);
   };
   
   const parseNumericInput = (value: string): string => {
@@ -362,12 +362,6 @@ export function BudgetTableMobile({
                           const isRenamingThis = editingName === item.id;
                           const displayName = item.custom_name || subCat.name;
                           const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
-                          const isGiftMoneyItem = category.id === 'main-ceremony' && subCat.id === 'expected-gift-money';
-                          const isPerPersonItem = isMealCostItem || isGiftMoneyItem;
-                          const perPersonLabel = isGiftMoneyItem ? '축의금 계산' : '인원수 계산';
-                          const perPersonUnitLabel = isGiftMoneyItem ? '1인당 평균 축의금 (₩)' : '1인당 비용 (₩)';
-                          const perPersonUnitPlaceholder = isGiftMoneyItem ? '50000' : '65000';
-                          const perPersonButtonLabel = isGiftMoneyItem ? '축의금 계산' : '식대 계산';
                           
                           return (
                             <div key={item.id} className="p-3 space-y-2">
@@ -444,7 +438,7 @@ export function BudgetTableMobile({
                               
                               {/* Row 2: Amount + Per Person Button */}
                               <div className="flex items-center gap-2 pl-7">
-                                {isPerPersonItem && (
+                                {isMealCostItem && (
                                   <Popover
                                     open={perPersonPopover === cellKey}
                                     onOpenChange={open => {
@@ -458,6 +452,7 @@ export function BudgetTableMobile({
                                     }}
                                   >
                                     <PopoverTrigger asChild>
+                                      {/* 식대비 입력 유도 버튼: 고대비 + glow 애니메이션 (미입력 시만 활성화) */}
                                       <Button 
                                         size="sm" 
                                         className={cn(
@@ -467,21 +462,21 @@ export function BudgetTableMobile({
                                         )}
                                       >
                                         <Users className="h-4 w-4" />
-                                        <span className="text-xs font-medium">{perPersonButtonLabel}</span>
+                                        <span className="text-xs font-medium">식대 계산</span>
                                       </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-64" align="start">
                                       <div className="space-y-3">
-                                        <div className="text-sm font-medium">{perPersonLabel}</div>
+                                        <div className="text-sm font-medium">인원수 계산</div>
                                         <div className="space-y-2">
                                           <div>
-                                            <label className="text-xs text-muted-foreground">{perPersonUnitLabel}</label>
+                                            <label className="text-xs text-muted-foreground">1인당 비용 (₩)</label>
                                             <Input
                                               type="text"
                                               inputMode="numeric"
                                               value={tempUnitPrice}
                                               onChange={e => setTempUnitPrice(parseNumericInput(e.target.value))}
-                                              placeholder={perPersonUnitPlaceholder}
+                                              placeholder="65000"
                                               className="h-9"
                                             />
                                           </div>

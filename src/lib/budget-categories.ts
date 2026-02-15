@@ -23,7 +23,6 @@ export const BUDGET_CATEGORIES: Category[] = [
     subCategories: [
       { id: 'venue-fee', name: '대관료', placeholder: '예식장 대관 비용' },
       { id: 'meal-cost', name: '식대비', placeholder: '하객 식사 비용' },
-      { id: 'expected-gift-money', name: '축의금 (예상)', placeholder: '예상 축의금 수입' },
       { id: 'thank-you-gifts', name: '답례품 준비비', placeholder: '하객 답례품' },
       { id: 'ceremony-staff', name: '축가, 축의대, 사회비', placeholder: '축가, 축의대, 사회자 비용' },
       { id: 'main-snap', name: '본식 스냅', placeholder: '본식 스냅 촬영' },
@@ -120,13 +119,6 @@ export const formatKoreanWon = (amount: number): string => {
   }
   return `${amount.toLocaleString()}원`;
 };
-
-export const isIncomeItem = (category: string, subCategory: string): boolean =>
-  category === 'main-ceremony' && subCategory === 'expected-gift-money';
-
-export const calculateNetTotal = (items: { category: string; sub_category: string; amount: number }[]): number =>
-  items.reduce((sum, item) =>
-    isIncomeItem(item.category, item.sub_category) ? sum - item.amount : sum + item.amount, 0);
 
 export const parseKoreanWon = (input: string): number => {
   // Remove all non-numeric characters except for Korean units

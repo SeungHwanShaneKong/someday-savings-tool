@@ -1,5 +1,5 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { BUDGET_CATEGORIES, formatKoreanWon, calculateNetTotal } from '@/lib/budget-categories';
+import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
 import { BudgetItem } from '@/hooks/useBudget';
 
 interface BudgetDonutChartProps {
@@ -26,7 +26,7 @@ export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
     };
   }).filter(d => d.value > 0);
 
-  const total = calculateNetTotal(items);
+  const total = data.reduce((sum, d) => sum + d.value, 0);
 
   if (data.length === 0) {
     return (

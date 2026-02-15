@@ -1,4 +1,1 @@
 project_id = "tnboeqtdimyxpjzsraro"
-
-[functions.preview-auto-login]
-verify_jwt = false

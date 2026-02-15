@@ -1,86 +1,139 @@
-# '축의금 (예상)' 수익 처리 로직 구현
+
+# 관리자 KPI 대시보드 전면 재구축
 
 ## 개요
+현재의 간단한 관리자 대시보드를 이미지에 표시된 15개 핵심 KPI 지표 기반의 운영 대시보드로 전면 교체합니다. 데모 데이터 모드와 실제 데이터 모드를 모두 지원하며, 기간 필터, 상태 배지, 5개 트렌드 차트, Top 페이지, KPI 정의 테이블을 포함합니다.
 
-현재 '축의금 (예상)' 항목은 다른 비용 항목과 동일하게 합산되고 있습니다. 이를 **수익(income)** 으로 처리하여 총 비용에서 **차감**되도록 모든 합계 계산 로직을 수정합니다.
+## 주요 기능
 
-## 핵심 로직
+### 1. 헤더 영역
+- 뒤로가기 버튼 + "관리자 KPI 대시보드 (초안)" 제목 + 부제
+- "데모 데이터 ON/OFF" 토글 버튼 (cyan 배경)
+- "새로고침" 버튼
 
-축의금 항목 판별 조건: `item.category === 'main-ceremony' && item.sub_category === 'expected-gift-money'`
+### 2. 필터 컨트롤 패널
+- 기간 선택: 최근 7일 / 최근 30일(기본) / 최근 90일 / 직접 지정
+- 세그먼트/플랫폼 드롭다운 (UI만 구현, 향후 확장용)
+- 초안 안내 메시지
+- 조회 기간 표시
 
-합계 공식 변경: `총 비용 = Σ(일반 항목 amount) - Σ(축의금 항목 amount)`
+### 3. KPI 카드 15개 (5열 x 3행)
+각 카드 구성: KPI ID, 지표명, 현재값, 전기 대비 변화율(%), 설명, 상태 배지(정상/주의/위험/참고)
 
-## 공통 유틸리티 함수 추가
+| ID | 지표명 | 계산식 (실제 데이터 소스) |
+|----|--------|--------------------------|
+| K01 | 신규 가입자 수 | 기간 내 profiles 생성 수 |
+| K02 | DAU | 당일 page_views 고유 user_id 수 |
+| K03 | WAU | 최근 7일 page_views 고유 user_id 수 |
+| K04 | MAU | 최근 30일 page_views 고유 user_id 수 |
+| K05 | Stickiness | DAU / MAU x 100 |
+| K06 | D1 리텐션 | 가입 후 1일 재방문 비율 |
+| K07 | D7 리텐션 | 가입 후 7일 재방문 비율 |
+| K08 | D30 리텐션 | 가입 후 30일 재방문 비율 |
+| K09 | 가입->예산 생성(24h) | 가입 후 24시간 내 예산 생성 비율 |
+| K10 | 가입->첫 금액 입력(24h) | 가입 후 24시간 내 amount>0 비율 |
+| K11 | TTFV 중앙값 | 가입->첫 금액 입력 소요시간 중앙값(분) |
+| K12 | 다중 시나리오 사용률 | 예산 2개 이상 사용자 비율 |
+| K13 | 공유 링크 생성률 | 활성 사용자 중 shared_budgets 생성 비율 |
+| K14 | 스냅샷 사용률 | 활성 사용자 중 budget_snapshots 사용 비율 |
+| K15 | 예산 집행률 | is_paid 금액 합 / 전체 금액 합 |
 
-### `src/lib/budget-categories.ts`
+### 4. 상태 배지 임계값 로직
+각 KPI에 대해 정상(초록)/주의(노란)/위험(빨간)/참고(회색) 배지를 표시. 임계값은 이미지의 "15개 핵심 지표 정의" 테이블 기준:
+- 예: K05 Stickiness: 주의 < 25, 위험 < 20
+- 예: K06 D1 리텐션: 주의 < 40, 위험 < 35
 
-수익 항목 판별 헬퍼 함수를 추가하여 모든 파일에서 일관되게 사용:
+### 5. Historical Trend Top 5 차트 (Recharts)
+1. **활성 사용자 추이 (DAU/WAU/MAU)** - 3개 라인 차트
+2. **온보딩 전환 추이 (가입/생성/입력)** - 3개 바 차트
+3. **리텐션 코호트 추이 (D1/D7/D30)** - 3개 라인 차트
+4. **핵심 기능 채택률 추이** - 3개 라인 차트
+5. **집행률 & TTFV 추이** - 듀얼 Y축 라인 차트
 
-```typescript
-export const isIncomeItem = (category: string, subCategory: string): boolean =>
-  category === 'main-ceremony' && subCategory === 'expected-gift-money';
+### 6. Top 페이지 섹션
+page_views에서 상위 5개 경로를 집계하여 리스트 표시
 
-export const calculateNetTotal = (items: { category: string; sub_category: string; amount: number }[]): number =>
-  items.reduce((sum, item) =>
-    isIncomeItem(item.category, item.sub_category) ? sum - item.amount : sum + item.amount, 0);
+### 7. 15개 핵심 지표 정의 테이블
+ID, 지표명, 계산식, 현재값, 임계 기준을 테이블로 표시
+
+## 기술 상세
+
+### 파일 구조
+```
+src/pages/Admin.tsx          -- 전면 재작성 (메인 대시보드)
+src/hooks/useAdminKPI.tsx    -- 신규: KPI 데이터 페칭 커스텀 훅
+src/lib/kpi-definitions.ts   -- 신규: KPI 정의, 임계값, 데모 데이터
 ```
 
-## 수정 대상 파일 (총 7개)
+### 데이터 페칭 전략 (useAdminKPI 훅)
+- Supabase에서 profiles, page_views, budgets, budget_items, shared_budgets, budget_snapshots 테이블을 조회
+- 기간 필터(startDate, endDate)에 따라 쿼리 필터링
+- 이전 기간 대비 변화율 계산 (예: 30일 선택 시 이전 30일과 비교)
+- 일별 트렌드 데이터 생성
 
-### 1. `src/hooks/useBudget.tsx` (라인 164)
+### RLS 고려사항
+- profiles 테이블: 현재 본인만 조회 가능 -> Admin용 `SECURITY DEFINER` 함수 생성 필요
+- page_views: 이미 admin SELECT 정책 있음
+- budgets, budget_items, shared_budgets, budget_snapshots: admin SELECT 정책 추가 필요
 
-- `getTotal()`: `calculateNetTotal(items)` 사용
-- `getPaidTotal()`, `getPendingTotal()`도 동일하게 수익 항목 차감 적용
+### DB 마이그레이션 필요
+Admin이 모든 테이블의 집계 데이터를 조회할 수 있도록 `SECURITY DEFINER` 함수를 생성:
+```sql
+-- Admin KPI 집계 함수 (RLS 우회)
+CREATE OR REPLACE FUNCTION get_admin_kpi_data(p_start_date timestamptz, p_end_date timestamptz)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  -- profiles count, page_views aggregation, budgets data 등을 한번에 반환
+$function$;
+```
 
-### 2. `src/hooks/useMultipleBudgets.tsx` (라인 458)
+또는 더 간단하게: 필요한 테이블들에 admin SELECT RLS 정책 추가:
+```sql
+-- profiles: admin 조회 허용
+CREATE POLICY "Admins can view all profiles"
+ON profiles FOR SELECT
+USING (has_role(auth.uid(), 'admin'));
 
-- `getTotal()`: `calculateNetTotal(items)` 사용
+-- budgets: admin 조회 허용
+CREATE POLICY "Admins can view all budgets"
+ON budgets FOR SELECT
+USING (has_role(auth.uid(), 'admin'));
 
-### 3. `src/components/BudgetTable.tsx`
+-- budget_items: admin 조회 허용
+CREATE POLICY "Admins can view all budget items"
+ON budget_items FOR SELECT
+USING (has_role(auth.uid(), 'admin'));
 
-- `getOverallTotal()` 함수에 동일 로직 적용 (존재하는 경우)
+-- shared_budgets: admin 조회 허용
+CREATE POLICY "Admins can view all shared budgets"
+ON shared_budgets FOR SELECT
+USING (has_role(auth.uid(), 'admin'));
 
-### 4. `src/components/BudgetTableMobile.tsx` (라인 169-171)
+-- budget_snapshots: admin 조회 허용
+CREATE POLICY "Admins can view all budget snapshots"
+ON budget_snapshots FOR SELECT
+USING (has_role(auth.uid(), 'admin'));
+```
 
-- `getOverallTotal()`: `calculateNetTotal(items)` 사용
+### 데모 데이터 모드
+"데모 데이터 ON" 버튼 토글 시 실제 DB 대신 미리 정의된 데모 데이터(이미지의 수치)를 사용하여 대시보드를 렌더링. 개발/프레젠테이션 용도.
 
-### 5. `src/pages/Summary.tsx` (라인 75-84)
+### 반응형 디자인
+- 데스크탑: 5열 KPI 카드 그리드
+- 태블릿: 3열
+- 모바일: 2열
+- 차트: 2열 -> 1열 반응형
 
-- `getBudgetTotal()`: `calculateNetTotal(budgetItems)` 사용
-- `getCategoryTotal()`: 카테고리별 합계는 그대로 유지 (카테고리 내에서는 양수 표시)
+### 보안
+- 기존 useAdmin 훅 + user_roles RLS로 접근 제어 유지
+- 모든 데이터 쿼리는 서버 측 RLS 정책으로 보호
+- 클라이언트에서 admin이 아닌 경우 즉시 리다이렉트
 
-### 6. `src/components/BudgetComparisonDashboard.tsx` (라인 51-54)
-
-- `budgetTotals` 계산: `calculateNetTotal(budget.items)` 사용
-
-### 7. `src/pages/SharedBudget.tsx` (라인 82)
-
-- `total` 계산: `calculateNetTotal(data.items)` 사용
-
-### 8. `src/components/BudgetDonutChart.tsx` (라인 20, 29)
-
-- 도넛 차트의 총계 계산에서 축의금을 수익으로 표시
-- 차트 데이터에서는 축의금 카테고리 금액을 양수로 표시하되, 중앙 총합은 순비용으로 표시
-
-### 9. `src/components/FloatingTotalBar.tsx`
-
-- 이 컴포넌트는 `total` prop을 받으므로 자체 수정 불필요 (호출부에서 처리)
-
-필요하다면, 관련하여 바꿔야 차트나, 수치들을 내용에 충돌이 없도록 업그레이드해 주세요.
-
-## UI 표시 개선
-
-- 총계 라벨을 "총 예상 비용"에서 상황에 맞게 유지하되, 축의금이 차감된 **순비용**임을 사용자가 인지할 수 있도록 함
-- 축의금 항목에 수익 표시 뱃지 또는 마이너스(-) 부호를 추가하여 시각적 구분
-
-## 검증 시나리오 (3회 독립 테스트)
-
-1. **시나리오 1 - BudgetFlow 페이지**: 본식 운영 카테고리에서 축의금 금액 입력 후, FloatingTotalBar의 총 예상 비용이 (다른 항목 합계 - 축의금)으로 표시되는지 확인
-2. **시나리오 2 - Summary 페이지**: 여러 예산 옵션의 비교 대시보드에서 각 옵션의 총액이 축의금을 차감한 순비용으로 계산되는지 확인
-3. **시나리오 3 - SharedBudget 페이지**: 공유 링크로 접속 시 총 예상 비용이 축의금 차감된 값으로 표시되는지 확인
-
-## 기술적 고려사항
-
-- `calculateNetTotal` 유틸리티를 중앙에 두어 로직 중복 방지
-- 카테고리별 소계(getCategoryTotal)는 변경하지 않음 - 본식 운영 카테고리 내에서 축의금은 양수로 표시
-- 전체 합계에서만 차감 처리
+## 구현 순서
+1. DB 마이그레이션: admin용 SELECT RLS 정책 추가 (5개 테이블)
+2. `src/lib/kpi-definitions.ts` 생성: KPI 메타데이터, 임계값, 데모 데이터
+3. `src/hooks/useAdminKPI.tsx` 생성: 데이터 페칭 및 KPI 계산 로직
+4. `src/pages/Admin.tsx` 전면 재작성: 새 대시보드 UI

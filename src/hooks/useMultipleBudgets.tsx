@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { BUDGET_CATEGORIES, calculateNetTotal } from '@/lib/budget-categories';
+import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
 import { useToast } from '@/hooks/use-toast';
 import { Budget } from './useBudget';
 import { ExtendedBudgetItem } from '@/components/BudgetTable';
@@ -454,8 +454,8 @@ export function useMultipleBudgets() {
   // Alias for backward compatibility
   const deleteCustomItem = deleteItem;
 
-  // Get total (net: expenses - income)
-  const getTotal = () => calculateNetTotal(items);
+  // Get total
+  const getTotal = () => items.reduce((sum, item) => sum + item.amount, 0);
 
   // Get all budgets with their items for comparison
   const getBudgetsForComparison = () => {

@@ -1,53 +1,35 @@
 
 
-# Preview 환경에서 인증 없이 모든 페이지 접근 허용
+# Preview 모드 완전 인증 우회
 
-## 개요
-Preview 환경(lovable.app 도메인)에서는 로그인 없이 모든 페이지(/budget, /summary, /admin)로 자유롭게 이동할 수 있도록 인증 가드를 조건부로 비활성화합니다.
+## 문제
+- Preview 환경에서 Google OAuth가 지원되지 않아 로그인 실패
+- 페이지 가드는 이미 우회했지만, `/auth` 페이지에서 로그인 버튼을 누르면 에러 발생
+- 또한 `useMultipleBudgets`/`useBudget` 훅에서 `if (!user) return;`으로 데이터 로딩을 스킵하므로 빈 화면이 표시될 수 있음
 
 ## 변경 내용
 
-### 1. `src/lib/utils.ts` - Preview 환경 감지 헬퍼 추가
+### 1. `src/pages/Auth.tsx` - Preview 모드에서 자동 리다이렉트
+- Preview 모드 감지 시 로그인 페이지를 보여주지 않고, 즉시 `/budget`으로 리다이렉트
 ```typescript
-export const isPreviewMode = () => {
-  return window.location.hostname.includes('preview') 
-    && window.location.hostname.includes('lovable.app');
-};
-```
+import { isPreviewMode } from '@/lib/utils';
 
-### 2. `src/pages/BudgetFlow.tsx` - 인증 가드 조건부 해제
-기존:
-```typescript
-if (!authLoading && !user) {
-  return <Navigate to="/auth" replace />;
-}
-```
-변경:
-```typescript
-if (!authLoading && !user && !isPreviewMode()) {
-  return <Navigate to="/auth" replace />;
+// 기존 user 체크 직후 추가
+if (!loading && !user && isPreviewMode()) {
+  return <Navigate to="/budget" replace />;
 }
 ```
 
-### 3. `src/pages/Summary.tsx` - 동일 패턴 적용
-인증 체크에 `&& !isPreviewMode()` 조건 추가
+### 2. `src/pages/BudgetFlow.tsx` - Preview 모드에서 데모 데이터 로딩
+- `user`가 null이고 `isPreviewMode()`일 때, 빈 상태 대신 기본 카테고리 구조의 빈 예산 UI를 표시
+- 이미 auth 가드 우회는 적용되어 있으므로, 데이터가 비어있더라도 페이지 자체는 접근 가능
+- 현재 구조상 `useMultipleBudgets`가 user 없이는 fetch하지 않으므로, "새 예산 만들기" 등의 빈 상태 UI가 자연스럽게 표시됨
 
-### 4. `src/pages/Admin.tsx` - 동일 패턴 적용
-`useEffect` 내 인증/권한 체크에 `isPreviewMode()` 조건 추가:
-```typescript
-useEffect(() => {
-  if (isPreviewMode()) return; // Preview에서는 체크 스킵
-  if (!authLoading && !user) { navigate('/auth'); return; }
-  if (!adminLoading && !isAdmin) { navigate('/'); return; }
-}, [user, authLoading, isAdmin, adminLoading, navigate]);
-```
+### 3. `src/pages/Landing.tsx` - Preview 모드에서 CTA 버튼 경로 변경 (선택적)
+- "시작하기" 버튼이 `/auth`로 이동하는 경우, Preview 모드에서는 `/budget`으로 직접 이동하도록 변경
 
-### 5. `src/hooks/useMultipleBudgets.tsx` / `src/hooks/useBudget.tsx` - 데이터 로딩
-- Preview 모드에서 `user`가 null이면 데이터 fetch를 스킵하므로, 페이지는 보이지만 데이터는 비어있을 수 있음
-- 이는 예상된 동작이며, 데모 데이터나 빈 상태 UI가 표시됨
-
-## 보안 고려사항
-- `isPreviewMode()`는 Lovable preview 도메인(`*-preview--*.lovable.app`)에서만 true 반환
-- 프로덕션 배포(`someday-savings-tool.lovable.app`)에서는 기존 인증 로직 그대로 유지
-- RLS 정책은 서버 측에서 여전히 적용되므로 데이터 보안에는 영향 없음
+## 영향 범위
+- Preview 모드에서는 인증 없이 UI 탐색 가능 (데이터는 RLS로 보호되어 빈 상태)
+- 프로덕션 환경에는 전혀 영향 없음
+- 기존 `isPreviewMode()` 헬퍼 함수 재활용
 

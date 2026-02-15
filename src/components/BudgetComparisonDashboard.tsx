@@ -1,4 +1,4 @@
-import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
+import { BUDGET_CATEGORIES, formatKoreanWon, calculateNetTotal } from '@/lib/budget-categories';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExtendedBudgetItem, COST_SPLIT_OPTIONS, CostSplitType } from './BudgetTable';
 import {
@@ -47,10 +47,10 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
     );
   }
 
-  // Calculate totals for each budget
+  // Calculate totals for each budget (net: expenses - income)
   const budgetTotals = budgets.map(budget => ({
     name: budget.name,
-    total: budget.items.reduce((sum, item) => sum + item.amount, 0),
+    total: calculateNetTotal(budget.items),
   }));
 
   // Calculate category breakdown for each budget

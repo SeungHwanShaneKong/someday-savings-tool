@@ -121,6 +121,13 @@ export const formatKoreanWon = (amount: number): string => {
   return `${amount.toLocaleString()}원`;
 };
 
+export const isIncomeItem = (category: string, subCategory: string): boolean =>
+  category === 'main-ceremony' && subCategory === 'expected-gift-money';
+
+export const calculateNetTotal = (items: { category: string; sub_category: string; amount: number }[]): number =>
+  items.reduce((sum, item) =>
+    isIncomeItem(item.category, item.sub_category) ? sum - item.amount : sum + item.amount, 0);
+
 export const parseKoreanWon = (input: string): number => {
   // Remove all non-numeric characters except for Korean units
   const cleaned = input.replace(/[,\s원]/g, '');

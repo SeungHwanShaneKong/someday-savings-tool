@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
-import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
+import { BUDGET_CATEGORIES, formatKoreanWon, calculateNetTotal } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
 import { Home, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,7 +79,7 @@ export default function SharedBudget() {
     fetchSharedBudget();
   }, [token]);
 
-  const total = data.items.reduce((sum, item) => sum + item.amount, 0);
+  const total = calculateNetTotal(data.items);
   const getCategoryTotal = (categoryId: string) => 
     data.items.filter(item => item.category === categoryId).reduce((sum, item) => sum + item.amount, 0);
 

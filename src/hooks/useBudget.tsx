@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
+import { BUDGET_CATEGORIES, isIncomeItem, calculateNetTotal } from '@/lib/budget-categories';
 import { useToast } from '@/hooks/use-toast';
 
 export interface BudgetItem {
@@ -160,16 +160,14 @@ export function useBudget() {
   const getCategoryTotal = (categoryId: string) => 
     getItemsByCategory(categoryId).reduce((sum, item) => sum + item.amount, 0);
 
-  // Get overall total
-  const getTotal = () => items.reduce((sum, item) => sum + item.amount, 0);
+  // Get overall total (net: expenses - income)
+  const getTotal = () => calculateNetTotal(items);
 
-  // Get paid total
-  const getPaidTotal = () => 
-    items.filter(item => item.is_paid).reduce((sum, item) => sum + item.amount, 0);
+  // Get paid total (net: expenses - income)
+  const getPaidTotal = () => calculateNetTotal(items.filter(item => item.is_paid));
 
-  // Get pending total
-  const getPendingTotal = () => 
-    items.filter(item => !item.is_paid && item.amount > 0).reduce((sum, item) => sum + item.amount, 0);
+  // Get pending total (net: expenses - income)
+  const getPendingTotal = () => calculateNetTotal(items.filter(item => !item.is_paid && item.amount > 0));
 
   return {
     budget,

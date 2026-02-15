@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
-import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
+import { BUDGET_CATEGORIES, formatKoreanWon, calculateNetTotal } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -78,9 +78,9 @@ export default function Summary() {
       .reduce((sum, item) => sum + item.amount, 0);
   };
 
-  // Get total for specific budget items
+  // Get total for specific budget items (net: expenses - income)
   const getBudgetTotal = (budgetItems: typeof items) => {
-    return budgetItems.reduce((sum, item) => sum + item.amount, 0);
+    return calculateNetTotal(budgetItems);
   };
 
   // Find min and max budgets

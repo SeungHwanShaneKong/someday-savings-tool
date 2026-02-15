@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import React from 'react';
-import { formatKoreanWon, SubCategory, Category } from '@/lib/budget-categories';
+import { formatKoreanWon, SubCategory, Category, calculateNetTotal } from '@/lib/budget-categories';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -167,7 +167,7 @@ export function BudgetTableMobile({
   };
   
   const getOverallTotal = () => {
-    return items.reduce((sum, item) => sum + item.amount, 0);
+    return calculateNetTotal(items);
   };
   
   const parseNumericInput = (value: string): string => {

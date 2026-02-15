@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { isPreviewEnvironment } from '@/lib/utils';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
@@ -50,6 +51,7 @@ const COST_SPLIT_COLORS: Record<CostSplitType, string> = {
 
 export default function Summary() {
   const navigate = useNavigate();
+  const isPreview = isPreviewEnvironment();
   const { user, loading: authLoading } = useAuth();
   const { 
     budgets, 
@@ -93,8 +95,8 @@ export default function Summary() {
   const maxBudget = sortedByTotal[sortedByTotal.length - 1];
   const difference = maxBudget?.total - minBudget?.total || 0;
 
-  // Auth check
-  if (!authLoading && !user) {
+  // Auth check (skip in preview environment)
+  if (!authLoading && !user && !isPreview) {
     return <Navigate to="/auth" replace />;
   }
 

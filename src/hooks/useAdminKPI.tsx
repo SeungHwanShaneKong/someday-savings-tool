@@ -272,6 +272,12 @@ export function useAdminKPI(): UseAdminKPIResult {
           ? Math.round(dayDurations.reduce((a, b) => a + b, 0) / dayDurations.length)
           : 0;
 
+        // amountEntered: budget_items with amount > 0 created on this day
+        const dayAmountEntered = budgetItems.filter(bi => {
+          const d = new Date(bi.created_at);
+          return d >= dayStart && d <= dayEnd && bi.amount > 0;
+        }).length;
+
         trend.push({
           date: dateStr,
           dau: unique(dayPVs).size,
@@ -288,15 +294,7 @@ export function useAdminKPI(): UseAdminKPIResult {
             const d = new Date(b.created_at);
             return d >= dayStart && d <= dayEnd;
           }).length,
-          amountEntered: 0,
-          d1: Math.round(d1Retention),
-          d7: Math.round(d7Retention),
-          d30: Math.round(d30Retention),
-          multiScenario: Math.round(k12),
-          shareLink: Math.round(k13),
-          snapshot: Math.round(k14),
-          executionRate: Math.round(k15),
-          ttfv: ttfvMedian,
+          amountEntered: dayAmountEntered,
           pv: dayPVCount,
           loyalCount: dayLoyalCount,
           avgDuration: dayAvgDuration,

@@ -21,7 +21,6 @@ import {
 import { subDays, startOfYear, format } from 'date-fns';
 import {
   KPI_DEFINITIONS, getKPIStatus, getStatusColor,
-  getDemoKPIValues, getDemoTrendData, getDemoTopPages,
   type KPIValue
 } from '@/lib/kpi-definitions';
 import type { SummaryKPIs } from '@/hooks/useAdminKPI';
@@ -54,20 +53,6 @@ function calcChangePercent(current: number, prev: number): number {
   return ((current - prev) / prev) * 100;
 }
 
-// ========= 데모 Summary KPI =========
-const demoSummaryKPIs: SummaryKPIs = {
-  totalPageViews: 12847,
-  prevTotalPageViews: 10230,
-  loyalUsers: 342,
-  prevLoyalUsers: 280,
-  totalUniqueUsers: 1520,
-  avgSessionTime: 245,
-  prevAvgSessionTime: 198,
-  dailyPageViews: 421,
-  weeklyPageViews: 3120,
-  monthlyPageViews: 12847,
-};
-
 export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -75,7 +60,6 @@ export default function Admin() {
   const { kpiValues, trendData, topPages, summaryKPIs, loading: dataLoading, fetchData } = useAdminKPI();
 
   const [period, setPeriod] = useState('30');
-  const [demoMode, setDemoMode] = useState(false);
 
   const { startDate, endDate } = useMemo(() => {
     const end = new Date();
@@ -89,18 +73,13 @@ export default function Admin() {
   }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
   useEffect(() => {
-    if (isAdmin && !demoMode) {
+    if (isAdmin) {
       fetchData(startDate, endDate);
     }
-  }, [isAdmin, demoMode, startDate, endDate, fetchData]);
-
-  const activeKPIs = demoMode ? getDemoKPIValues() : kpiValues;
-  const activeTrend = demoMode ? getDemoTrendData() : trendData;
-  const activeTopPages = demoMode ? getDemoTopPages() : topPages;
-  const activeSummary = demoMode ? demoSummaryKPIs : summaryKPIs;
+  }, [isAdmin, startDate, endDate, fetchData]);
 
   const handleRefresh = () => {
-    if (!demoMode) fetchData(startDate, endDate);
+    fetchData(startDate, endDate);
   };
 
   if (authLoading || adminLoading) {
@@ -112,11 +91,11 @@ export default function Admin() {
   }
   if (!isAdmin) return null;
 
-  const pvChange = calcChangePercent(activeSummary.totalPageViews, activeSummary.prevTotalPageViews);
-  const loyalChange = calcChangePercent(activeSummary.loyalUsers, activeSummary.prevLoyalUsers);
-  const sessionChange = calcChangePercent(activeSummary.avgSessionTime, activeSummary.prevAvgSessionTime);
-  const loyalPercent = activeSummary.totalUniqueUsers > 0
-    ? Math.round((activeSummary.loyalUsers / activeSummary.totalUniqueUsers) * 1000) / 10
+  const pvChange = calcChangePercent(summaryKPIs.totalPageViews, summaryKPIs.prevTotalPageViews);
+  const loyalChange = calcChangePercent(summaryKPIs.loyalUsers, summaryKPIs.prevLoyalUsers);
+  const sessionChange = calcChangePercent(summaryKPIs.avgSessionTime, summaryKPIs.prevAvgSessionTime);
+  const loyalPercent = summaryKPIs.totalUniqueUsers > 0
+    ? Math.round((summaryKPIs.loyalUsers / summaryKPIs.totalUniqueUsers) * 1000) / 10
     : 0;
 
   return (
@@ -135,14 +114,6 @@ export default function Admin() {
               <p className="text-sm text-muted-foreground leading-relaxed">운영 핵심 지표 모니터링</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant={demoMode ? 'default' : 'outline'}
-                onClick={() => setDemoMode(!demoMode)}
-                className={`text-sm ${demoMode ? 'bg-cyan-600 hover:bg-cyan-700 text-white' : ''}`}
-              >
-                {demoMode ? '데모 ON' : '데모 OFF'}
-              </Button>
               <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
                 <RefreshCw className={`h-4 w-4 ${dataLoading ? 'animate-spin' : ''}`} />
               </Button>
@@ -170,12 +141,6 @@ export default function Admin() {
             </div>
           </div>
 
-          {demoMode && (
-            <div className="rounded-lg bg-cyan-50 dark:bg-cyan-950/20 border border-cyan-200 dark:border-cyan-800 px-4 py-3 text-sm text-cyan-700 dark:text-cyan-400">
-              ⚡ 데모 데이터 모드 — 실제 DB 대신 미리 정의된 샘플 데이터를 표시합니다.
-            </div>
-          )}
-
           {/* ===== 상단 3종 KPI 위젯 ===== */}
           <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* 페이지뷰 */}
@@ -184,7 +149,7 @@ export default function Admin() {
                 <div className="space-y-2">
                   <p className="text-sm sm:text-base font-medium text-muted-foreground leading-relaxed">페이지뷰 (PV)</p>
                   <p className="text-3xl sm:text-4xl font-bold tabular-nums leading-tight">
-                    {activeSummary.totalPageViews.toLocaleString()}
+                    {summaryKPIs.totalPageViews.toLocaleString()}
                   </p>
                   <div className="flex items-center gap-1.5">
                     {pvChange > 0 ? <TrendingUp className="h-4 w-4 text-emerald-500" /> :
@@ -195,7 +160,7 @@ export default function Admin() {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                    오늘 {activeSummary.dailyPageViews.toLocaleString()} · 주간 {activeSummary.weeklyPageViews.toLocaleString()} · 월간 {activeSummary.monthlyPageViews.toLocaleString()}
+                    오늘 {summaryKPIs.dailyPageViews.toLocaleString()} · 주간 {summaryKPIs.weeklyPageViews.toLocaleString()} · 월간 {summaryKPIs.monthlyPageViews.toLocaleString()}
                   </p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-blue-500/10">
@@ -210,7 +175,7 @@ export default function Admin() {
                 <div className="space-y-2">
                   <p className="text-sm sm:text-base font-medium text-muted-foreground leading-relaxed">충성 고객 수</p>
                   <p className="text-3xl sm:text-4xl font-bold tabular-nums leading-tight">
-                    {activeSummary.loyalUsers.toLocaleString()}
+                    {summaryKPIs.loyalUsers.toLocaleString()}
                     <span className="text-base sm:text-lg font-normal text-muted-foreground ml-1.5">명</span>
                   </p>
                   <div className="flex items-center gap-1.5">
@@ -237,7 +202,7 @@ export default function Admin() {
                 <div className="space-y-2">
                   <p className="text-sm sm:text-base font-medium text-muted-foreground leading-relaxed">평균 체류 시간</p>
                   <p className="text-3xl sm:text-4xl font-bold tabular-nums leading-tight">
-                    {formatDuration(activeSummary.avgSessionTime)}
+                    {formatDuration(summaryKPIs.avgSessionTime)}
                   </p>
                   <div className="flex items-center gap-1.5">
                     {sessionChange > 0 ? <TrendingUp className="h-4 w-4 text-emerald-500" /> :
@@ -267,7 +232,7 @@ export default function Admin() {
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">페이지뷰 추이</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activeTrend}>
+                    <AreaChart data={trendData}>
                       <defs>
                         <linearGradient id="gradPV" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
@@ -294,7 +259,7 @@ export default function Admin() {
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">충성 고객 추이</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activeTrend}>
+                    <AreaChart data={trendData}>
                       <defs>
                         <linearGradient id="gradLoyal" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15} />
@@ -321,7 +286,7 @@ export default function Admin() {
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">평균 체류 시간 추이</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activeTrend}>
+                    <AreaChart data={trendData}>
                       <defs>
                         <linearGradient id="gradDuration" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15} />
@@ -361,7 +326,7 @@ export default function Admin() {
             <h2 className="text-base sm:text-lg font-bold mb-4 leading-relaxed">📊 15개 핵심 운영 지표</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               {KPI_DEFINITIONS.map(def => {
-                const kv = activeKPIs.find(k => k.id === def.id);
+                const kv = kpiValues.find(k => k.id === def.id);
                 const value = kv?.value ?? 0;
                 const change = kv?.change ?? 0;
                 const status = getKPIStatus(def, value);
@@ -411,9 +376,9 @@ export default function Admin() {
             </div>
           </section>
 
-          {/* ===== 트렌드 차트 (5개) ===== */}
+          {/* ===== 트렌드 차트 (실제 일별 데이터만) ===== */}
           <section className="space-y-5">
-            <h2 className="text-base sm:text-lg font-bold leading-relaxed">📈 Historical Trend — Top 5 차트</h2>
+            <h2 className="text-base sm:text-lg font-bold leading-relaxed">📈 Historical Trend</h2>
 
             <div className="grid md:grid-cols-2 gap-4 sm:gap-5">
               {/* 차트 1: 활성 사용자 추이 */}
@@ -421,7 +386,7 @@ export default function Admin() {
                 <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">활성 사용자 추이 (DAU / WAU / MAU)</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={activeTrend}>
+                    <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
@@ -440,7 +405,7 @@ export default function Admin() {
                 <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">온보딩 전환 추이 (가입 / 생성 / 입력)</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={activeTrend}>
+                    <BarChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
@@ -453,63 +418,6 @@ export default function Admin() {
                   </ResponsiveContainer>
                 </div>
               </Card>
-
-              {/* 차트 3: 리텐션 코호트 추이 */}
-              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
-                <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">리텐션 코호트 추이 (D1 / D7 / D30)</h3>
-                <div className="h-56 sm:h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={activeTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                      <RechartsTooltip contentStyle={chartTooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: '13px' }} />
-                      <Line type="monotone" dataKey="d1" name="D1" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="d7" name="D7" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="d30" name="D30" stroke="#6366f1" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-
-              {/* 차트 4: 핵심 기능 채택률 추이 */}
-              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
-                <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">핵심 기능 채택률 추이</h3>
-                <div className="h-56 sm:h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={activeTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                      <RechartsTooltip contentStyle={chartTooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: '13px' }} />
-                      <Line type="monotone" dataKey="multiScenario" name="다중 시나리오" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="shareLink" name="공유 링크" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="snapshot" name="스냅샷" stroke="#ec4899" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-
-              {/* 차트 5: 집행률 & TTFV 추이 (full-width) */}
-              <Card className="p-4 sm:p-5 md:col-span-2 hover:shadow-md transition-shadow">
-                <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">집행률 & TTFV 추이</h3>
-                <div className="h-56 sm:h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={activeTrend}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis yAxisId="left" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" unit="%" />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" unit="분" />
-                      <RechartsTooltip contentStyle={chartTooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: '13px' }} />
-                      <Line yAxisId="left" type="monotone" dataKey="executionRate" name="집행률(%)" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line yAxisId="right" type="monotone" dataKey="ttfv" name="TTFV(분)" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="5 5" activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
             </div>
           </section>
 
@@ -519,7 +427,7 @@ export default function Admin() {
               <Eye className="h-5 w-5" /> Top 페이지 (조회 기간 내)
             </h2>
             <div className="space-y-1">
-              {activeTopPages.length ? activeTopPages.map((page, i) => (
+              {topPages.length ? topPages.map((page, i) => (
                 <div key={page.path} className="flex items-center justify-between py-2.5 px-2 rounded-md border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3">
                     <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">{i + 1}</span>
@@ -553,7 +461,7 @@ export default function Admin() {
                 </TableHeader>
                 <TableBody>
                   {KPI_DEFINITIONS.map(def => {
-                    const kv = activeKPIs.find(k => k.id === def.id);
+                    const kv = kpiValues.find(k => k.id === def.id);
                     const value = kv?.value ?? 0;
                     const status = getKPIStatus(def, value);
                     const sc = getStatusColor(status);

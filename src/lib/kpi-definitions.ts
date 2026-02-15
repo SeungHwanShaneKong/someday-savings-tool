@@ -73,14 +73,6 @@ export interface TrendDataPoint {
   signups?: number;
   budgetCreated?: number;
   amountEntered?: number;
-  d1?: number;
-  d7?: number;
-  d30?: number;
-  multiScenario?: number;
-  shareLink?: number;
-  snapshot?: number;
-  executionRate?: number;
-  ttfv?: number;
   pv?: number;
   loyalCount?: number;
   avgDuration?: number;
@@ -90,64 +82,4 @@ export interface TopPage {
   path: string;
   views: number;
   percentage: number;
-}
-
-/** 데모 데이터 */
-export function getDemoKPIValues(): KPIValue[] {
-  return [
-    { id: 'K01', value: 47, change: 12.5 },
-    { id: 'K02', value: 23, change: -5.2 },
-    { id: 'K03', value: 89, change: 8.1 },
-    { id: 'K04', value: 156, change: 15.3 },
-    { id: 'K05', value: 14.7, change: -18.2 },
-    { id: 'K06', value: 38.5, change: -3.1 },
-    { id: 'K07', value: 22.1, change: 5.4 },
-    { id: 'K08', value: 8.3, change: -12.0 },
-    { id: 'K09', value: 62.4, change: 7.8 },
-    { id: 'K10', value: 41.2, change: 3.5 },
-    { id: 'K11', value: 35, change: -8.6 },
-    { id: 'K12', value: 18.7, change: 22.1 },
-    { id: 'K13', value: 7.3, change: -15.0 },
-    { id: 'K14', value: 12.5, change: 45.2 },
-    { id: 'K15', value: 34.8, change: 6.7 },
-  ];
-}
-
-export function getDemoTrendData(): TrendDataPoint[] {
-  const days = 30;
-  return Array.from({ length: days }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - 1 - i));
-    const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-    return {
-      date: dateStr,
-      dau: Math.floor(15 + Math.random() * 20),
-      wau: Math.floor(60 + Math.random() * 40),
-      mau: Math.floor(120 + Math.random() * 60),
-      signups: Math.floor(1 + Math.random() * 5),
-      budgetCreated: Math.floor(1 + Math.random() * 4),
-      amountEntered: Math.floor(0 + Math.random() * 3),
-      d1: Math.round(30 + Math.random() * 20),
-      d7: Math.round(15 + Math.random() * 15),
-      d30: Math.round(5 + Math.random() * 10),
-      multiScenario: Math.round(10 + Math.random() * 15),
-      shareLink: Math.round(3 + Math.random() * 10),
-      snapshot: Math.round(5 + Math.random() * 15),
-      executionRate: Math.round(25 + Math.random() * 20),
-      ttfv: Math.round(20 + Math.random() * 40),
-      pv: Math.floor(300 + Math.random() * 200),
-      loyalCount: Math.floor(20 + Math.random() * 30),
-      avgDuration: Math.floor(120 + Math.random() * 180),
-    };
-  });
-}
-
-export function getDemoTopPages(): TopPage[] {
-  return [
-    { path: '/', views: 1234, percentage: 35.2 },
-    { path: '/budget', views: 876, percentage: 25.0 },
-    { path: '/summary', views: 543, percentage: 15.5 },
-    { path: '/auth', views: 432, percentage: 12.3 },
-    { path: '/shared', views: 421, percentage: 12.0 },
-  ];
 }

@@ -69,7 +69,7 @@ export function useAdminKPI(): UseAdminKPIResult {
         supabase.from('profiles').select('user_id, created_at').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString()),
         supabase.from('profiles').select('user_id, created_at').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
         supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString()),
-        supabase.from('page_views').select('user_id, created_at').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
+        supabase.from('page_views').select('user_id, created_at, duration_seconds').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
         supabase.from('budgets').select('id, user_id, created_at'),
         supabase.from('budgets').select('id, user_id, created_at').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
         supabase.from('budget_items').select('budget_id, amount, is_paid, created_at'),
@@ -249,6 +249,29 @@ export function useAdminKPI(): UseAdminKPIResult {
           return d >= dayStart && d <= dayEnd;
         });
 
+        // pv: total page views for this day
+        const dayPVCount = dayPVs.length;
+
+        // loyalCount: unique users who visited 2+ days in the trailing 7-day window
+        const trailing7Start = subDays(dayEnd, 7);
+        const trailing7PVs = pageViews.filter(pv => {
+          const d = new Date(pv.created_at);
+          return d >= trailing7Start && d <= dayEnd;
+        });
+        const userDaysTrailing: Record<string, Set<string>> = {};
+        trailing7PVs.forEach(pv => {
+          if (!pv.user_id) return;
+          if (!userDaysTrailing[pv.user_id]) userDaysTrailing[pv.user_id] = new Set();
+          userDaysTrailing[pv.user_id].add(new Date(pv.created_at).toDateString());
+        });
+        const dayLoyalCount = Object.values(userDaysTrailing).filter(days => days.size >= 2).length;
+
+        // avgDuration: mean duration_seconds for this day
+        const dayDurations = dayPVs.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
+        const dayAvgDuration = dayDurations.length > 0
+          ? Math.round(dayDurations.reduce((a, b) => a + b, 0) / dayDurations.length)
+          : 0;
+
         trend.push({
           date: dateStr,
           dau: unique(dayPVs).size,
@@ -265,7 +288,7 @@ export function useAdminKPI(): UseAdminKPIResult {
             const d = new Date(b.created_at);
             return d >= dayStart && d <= dayEnd;
           }).length,
-          amountEntered: 0, // simplified
+          amountEntered: 0,
           d1: Math.round(d1Retention),
           d7: Math.round(d7Retention),
           d30: Math.round(d30Retention),
@@ -274,6 +297,9 @@ export function useAdminKPI(): UseAdminKPIResult {
           snapshot: Math.round(k14),
           executionRate: Math.round(k15),
           ttfv: ttfvMedian,
+          pv: dayPVCount,
+          loyalCount: dayLoyalCount,
+          avgDuration: dayAvgDuration,
         });
       }
       setTrendData(trend);
@@ -316,8 +342,8 @@ export function useAdminKPI(): UseAdminKPIResult {
       const durations = pageViews.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
       const avgDur = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
 
-      const prevDurations = prevPageViews.length > 0 ? [] : []; // prev doesn't have duration in current query
-      const prevAvgDur = 0; // simplified - prev period duration not fetched
+      const prevDurations = (prevPageViews as any[]).map(pv => pv.duration_seconds || 0).filter((d: number) => d > 0);
+      const prevAvgDur = prevDurations.length > 0 ? prevDurations.reduce((a: number, b: number) => a + b, 0) / prevDurations.length : 0;
 
       setSummaryKPIs({
         totalPageViews: totalPVCount,

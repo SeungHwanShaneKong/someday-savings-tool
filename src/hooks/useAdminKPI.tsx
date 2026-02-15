@@ -3,19 +3,41 @@ import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
 
+export interface SummaryKPIs {
+  totalPageViews: number;
+  prevTotalPageViews: number;
+  loyalUsers: number;
+  prevLoyalUsers: number;
+  totalUniqueUsers: number;
+  avgSessionTime: number; // seconds
+  prevAvgSessionTime: number;
+  dailyPageViews: number;
+  weeklyPageViews: number;
+  monthlyPageViews: number;
+}
+
 interface UseAdminKPIResult {
   kpiValues: KPIValue[];
   trendData: TrendDataPoint[];
   topPages: TopPage[];
+  summaryKPIs: SummaryKPIs;
   loading: boolean;
   error: string | null;
   fetchData: (startDate: Date, endDate: Date) => Promise<void>;
 }
 
+const defaultSummary: SummaryKPIs = {
+  totalPageViews: 0, prevTotalPageViews: 0,
+  loyalUsers: 0, prevLoyalUsers: 0, totalUniqueUsers: 0,
+  avgSessionTime: 0, prevAvgSessionTime: 0,
+  dailyPageViews: 0, weeklyPageViews: 0, monthlyPageViews: 0,
+};
+
 export function useAdminKPI(): UseAdminKPIResult {
   const [kpiValues, setKpiValues] = useState<KPIValue[]>([]);
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
   const [topPages, setTopPages] = useState<TopPage[]>([]);
+  const [summaryKPIs, setSummaryKPIs] = useState<SummaryKPIs>(defaultSummary);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -267,6 +289,48 @@ export function useAdminKPI(): UseAdminKPIResult {
         .sort((a, b) => b.views - a.views)
         .slice(0, 5);
       setTopPages(tp);
+
+      // ===== Summary KPIs =====
+      const totalPVCount = pageViews.length;
+      const prevPVCount = prevPageViews.length;
+
+      // Loyal users: visited 2+ distinct days in period
+      const userDays: Record<string, Set<string>> = {};
+      pageViews.forEach(pv => {
+        if (!pv.user_id) return;
+        if (!userDays[pv.user_id]) userDays[pv.user_id] = new Set();
+        userDays[pv.user_id].add(new Date(pv.created_at).toDateString());
+      });
+      const loyal = Object.values(userDays).filter(days => days.size >= 2).length;
+      const totalUnique = Object.keys(userDays).length;
+
+      const prevUserDays: Record<string, Set<string>> = {};
+      prevPageViews.forEach(pv => {
+        if (!pv.user_id) return;
+        if (!prevUserDays[pv.user_id]) prevUserDays[pv.user_id] = new Set();
+        prevUserDays[pv.user_id].add(new Date(pv.created_at).toDateString());
+      });
+      const prevLoyal = Object.values(prevUserDays).filter(days => days.size >= 2).length;
+
+      // Avg session time
+      const durations = pageViews.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
+      const avgDur = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+
+      const prevDurations = prevPageViews.length > 0 ? [] : []; // prev doesn't have duration in current query
+      const prevAvgDur = 0; // simplified - prev period duration not fetched
+
+      setSummaryKPIs({
+        totalPageViews: totalPVCount,
+        prevTotalPageViews: prevPVCount,
+        loyalUsers: loyal,
+        prevLoyalUsers: prevLoyal,
+        totalUniqueUsers: totalUnique,
+        avgSessionTime: Math.round(avgDur),
+        prevAvgSessionTime: prevAvgDur,
+        dailyPageViews: todayPV.length,
+        weeklyPageViews: weekPV.length,
+        monthlyPageViews: monthPV.length,
+      });
     } catch (err) {
       console.error('KPI fetch error:', err);
       setError('데이터를 불러오는 중 오류가 발생했습니다.');
@@ -275,5 +339,5 @@ export function useAdminKPI(): UseAdminKPIResult {
     }
   }, []);
 
-  return { kpiValues, trendData, topPages, loading, error, fetchData };
+  return { kpiValues, trendData, topPages, summaryKPIs, loading, error, fetchData };
 }

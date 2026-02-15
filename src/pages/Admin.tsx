@@ -42,7 +42,7 @@ export default function Admin() {
   const { kpiValues, trendData, topPages, loading: dataLoading, fetchData } = useAdminKPI();
 
   const [period, setPeriod] = useState('30');
-  const [demoMode, setDemoMode] = useState(false);
+  const [demoMode, setDemoMode] = useState(true); // 임시: 데모 모드 기본 ON
 
   // 기간 계산
   const { startDate, endDate } = useMemo(() => {
@@ -51,11 +51,11 @@ export default function Admin() {
     return { startDate: start, endDate: end };
   }, [period]);
 
-  // 인증 & 권한 체크
-  useEffect(() => {
-    if (!authLoading && !user) { navigate('/auth'); return; }
-    if (!adminLoading && !isAdmin) { navigate('/'); return; }
-  }, [user, authLoading, isAdmin, adminLoading, navigate]);
+  // 인증 & 권한 체크 (임시 비활성화 — 배포 전 데모용)
+  // useEffect(() => {
+  //   if (!authLoading && !user) { navigate('/auth'); return; }
+  //   if (!adminLoading && !isAdmin) { navigate('/'); return; }
+  // }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
   // 데이터 로드
   useEffect(() => {
@@ -73,14 +73,15 @@ export default function Admin() {
     if (!demoMode) fetchData(startDate, endDate);
   };
 
-  if (authLoading || adminLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">로딩 중...</div>
-      </div>
-    );
-  }
-  if (!isAdmin) return null;
+  // 임시 비활성화 — 배포 전 데모용
+  // if (authLoading || adminLoading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-background">
+  //       <div className="animate-pulse text-muted-foreground">로딩 중...</div>
+  //     </div>
+  //   );
+  // }
+  // if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-background">

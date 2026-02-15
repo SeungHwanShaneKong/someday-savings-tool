@@ -23,7 +23,8 @@ import {
   Copy,
   ChevronDown,
   RotateCcw,
-  History
+  History,
+  Shield
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -265,6 +266,18 @@ export default function BudgetFlow() {
                 <span className="hidden sm:inline">요약 보기</span>
                 <span className="sm:hidden">요약</span>
               </Button>
+              {!authLoading && user?.email === 'seunghwan.kong@gmail.com' && (
+                <Button
+                  onClick={() => navigate('/admin')}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 sm:gap-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0"
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">관리자</span>
+                  <span className="sm:hidden">관리</span>
+                </Button>
+              )}
               <LogoutButton />
             </div>
           </div>

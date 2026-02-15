@@ -1,42 +1,58 @@
 
 
-# Preview 환경 인증 우회 구현
+# '축의금 (예상)' 항목 추가 및 자동 계산 로직 구현
 
 ## 개요
-Preview URL(`id-preview--*.lovable.app`)에서만 로그인 없이 모든 페이지에 접근할 수 있도록 인증 체크를 우회합니다. Published URL(`someday-savings-tool.lovable.app`)에서는 기존 인증 로직이 그대로 유지됩니다.
+'본식 운영' 카테고리에서 '식대비'와 '답례품 준비비' 사이에 '축의금 (예상)' 항목을 추가합니다. 이 항목은 기존 '식대비'의 MealCostCalculator와 유사하게 '하객 수 x 1인당 평균 축의금' 방식의 자동 계산 UI를 제공합니다.
 
-## 구현 방법
+## 변경 파일 및 상세 내용
 
-### 1. Preview 환경 감지 유틸리티 추가 (`src/lib/utils.ts`)
+### 1. `src/lib/budget-categories.ts`
+- `main-ceremony` 카테고리의 `subCategories` 배열에서 `meal-cost` 바로 뒤, `thank-you-gifts` 바로 앞에 새 항목 삽입:
 ```typescript
-export function isPreviewEnvironment(): boolean {
-  return window.location.hostname.includes('id-preview--');
-}
+{ id: 'expected-gift-money', name: '축의금 (예상)', placeholder: '예상 축의금 수입' }
 ```
 
-### 2. 인증 우회가 필요한 3개 파일 수정
+### 2. `src/lib/average-costs.ts`
+- `main-ceremony` 섹션에 평균 비용 데이터 추가:
+```typescript
+'expected-gift-money': { amount: 10000000, note: '200명 기준, 1인당 5만원' }
+```
 
-| 파일 | 현재 동작 | 변경 내용 |
-|------|----------|----------|
-| `src/pages/BudgetFlow.tsx` (139행) | `!user` 시 `/auth`로 리다이렉트 | Preview면 리다이렉트 스킵 |
-| `src/pages/Summary.tsx` (97행) | `!user` 시 `/auth`로 리다이렉트 | Preview면 리다이렉트 스킵 |
-| `src/pages/Admin.tsx` (56행) | `!user` 시 `/auth`로 navigate | Preview면 navigate 스킵 + `isAdmin=true` 강제 |
+### 3. `src/components/BudgetTable.tsx` (데스크탑 테이블)
+- `renderItemRow` 함수 내 `isMealCostItem` 체크 로직 옆에 축의금 항목 감지 변수 추가:
+```typescript
+const isGiftMoneyItem = category.id === 'main-ceremony' && subCat.id === 'expected-gift-money';
+```
+- 비용 컬럼에서 `isMealCostItem`과 동일한 패턴으로 Users 아이콘 + Popover 계산기를 렌더링. Popover 내용:
+  - **하객 수 (명)**: 숫자 입력
+  - **1인당 평균 축의금 (원)**: 숫자 입력
+  - **실시간 계산 미리보기**: `하객수 x 1인당 축의금 = 총액`
+  - **적용 버튼**: `handlePerPersonSave` 호출
+- 기존 `isMealCostItem` 조건을 `(isMealCostItem || isGiftMoneyItem)`으로 확장하여 동일한 Popover 로직을 공유하되, 라벨만 다르게 표시:
+  - 식대비: "인원수 계산" / "1인당 비용"
+  - 축의금: "축의금 계산" / "1인당 평균 축의금"
 
-각 파일에서 인증 체크 조건에 `&& !isPreviewEnvironment()` 를 추가합니다.
+### 4. `src/components/BudgetTableMobile.tsx` (모바일 테이블)
+- 데스크탑과 동일한 패턴으로 `isGiftMoneyItem` 감지 및 계산기 Popover 추가
+- 모바일 `isMealCostItem` 조건을 `(isMealCostItem || isGiftMoneyItem)`으로 확장
 
-### 3. Admin 페이지 특수 처리
-Admin은 인증뿐 아니라 `isAdmin` 권한 체크도 있으므로, Preview 환경에서는 두 조건 모두 스킵하도록 처리합니다.
+### 5. `src/components/CategoryStep.tsx` (BudgetFlow 단계별 입력)
+- 변경 불필요: 기존 로직이 `category.subCategories`를 순회하므로 자동으로 새 항목이 표시됨
 
-### 4. useMultipleBudgets 훅 호환성
-`user`가 null일 때 데이터 로딩이 실패할 수 있으므로, Preview에서 user가 없을 때에도 데모/빈 상태로 정상 렌더링되는지 확인이 필요합니다.
+## 합계 로직 영향
+- 축의금은 **수입** 항목이지만, 현재 시스템에는 수입/지출 구분이 없으므로 다른 항목과 동일하게 금액으로 관리됨
+- 사용자가 메모란에 "수입" 등을 기재하여 구분할 수 있음
+- 총계에는 다른 항목과 동일하게 합산됨 (기존 `getOverallTotal()` 로직 변경 불필요)
 
-## 검증 계획 (3회 시나리오 테스트)
-1. **시나리오 A**: 비로그인 상태에서 `/budget` 직접 접근 → 페이지가 렌더링되는지 확인
-2. **시나리오 B**: 비로그인 상태에서 `/summary` 직접 접근 → 페이지가 렌더링되는지 확인
-3. **시나리오 C**: 비로그인 상태에서 `/admin` 직접 접근 → 대시보드가 렌더링되는지 확인
+## 기존 데이터 호환성
+- 기존 사용자의 budget에는 `expected-gift-money` 항목이 없음
+- `BudgetTable`의 `getCategoryItems()`는 `category.subCategories`를 순회하며 `getItem()`으로 매칭하므로, 해당 항목이 DB에 없으면 단순히 표시되지 않음
+- 신규 예산 생성 시 `useMultipleBudgets`의 `createNewBudget()`이 `BUDGET_CATEGORIES`를 순회하여 자동으로 새 항목을 초기화함
+- 기존 사용자에게는 "항목 추가" 버튼으로 커스텀 항목을 추가하는 것과 동일한 흐름으로, 해당 카테고리에 자동으로 빈 행이 나타남 (단, 기존 budget에 대해서는 수동으로 추가해야 함)
 
-## 보안 고려
-- `isPreviewEnvironment()`는 클라이언트 사이드 체크이므로 UI 접근만 허용
-- DB 쿼리는 여전히 RLS 정책에 의해 보호됨 (user가 없으면 데이터 조회 불가)
-- Published 환경에서는 일체 영향 없음
+## 기술적 제약 및 고려사항
+- Popover 라벨을 항목 유형에 따라 동적으로 변경하여 컨텍스트에 맞는 UX 제공
+- `unit_price`와 `quantity` 필드는 이미 DB 스키마에 존재하므로 마이그레이션 불필요
+- 포맷팅: 기존 `formatKoreanWon()` 및 `₩{amount.toLocaleString()}` 패턴 그대로 사용
 

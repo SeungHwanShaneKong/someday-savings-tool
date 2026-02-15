@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { isPreviewEnvironment } from '@/lib/utils';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -52,7 +51,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
-  const isPreview = isPreviewEnvironment();
   const { user, loading: authLoading } = useAuth();
   const { 
     budgets, 
@@ -137,8 +135,8 @@ export default function BudgetFlow() {
     setIsHistoryOpen(false);
   };
 
-  // Auth check (skip in preview environment)
-  if (!authLoading && !user && !isPreview) {
+  // Auth check
+  if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
   }
 

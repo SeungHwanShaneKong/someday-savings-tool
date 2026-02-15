@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from 'react';
-import { isPreviewEnvironment } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -52,20 +51,18 @@ export default function Admin() {
     return { startDate: start, endDate: end };
   }, [period]);
 
-  // 인증 & 권한 체크 (Preview 환경에서는 스킵)
-  const isPreview = isPreviewEnvironment();
+  // 인증 & 권한 체크
   useEffect(() => {
-    if (isPreview) return;
     if (!authLoading && !user) { navigate('/auth'); return; }
     if (!adminLoading && !isAdmin) { navigate('/'); return; }
-  }, [user, authLoading, isAdmin, adminLoading, navigate, isPreview]);
+  }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
   // 데이터 로드
   useEffect(() => {
-    if ((isAdmin || isPreview) && !demoMode) {
+    if (isAdmin && !demoMode) {
       fetchData(startDate, endDate);
     }
-  }, [isAdmin, isPreview, demoMode, startDate, endDate, fetchData]);
+  }, [isAdmin, demoMode, startDate, endDate, fetchData]);
 
   // 데모/실제 데이터 전환
   const activeKPIs = demoMode ? getDemoKPIValues() : kpiValues;
@@ -83,7 +80,7 @@ export default function Admin() {
       </div>
     );
   }
-  if (!isAdmin && !isPreview) return null;
+  if (!isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-background">

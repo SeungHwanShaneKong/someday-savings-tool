@@ -1,72 +1,86 @@
-
-# Preview 환경 전용 자동 로그인 (Auth Mock) 구현
+# '축의금 (예상)' 수익 처리 로직 구현
 
 ## 개요
-Lovable Preview 환경(*.lovable.app, localhost)에서 seunghwan.kong@gmail.com 계정으로 **실제 인증 세션**을 자동 생성하여, 수동 로그인 없이 모든 기능(UI 접근 + DB 쿼리 + RLS)을 정상적으로 사용할 수 있도록 합니다.
 
-## 핵심 설계 결정
+현재 '축의금 (예상)' 항목은 다른 비용 항목과 동일하게 합산되고 있습니다. 이를 **수익(income)** 으로 처리하여 총 비용에서 **차감**되도록 모든 합계 계산 로직을 수정합니다.
 
-단순 클라이언트 Mock(가짜 user 객체 주입)은 Supabase RLS가 요구하는 JWT 토큰이 없어 **모든 DB 쿼리가 실패**합니다. 따라서 서버 측에서 실제 세션 토큰을 발급하는 방식을 사용합니다.
+## 핵심 로직
 
-## 구현 아키텍처
+축의금 항목 판별 조건: `item.category === 'main-ceremony' && item.sub_category === 'expected-gift-money'`
 
-```text
-[Preview 브라우저]                [Edge Function]              [Supabase Auth]
-      |                              |                              |
-      |-- 세션 없음 감지 ------------->|                              |
-      |   POST /preview-auto-login   |                              |
-      |   (Origin: *.lovable.app)    |-- service_role로 토큰 생성 --->|
-      |                              |   admin.generateLink()       |
-      |<-- access_token + refresh ---|<-- 실제 JWT 반환 -------------|
-      |                              |                              |
-      |-- supabase.auth.setSession() |                              |
-      |   (실제 인증 세션 설정)        |                              |
-```
+합계 공식 변경: `총 비용 = Σ(일반 항목 amount) - Σ(축의금 항목 amount)`
 
-## 변경 사항
+## 공통 유틸리티 함수 추가
 
-### 1. Edge Function 생성: `supabase/functions/preview-auto-login/index.ts`
-- **도메인 검증**: Origin 헤더가 `*.lovable.app`, `localhost`, `127.0.0.1` 중 하나인 경우에만 허용
-- **이메일 고정**: `seunghwan.kong@gmail.com` 전용 (다른 이메일 불가)
-- **토큰 발급**: Supabase Admin API (service_role_key)를 사용하여 해당 유저의 실제 JWT 세션 토큰을 생성
-- **응답**: `{ access_token, refresh_token }` 반환
+### `src/lib/budget-categories.ts`
 
-### 2. `src/hooks/useAuth.tsx` 수정
-- 환경 감지 헬퍼 함수 추가:
+수익 항목 판별 헬퍼 함수를 추가하여 모든 파일에서 일관되게 사용:
+
 ```typescript
-function isPreviewEnvironment(): boolean {
-  const host = window.location.hostname;
-  return host.includes('lovable.app') || host === 'localhost' || host === '127.0.0.1';
-}
+export const isIncomeItem = (category: string, subCategory: string): boolean =>
+  category === 'main-ceremony' && subCategory === 'expected-gift-money';
+
+export const calculateNetTotal = (items: { category: string; sub_category: string; amount: number }[]): number =>
+  items.reduce((sum, item) =>
+    isIncomeItem(item.category, item.sub_category) ? sum - item.amount : sum + item.amount, 0);
 ```
-- `AuthProvider`의 `useEffect` 내에서:
-  1. 기존 `getSession()` 호출
-  2. 세션이 없고 `isPreviewEnvironment()` === true인 경우
-  3. Edge Function `/preview-auto-login` 호출
-  4. 반환된 토큰으로 `supabase.auth.setSession()` 호출
-  5. 이후 정상 인증 흐름 진행
 
-### 3. `src/pages/Auth.tsx` 수정
-- Preview 환경에서 자동 로그인 진행 중일 때 "자동 로그인 중..." 로딩 UI 표시
-- 자동 로그인 성공 시 `/budget`으로 리다이렉트
+## 수정 대상 파일 (총 7개)
 
-## 보안 가드
+### 1. `src/hooks/useBudget.tsx` (라인 164)
 
-| 보호 계층 | 내용 |
-|-----------|------|
-| Edge Function Origin 검증 | `*.lovable.app`, `localhost`만 허용, 그 외 403 반환 |
-| 이메일 하드코딩 | 함수 내부에서 `seunghwan.kong@gmail.com`만 처리 |
-| Production 차단 | `someday-savings-tool.lovable.app` (Published URL) 도메인 명시 차단 |
-| 클라이언트 이중 가드 | `isPreviewEnvironment()` 체크로 프로덕션에서 함수 호출 자체를 방지 |
+- `getTotal()`: `calculateNetTotal(items)` 사용
+- `getPaidTotal()`, `getPendingTotal()`도 동일하게 수익 항목 차감 적용
 
-## 검증 시나리오 대응
+### 2. `src/hooks/useMultipleBudgets.tsx` (라인 458)
 
-- **Scenario 1**: Preview 접속 시 로그인 폼 없이 자동 로그인, 헤더에 이메일 표시
-- **Scenario 2**: admin 역할 확인 -> 관리자 버튼 노출, /admin 접근 가능
-- **Scenario 3**: 실제 JWT 토큰으로 RLS 통과 -> DB 데이터 정상 로드
+- `getTotal()`: `calculateNetTotal(items)` 사용
 
-## 구현 순서
-1. Edge Function `preview-auto-login` 생성 및 배포
-2. `src/hooks/useAuth.tsx`에 Preview 환경 자동 로그인 로직 추가
-3. `src/pages/Auth.tsx`에 자동 로그인 로딩 UI 추가
-4. 배포 후 Preview 환경에서 3개 시나리오 검증
+### 3. `src/components/BudgetTable.tsx`
+
+- `getOverallTotal()` 함수에 동일 로직 적용 (존재하는 경우)
+
+### 4. `src/components/BudgetTableMobile.tsx` (라인 169-171)
+
+- `getOverallTotal()`: `calculateNetTotal(items)` 사용
+
+### 5. `src/pages/Summary.tsx` (라인 75-84)
+
+- `getBudgetTotal()`: `calculateNetTotal(budgetItems)` 사용
+- `getCategoryTotal()`: 카테고리별 합계는 그대로 유지 (카테고리 내에서는 양수 표시)
+
+### 6. `src/components/BudgetComparisonDashboard.tsx` (라인 51-54)
+
+- `budgetTotals` 계산: `calculateNetTotal(budget.items)` 사용
+
+### 7. `src/pages/SharedBudget.tsx` (라인 82)
+
+- `total` 계산: `calculateNetTotal(data.items)` 사용
+
+### 8. `src/components/BudgetDonutChart.tsx` (라인 20, 29)
+
+- 도넛 차트의 총계 계산에서 축의금을 수익으로 표시
+- 차트 데이터에서는 축의금 카테고리 금액을 양수로 표시하되, 중앙 총합은 순비용으로 표시
+
+### 9. `src/components/FloatingTotalBar.tsx`
+
+- 이 컴포넌트는 `total` prop을 받으므로 자체 수정 불필요 (호출부에서 처리)
+
+필요하다면, 관련하여 바꿔야 차트나, 수치들을 내용에 충돌이 없도록 업그레이드해 주세요.
+
+## UI 표시 개선
+
+- 총계 라벨을 "총 예상 비용"에서 상황에 맞게 유지하되, 축의금이 차감된 **순비용**임을 사용자가 인지할 수 있도록 함
+- 축의금 항목에 수익 표시 뱃지 또는 마이너스(-) 부호를 추가하여 시각적 구분
+
+## 검증 시나리오 (3회 독립 테스트)
+
+1. **시나리오 1 - BudgetFlow 페이지**: 본식 운영 카테고리에서 축의금 금액 입력 후, FloatingTotalBar의 총 예상 비용이 (다른 항목 합계 - 축의금)으로 표시되는지 확인
+2. **시나리오 2 - Summary 페이지**: 여러 예산 옵션의 비교 대시보드에서 각 옵션의 총액이 축의금을 차감한 순비용으로 계산되는지 확인
+3. **시나리오 3 - SharedBudget 페이지**: 공유 링크로 접속 시 총 예상 비용이 축의금 차감된 값으로 표시되는지 확인
+
+## 기술적 고려사항
+
+- `calculateNetTotal` 유틸리티를 중앙에 두어 로직 중복 방지
+- 카테고리별 소계(getCategoryTotal)는 변경하지 않음 - 본식 운영 카테고리 내에서 축의금은 양수로 표시
+- 전체 합계에서만 차감 처리

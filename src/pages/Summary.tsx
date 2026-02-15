@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
-import { isPreviewMode } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -94,8 +93,8 @@ export default function Summary() {
   const maxBudget = sortedByTotal[sortedByTotal.length - 1];
   const difference = maxBudget?.total - minBudget?.total || 0;
 
-  // Auth check (skip in preview mode)
-  if (!authLoading && !user && !isPreviewMode()) {
+  // Auth check
+  if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
   }
 

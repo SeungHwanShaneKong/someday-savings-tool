@@ -14,7 +14,6 @@ import {
   Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import { subDays, format } from 'date-fns';
-import { isPreviewMode } from '@/lib/utils';
 import {
   KPI_DEFINITIONS, getKPIStatus, getStatusColor,
   getDemoKPIValues, getDemoTrendData, getDemoTopPages,
@@ -52,9 +51,8 @@ export default function Admin() {
     return { startDate: start, endDate: end };
   }, [period]);
 
-  // 인증 & 권한 체크 (Preview 모드에서는 스킵)
+  // 인증 & 권한 체크
   useEffect(() => {
-    if (isPreviewMode()) return;
     if (!authLoading && !user) { navigate('/auth'); return; }
     if (!adminLoading && !isAdmin) { navigate('/'); return; }
   }, [user, authLoading, isAdmin, adminLoading, navigate]);

@@ -12,7 +12,6 @@ export const AVERAGE_COSTS: Record<string, Record<string, AverageCostData>> = {
   'main-ceremony': {
     'venue-fee': { amount: 5000000 },
     'meal-cost': { amount: 14000000, note: '200명 기준' },
-    'expected-gift-money': { amount: 10000000, note: '200명 기준, 1인당 5만원' },
     'thank-you-gifts': { amount: 1000000 },
     'ceremony-staff': { amount: 400000 },
     'main-snap': { amount: 1500000 },

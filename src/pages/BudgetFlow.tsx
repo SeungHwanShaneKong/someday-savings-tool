@@ -27,7 +27,6 @@ import {
   Shield
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
-import { isPreviewMode } from '@/lib/utils';
 import { LogoutButton } from '@/components/LogoutButton';
 import {
   AlertDialog,
@@ -136,8 +135,8 @@ export default function BudgetFlow() {
     setIsHistoryOpen(false);
   };
 
-  // Auth check (skip in preview mode)
-  if (!authLoading && !user && !isPreviewMode()) {
+  // Auth check
+  if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
   }
 

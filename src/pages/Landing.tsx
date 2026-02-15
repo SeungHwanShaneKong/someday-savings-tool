@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { isPreviewMode } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -44,7 +43,7 @@ export default function Landing() {
   }, []);
 
   const handleStart = () => {
-    if (user || isPreviewMode()) {
+    if (user) {
       navigate('/budget');
     } else {
       navigate('/auth');

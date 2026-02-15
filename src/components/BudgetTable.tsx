@@ -337,11 +337,6 @@ export function BudgetTable({
     const isRenamingThis = editingName === item.id;
     const displayName = item.custom_name || subCat.name;
     const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
-    const isGiftMoneyItem = category.id === 'main-ceremony' && subCat.id === 'expected-gift-money';
-    const isPerPersonItem = isMealCostItem || isGiftMoneyItem;
-    const perPersonLabel = isGiftMoneyItem ? '축의금 계산' : '인원수 계산';
-    const perPersonUnitLabel = isGiftMoneyItem ? '1인당 평균 축의금 (₩)' : '1인당 비용 (₩)';
-    const perPersonUnitPlaceholder = isGiftMoneyItem ? '50000' : '65000';
     return <TableRow key={cellKey} className={cn("hover:bg-muted/50 transition-colors", isFirstInCategory && "border-t-2 border-primary/10")}>
         {subIndex === 0 && <TableCell rowSpan={totalRowsForCategory} className="font-semibold bg-secondary/50 align-top pt-2 sm:pt-4 px-1 sm:px-4">
             <div className="flex flex-col items-center gap-1">
@@ -388,7 +383,7 @@ export function BudgetTable({
         </TableCell>
         <TableCell className="text-center px-1 sm:px-2">
           <div className="flex items-center justify-end gap-0.5 sm:gap-1">
-            {isPerPersonItem && <Popover open={perPersonPopover === cellKey} onOpenChange={open => {
+            {isMealCostItem && <Popover open={perPersonPopover === cellKey} onOpenChange={open => {
             if (open) {
               setPerPersonPopover(cellKey);
               setTempUnitPrice(item.unit_price?.toString() || '');
@@ -404,11 +399,11 @@ export function BudgetTable({
                 </PopoverTrigger>
                 <PopoverContent className="w-56 sm:w-64" align="end">
                   <div className="space-y-3">
-                    <div className="text-sm font-medium">{perPersonLabel}</div>
+                    <div className="text-sm font-medium">인원수 계산</div>
                     <div className="space-y-2">
                       <div>
-                        <label className="text-xs text-muted-foreground">{perPersonUnitLabel}</label>
-                        <Input type="text" inputMode="numeric" value={tempUnitPrice} onChange={e => setTempUnitPrice(parseNumericInput(e.target.value))} placeholder={perPersonUnitPlaceholder} className="h-8" />
+                        <label className="text-xs text-muted-foreground">1인당 비용 (₩)</label>
+                        <Input type="text" inputMode="numeric" value={tempUnitPrice} onChange={e => setTempUnitPrice(parseNumericInput(e.target.value))} placeholder="65000" className="h-8" />
                       </div>
                       <div>
                         <label className="text-xs text-muted-foreground">예상 인원 (명)</label>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -60,6 +60,7 @@ export default function Admin() {
   const { kpiValues, trendData, topPages, summaryKPIs, loading: dataLoading, fetchData } = useAdminKPI();
 
   const [period, setPeriod] = useState('30');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const { startDate, endDate } = useMemo(() => {
     const end = new Date();
@@ -72,15 +73,29 @@ export default function Admin() {
     if (!adminLoading && !isAdmin) { navigate('/'); return; }
   }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchData(startDate, endDate);
-    }
-  }, [isAdmin, startDate, endDate, fetchData]);
+  // Fetch + record timestamp
+  const doFetch = useCallback(() => {
+    fetchData(startDate, endDate).then(() => setLastUpdated(new Date()));
+  }, [fetchData, startDate, endDate]);
 
-  const handleRefresh = () => {
-    fetchData(startDate, endDate);
-  };
+  useEffect(() => {
+    if (isAdmin) doFetch();
+  }, [isAdmin, doFetch]);
+
+  // 30-second auto-refresh, paused when tab is hidden
+  useEffect(() => {
+    if (!isAdmin) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') doFetch();
+    }, 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') doFetch();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, [isAdmin, doFetch]);
+
+  const handleRefresh = () => doFetch();
 
   if (authLoading || adminLoading) {
     return (
@@ -114,6 +129,11 @@ export default function Admin() {
               <p className="text-sm text-muted-foreground leading-relaxed">운영 핵심 지표 모니터링</p>
             </div>
             <div className="flex items-center gap-2">
+              {lastUpdated && (
+                <span className="text-xs text-muted-foreground tabular-nums hidden sm:inline">
+                  갱신 {format(lastUpdated, 'HH:mm:ss')}
+                </span>
+              )}
               <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
                 <RefreshCw className={`h-4 w-4 ${dataLoading ? 'animate-spin' : ''}`} />
               </Button>

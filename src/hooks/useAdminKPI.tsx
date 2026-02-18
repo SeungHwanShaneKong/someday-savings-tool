@@ -33,6 +33,28 @@ const defaultSummary: SummaryKPIs = {
   dailyPageViews: 0, weeklyPageViews: 0, monthlyPageViews: 0,
 };
 
+const PAGE_SIZE = 1000;
+
+/**
+ * Paginated fetch: bypasses Supabase 1000-row default limit.
+ * Builds query via callback, fetches PAGE_SIZE rows at a time.
+ */
+async function fetchAllRows<T>(
+  buildQuery: () => ReturnType<ReturnType<typeof supabase.from>['select']>,
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 export function useAdminKPI(): UseAdminKPIResult {
   const [kpiValues, setKpiValues] = useState<KPIValue[]>([]);
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
@@ -54,43 +76,59 @@ export function useAdminKPI(): UseAdminKPIResult {
       const weekAgo = subDays(now, 7);
       const monthAgo = subDays(now, 30);
 
-      // Parallel fetch all data
+      const startISO = startDate.toISOString();
+      const endISO = endDate.toISOString();
+      const prevStartISO = prevStart.toISOString();
+      const prevEndISO = prevEnd.toISOString();
+
+      // Parallel fetch — paginated for large tables (page_views, budget_items)
       const [
-        profilesRes, prevProfilesRes,
-        pageViewsRes, prevPageViewsRes,
-        budgetsRes, prevBudgetsRes,
-        budgetItemsRes,
-        sharedBudgetsRes,
-        snapshotsRes,
-        todayPVRes,
-        weekPVRes,
-        monthPVRes,
+        profiles, prevProfiles,
+        pageViews, prevPageViews,
+        budgets, prevBudgets,
+        budgetItems, periodBudgetItems,
+        sharedBudgets,
+        snapshots,
+        todayPVRes, weekPVRes, monthPVRes,
       ] = await Promise.all([
-        supabase.from('profiles').select('user_id, created_at').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString()),
-        supabase.from('profiles').select('user_id, created_at').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
-        supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').gte('created_at', startDate.toISOString()).lte('created_at', endDate.toISOString()),
-        supabase.from('page_views').select('user_id, created_at, duration_seconds').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
-        supabase.from('budgets').select('id, user_id, created_at'),
-        supabase.from('budgets').select('id, user_id, created_at').gte('created_at', prevStart.toISOString()).lte('created_at', prevEnd.toISOString()),
-        supabase.from('budget_items').select('budget_id, amount, is_paid, created_at'),
-        supabase.from('shared_budgets').select('id, budget_id, created_at'),
-        supabase.from('budget_snapshots').select('id, user_id, created_at'),
-        supabase.from('page_views').select('user_id').gte('created_at', todayStart.toISOString()),
-        supabase.from('page_views').select('user_id').gte('created_at', weekAgo.toISOString()),
-        supabase.from('page_views').select('user_id').gte('created_at', monthAgo.toISOString()),
+        // profiles — small table, no pagination needed
+        supabase.from('profiles').select('user_id, created_at').gte('created_at', startISO).lte('created_at', endISO).then(r => r.data || []),
+        supabase.from('profiles').select('user_id, created_at').gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
+        // page_views — PAGINATED
+        fetchAllRows<{ user_id: string | null; created_at: string; page_path: string; duration_seconds: number | null }>(
+          () => supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
+        ),
+        fetchAllRows<{ user_id: string | null; created_at: string; duration_seconds: number | null }>(
+          () => supabase.from('page_views').select('user_id, created_at, duration_seconds').gte('created_at', prevStartISO).lte('created_at', prevEndISO).order('created_at', { ascending: true })
+        ),
+        // budgets — all (for user mapping), small table
+        supabase.from('budgets').select('id, user_id, created_at').then(r => r.data || []),
+        supabase.from('budgets').select('id, user_id, created_at').gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
+        // budget_items — PAGINATED, all (for K15 total)
+        fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string }>(
+          () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at').order('created_at', { ascending: true })
+        ),
+        // budget_items filtered to period (for period-specific metrics)
+        fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string }>(
+          () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
+        ),
+        supabase.from('shared_budgets').select('id, budget_id, created_at').then(r => r.data || []),
+        supabase.from('budget_snapshots').select('id, user_id, created_at').then(r => r.data || []),
+        // DAU/WAU/MAU counts — paginated
+        fetchAllRows<{ user_id: string | null }>(
+          () => supabase.from('page_views').select('user_id').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
+        ),
+        fetchAllRows<{ user_id: string | null }>(
+          () => supabase.from('page_views').select('user_id').gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: true })
+        ),
+        fetchAllRows<{ user_id: string | null }>(
+          () => supabase.from('page_views').select('user_id').gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: true })
+        ),
       ]);
 
-      const profiles = profilesRes.data || [];
-      const prevProfiles = prevProfilesRes.data || [];
-      const pageViews = pageViewsRes.data || [];
-      const prevPageViews = prevPageViewsRes.data || [];
-      const budgets = budgetsRes.data || [];
-      const budgetItems = budgetItemsRes.data || [];
-      const sharedBudgets = sharedBudgetsRes.data || [];
-      const snapshots = snapshotsRes.data || [];
-      const todayPV = todayPVRes.data || [];
-      const weekPV = weekPVRes.data || [];
-      const monthPV = monthPVRes.data || [];
+      const todayPV = todayPVRes;
+      const weekPV = weekPVRes;
+      const monthPV = monthPVRes;
 
       // Helper: unique user_ids
       const unique = (arr: { user_id: string | null }[]) => new Set(arr.filter(a => a.user_id).map(a => a.user_id!));
@@ -104,7 +142,6 @@ export function useAdminKPI(): UseAdminKPIResult {
       const wau = unique(weekPV).size;
       const mau = unique(monthPV).size;
 
-      // Previous DAU/WAU/MAU approximation from prev period page views
       const prevDAU = new Set(prevPageViews.filter(p => {
         const d = new Date(p.created_at);
         return d >= startOfDay(subDays(now, periodDays)) && d <= endOfDay(subDays(now, periodDays));
@@ -113,14 +150,13 @@ export function useAdminKPI(): UseAdminKPIResult {
       // K05: Stickiness
       const stickiness = mau > 0 ? (dau / mau) * 100 : 0;
 
-      // K06-K08: Retention (simplified: check if users who signed up in period came back)
+      // K06-K08: Retention
       const allProfiles = profiles;
       const computeRetention = (daysAfter: number) => {
         if (allProfiles.length === 0) return 0;
         let returned = 0;
         for (const p of allProfiles) {
           const signupDate = new Date(p.created_at);
-          const targetDate = subDays(now, -daysAfter); // Not useful, let's check from signup
           const targetStart = startOfDay(new Date(signupDate.getTime() + daysAfter * 86400000));
           const targetEnd = endOfDay(targetStart);
           const hasVisit = pageViews.some(pv =>
@@ -146,15 +182,12 @@ export function useAdminKPI(): UseAdminKPIResult {
       const k09 = allProfiles.length > 0 ? (k09Count / allProfiles.length) * 100 : 0;
 
       // K10: 가입→첫 금액 입력(24h) & K11: TTFV
-      // Build budget_id -> user_id map
       const budgetUserMap: Record<string, string> = {};
       budgets.forEach(b => { budgetUserMap[b.id] = b.user_id; });
       
-      // Profile signup times
       const profileSignupMap: Record<string, number> = {};
       allProfiles.forEach(p => { profileSignupMap[p.user_id] = new Date(p.created_at).getTime(); });
 
-      // Items with amount > 0
       const itemsWithAmount = budgetItems.filter(bi => bi.amount > 0);
       
       let k10Count = 0;
@@ -179,7 +212,6 @@ export function useAdminKPI(): UseAdminKPIResult {
       }
       const k10 = allProfiles.length > 0 ? (k10Count / allProfiles.length) * 100 : 0;
       
-      // TTFV median
       ttfvValues.sort((a, b) => a - b);
       const ttfvMedian = ttfvValues.length > 0 ? ttfvValues[Math.floor(ttfvValues.length / 2)] : 0;
 
@@ -192,21 +224,18 @@ export function useAdminKPI(): UseAdminKPIResult {
 
       // K13: 공유 링크 생성률
       const activeUsers = mau || 1;
-      const shareUsers = new Set(sharedBudgets.map(sb => {
-        return budgetUserMap[sb.budget_id];
-      }).filter(Boolean)).size;
+      const shareUsers = new Set(sharedBudgets.map(sb => budgetUserMap[sb.budget_id]).filter(Boolean)).size;
       const k13 = (shareUsers / activeUsers) * 100;
 
       // K14: 스냅샷 사용률
       const snapshotUsers = new Set(snapshots.map(s => s.user_id)).size;
       const k14 = (snapshotUsers / activeUsers) * 100;
 
-      // K15: 예산 집행률
-      const totalAmount = budgetItems.reduce((s, i) => s + (i.amount || 0), 0);
-      const paidAmount = budgetItems.filter(i => i.is_paid).reduce((s, i) => s + (i.amount || 0), 0);
+      // K15: 예산 집행률 — uses period-filtered budget_items
+      const totalAmount = periodBudgetItems.reduce((s, i) => s + (i.amount || 0), 0);
+      const paidAmount = periodBudgetItems.filter(i => i.is_paid).reduce((s, i) => s + (i.amount || 0), 0);
       const k15 = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
 
-      // Change calculation helper
       const calcChange = (current: number, prev: number) => {
         if (prev === 0) return current > 0 ? 100 : 0;
         return ((current - prev) / prev) * 100;
@@ -249,10 +278,8 @@ export function useAdminKPI(): UseAdminKPIResult {
           return d >= dayStart && d <= dayEnd;
         });
 
-        // pv: total page views for this day
         const dayPVCount = dayPVs.length;
 
-        // loyalCount: unique users who visited 2+ days in the trailing 7-day window
         const trailing7Start = subDays(dayEnd, 7);
         const trailing7PVs = pageViews.filter(pv => {
           const d = new Date(pv.created_at);
@@ -266,14 +293,12 @@ export function useAdminKPI(): UseAdminKPIResult {
         });
         const dayLoyalCount = Object.values(userDaysTrailing).filter(days => days.size >= 2).length;
 
-        // avgDuration: mean duration_seconds for this day
         const dayDurations = dayPVs.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
         const dayAvgDuration = dayDurations.length > 0
           ? Math.round(dayDurations.reduce((a, b) => a + b, 0) / dayDurations.length)
           : 0;
 
-        // amountEntered: budget_items with amount > 0 created on this day
-        const dayAmountEntered = budgetItems.filter(bi => {
+        const dayAmountEntered = periodBudgetItems.filter(bi => {
           const d = new Date(bi.created_at);
           return d >= dayStart && d <= dayEnd && bi.amount > 0;
         }).length;
@@ -318,7 +343,6 @@ export function useAdminKPI(): UseAdminKPIResult {
       const totalPVCount = pageViews.length;
       const prevPVCount = prevPageViews.length;
 
-      // Loyal users: visited 2+ distinct days in period
       const userDays: Record<string, Set<string>> = {};
       pageViews.forEach(pv => {
         if (!pv.user_id) return;
@@ -336,12 +360,11 @@ export function useAdminKPI(): UseAdminKPIResult {
       });
       const prevLoyal = Object.values(prevUserDays).filter(days => days.size >= 2).length;
 
-      // Avg session time
       const durations = pageViews.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
       const avgDur = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
 
-      const prevDurations = (prevPageViews as any[]).map(pv => pv.duration_seconds || 0).filter((d: number) => d > 0);
-      const prevAvgDur = prevDurations.length > 0 ? prevDurations.reduce((a: number, b: number) => a + b, 0) / prevDurations.length : 0;
+      const prevDurations = prevPageViews.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
+      const prevAvgDur = prevDurations.length > 0 ? prevDurations.reduce((a, b) => a + b, 0) / prevDurations.length : 0;
 
       setSummaryKPIs({
         totalPageViews: totalPVCount,

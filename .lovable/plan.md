@@ -1,97 +1,91 @@
 
+# 관리자 대시보드: 실제 데이터 정확성 100% 보장 업그레이드
 
-# 관리자 대시보드: 실제 데이터만 표시하도록 전면 개선
+## 현재 상태 진단
 
-## 문제 진단
+코드를 전체 검토한 결과, 데모/가짜 데이터는 이미 이전 작업에서 제거되었습니다. 하지만 **실제 데이터가 잘려서(truncated) 부정확하게 표시되는 심각한 버그**가 2건 있고, **실시간 업데이트 미지원** 문제가 있습니다.
 
-현재 대시보드에는 "데모 데이터"가 혼재되어 있어 실제(fact) 데이터만 보장되지 않습니다.
+### 버그 1: 1000행 제한으로 데이터 누락 (Critical)
 
-| 문제 | 위치 | 설명 |
-|------|------|------|
-| 데모 모드 토글 | Admin.tsx 라인 78, 97-100 | demoMode가 ON이면 가짜 데이터가 표시됨 |
-| 하드코딩 데모 Summary | Admin.tsx 라인 58-69 | demoSummaryKPIs에 가짜 숫자가 하드코딩 |
-| 데모 KPI/Trend/TopPages | kpi-definitions.ts 라인 96-153 | getDemoKPIValues, getDemoTrendData, getDemoTopPages - 랜덤 가짜 데이터 |
-| Trend 차트 고정값 반복 | useAdminKPI.tsx 트렌드 루프 | d1/d7/d30/multiScenario/shareLink/snapshot/executionRate/ttfv가 기간 전체 고정값을 매일 반복 |
+데이터베이스는 기본적으로 쿼리당 최대 1000행만 반환합니다. 현재 상태:
 
-## 변경 계획
+| 테이블 | 실제 행 수 | 가져오는 행 수 | 누락률 |
+|--------|-----------|--------------|--------|
+| page_views (30일) | 2,498 | 1,000 | **60% 누락** |
+| budget_items | 1,363 | 1,000 | **27% 누락** |
+| budgets | 46 | 46 | 정상 |
+| profiles | 30 | 30 | 정상 |
 
-### 파일 1: `src/pages/Admin.tsx`
+PV가 2,498건인데 1,000건만 가져오므로, 페이지뷰 수치가 실제의 40%만 표시됩니다. budget_items도 마찬가지로 예산 집행률(K15)이 부정확합니다.
 
-**제거 항목:**
-- `demoMode` 상태 변수와 토글 버튼 완전 제거
-- `demoSummaryKPIs` 하드코딩 객체 제거
-- `getDemoKPIValues`, `getDemoTrendData`, `getDemoTopPages` import 및 사용부 제거
-- `activeKPIs`, `activeTrend`, `activeTopPages`, `activeSummary` 변수를 실제 데이터만 사용하도록 변경
-- 데모 모드 안내 배너(라인 173-177) 제거
+### 버그 2: budgets/budget_items에 기간 필터 미적용
 
-**변경 후 데이터 흐름:**
-- `kpiValues` -> 직접 사용 (데모 분기 없음)
-- `trendData` -> 직접 사용
-- `topPages` -> 직접 사용
-- `summaryKPIs` -> 직접 사용
-- `fetchData` 호출에서 `demoMode` 조건 제거 -- 항상 실제 데이터 fetch
+`budgets`와 `budget_items` 쿼리에 날짜 필터가 없어 전체 기간의 데이터를 가져옵니다. "최근 7일" 필터를 선택해도 K09~K15 지표는 전체 기간 기준으로 계산됩니다.
 
-### 파일 2: `src/lib/kpi-definitions.ts`
+### 문제 3: 실시간 업데이트 미지원
 
-**제거 항목:**
-- `getDemoKPIValues()` 함수 (라인 96-114)
-- `getDemoTrendData()` 함수 (라인 116-143)
-- `getDemoTopPages()` 함수 (라인 145-153)
+현재는 페이지 로드 시 1회만 데이터를 가져오고, 새 페이지뷰나 예산 변경이 발생해도 대시보드에 반영되지 않습니다.
 
-나머지 타입 정의, KPI_DEFINITIONS, getKPIStatus, getStatusColor 등은 실제 로직에 필요하므로 유지.
+---
 
-### 파일 3: `src/hooks/useAdminKPI.tsx`
+## 해결 방안
 
-**수정: 트렌드 루프에서 일별 실제값 계산**
+### 1. 페이지네이션으로 전체 데이터 가져오기 (`useAdminKPI.tsx`)
 
-현재 문제: `d1`, `d7`, `d30`, `multiScenario`, `shareLink`, `snapshot`, `executionRate`, `ttfv`가 기간 전체에 대해 한 번 계산되고, 그 고정값이 모든 날짜에 반복 삽입됩니다.
+1000행 제한을 우회하는 헬퍼 함수를 추가합니다:
 
-수정 방향: 각 트렌드 데이터 포인트에서 해당 날짜까지 누적/해당 날짜 기준으로 실제 계산합니다.
+```
+async function fetchAllRows(query) {
+  // 1000행씩 반복 요청하여 전체 데이터를 가져옴
+  // .range(from, to) 메서드 사용
+  // 반환된 행이 1000 미만이면 종료
+}
+```
 
-- `d1`, `d7`, `d30` (리텐션): 해당 날짜에 가입한 사용자의 코호트 리텐션을 계산하는 것은 일별 트렌드에서 데이터가 부족하므로, 이 필드들은 일별 트렌드 차트에서 제거하고 KPI 카드에서만 기간 전체 값으로 표시
-- `multiScenario`, `shareLink`, `snapshot`, `executionRate`: 해당 날짜 기준 누적값을 계산하거나, 이 역시 기간 전체 값으로만 KPI 카드에 표시
-- `ttfv`: 기간 전체 중앙값으로만 KPI 카드에 표시
+적용 대상: `page_views`, `budget_items` (1000행 초과 가능한 테이블)
 
-결론적으로 **Historical Trend 차트 5개 중 일별로 의미 있는 실제 데이터를 생성할 수 없는 차트는 제거**합니다:
-- 차트 3 (리텐션 코호트 추이): 일별 코호트 계산 불가 -> 제거
-- 차트 4 (핵심 기능 채택률 추이): 일별 계산 불가 -> 제거  
-- 차트 5 (집행률 & TTFV 추이): 일별 계산 불가 -> 제거
+### 2. 기간 필터 적용 (`useAdminKPI.tsx`)
 
-**유지하는 차트 (실제 일별 데이터 가능):**
-- Analytics Insights 3종 (PV, 충성 고객, 체류 시간) -- 이미 일별 실제 계산 로직 존재
-- 차트 1 (활성 사용자 추이 DAU/WAU/MAU) -- 이미 일별 실제 계산 로직 존재
-- 차트 2 (온보딩 전환 추이 가입/생성/입력) -- signups, budgetCreated는 일별 실제 계산됨, amountEntered는 현재 항상 0이므로 일별 실제 계산 추가
+`budgets`와 `budget_items` 쿼리에도 `.gte('created_at', startDate)` 필터를 추가합니다. 단, K09~K12 등 가입자 기반 지표는 전체 budgets가 필요하므로, 기간 내 budgets와 전체 budgets를 구분하여 쿼리합니다.
 
-**amountEntered 일별 계산 추가:**
-- 트렌드 루프에서 해당 날짜에 생성된 budget_items 중 amount > 0인 건수를 계산
+### 3. 자동 새로고침 (30초 인터벌)
 
-### 트렌드 데이터 정리
+`Admin.tsx`에 30초마다 자동으로 `fetchData`를 호출하는 인터벌을 추가합니다. 탭이 비활성 상태이면 일시 중지하여 불필요한 요청을 방지합니다.
 
-`TrendDataPoint` 인터페이스에서 제거할 필드:
-- `d1`, `d7`, `d30`, `multiScenario`, `shareLink`, `snapshot`, `executionRate`, `ttfv`
+```
+useEffect(() => {
+  // 30초마다 fetchData 호출
+  // document.visibilityState 체크
+  // 마지막 갱신 시각 표시
+}, [])
+```
 
-유지할 필드:
-- `date`, `dau`, `wau`, `mau`, `signups`, `budgetCreated`, `amountEntered`, `pv`, `loyalCount`, `avgDuration`
+### 4. 마지막 갱신 시각 표시
 
-## 검증 계획 (3가지 시나리오)
+헤더에 "마지막 갱신: 14:32:15" 형태로 표시하여 데이터의 실시간성을 사용자가 확인할 수 있게 합니다.
 
-구현 완료 후 다음 3가지 시나리오로 검증합니다:
+---
 
-**시나리오 1: 데모 모드 완전 제거 확인**
-- 대시보드 헤더에 "데모 ON/OFF" 버튼이 없는지 확인
-- 코드에서 `demoMode`, `getDemoKPIValues` 등의 참조가 없는지 확인
+## 변경 파일
 
-**시나리오 2: 데이터 없는 상태 처리**
-- 실제 DB에 데이터가 없을 경우 KPI 카드가 0/빈 상태로 표시되는지 확인
-- 차트가 빈 데이터로 깨지지 않는지 확인
+### `src/hooks/useAdminKPI.tsx`
+- `fetchAllRows` 페이지네이션 헬퍼 함수 추가
+- `page_views`, `budget_items` 쿼리에 페이지네이션 적용
+- `budget_items` 쿼리에 기간 필터 추가 (기간 내 생성된 항목만)
 
-**시나리오 3: 실제 데이터 연동**
-- page_views 테이블에서 실제 조회하여 PV/충성 고객/체류 시간이 DB 값과 일치하는지 SQL 쿼리로 교차 검증
+### `src/pages/Admin.tsx`
+- 30초 자동 새로고침 `useEffect` 추가
+- `lastUpdated` 상태 추가 및 헤더에 갱신 시각 표시
+- `document.visibilitychange` 이벤트로 탭 활성 시에만 갱신
 
-## 기술 요약
+---
 
-- 변경 파일 3개: `Admin.tsx`, `kpi-definitions.ts`, `useAdminKPI.tsx`
-- 데모 데이터 관련 코드 완전 삭제
-- 일별 계산 불가능한 트렌드 차트 3개 제거
-- amountEntered 일별 실제 계산 로직 추가
-- DB 변경 없음
+## 7가지 검증 시나리오
+
+1. **PV 전체 건수 검증**: SQL로 30일간 PV 수를 조회하고 대시보드 표시값과 비교
+2. **budget_items 전체 건수 검증**: SQL로 budget_items 총 amount를 조회하고 K15와 비교
+3. **기간 필터 7일 vs 30일**: 7일과 30일 선택 시 PV/충성 고객 수치가 다른지 확인
+4. **자동 갱신**: 30초 대기 후 "마지막 갱신" 시각이 업데이트되는지 확인
+5. **빈 데이터 기간**: 데이터가 없는 기간(예: 미래 날짜)에서 0 표시 및 차트 정상 렌더링
+6. **YTD 필터**: 올해 전체 선택 시 1월 24일부터의 데이터가 모두 포함되는지 확인
+7. **탭 비활성 시 갱신 중지**: 다른 탭으로 전환 후 복귀 시 즉시 갱신되는지 확인

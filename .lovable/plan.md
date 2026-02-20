@@ -1,91 +1,76 @@
 
-# 관리자 대시보드: 실제 데이터 정확성 100% 보장 업그레이드
+# 관리자 대시보드 개선 + 모바일 팝업 추가
 
-## 현재 상태 진단
+## 개선 요청사항 1: 관리자 활동 제외
 
-코드를 전체 검토한 결과, 데모/가짜 데이터는 이미 이전 작업에서 제거되었습니다. 하지만 **실제 데이터가 잘려서(truncated) 부정확하게 표시되는 심각한 버그**가 2건 있고, **실시간 업데이트 미지원** 문제가 있습니다.
+### 문제
+현재 `useAdminKPI.tsx`에서 `page_views`, `profiles`, `budgets`, `budget_items` 등 모든 데이터를 필터링 없이 집계하고 있어, 관리자(`seunghwan.kong@gmail.com`, user_id: `f628fbf6-5f2f-4ca1-86e0-21eb2395bc40`)의 활동이 모든 KPI에 포함됩니다.
 
-### 버그 1: 1000행 제한으로 데이터 누락 (Critical)
+### 해결 방안
 
-데이터베이스는 기본적으로 쿼리당 최대 1000행만 반환합니다. 현재 상태:
+**파일: `src/hooks/useAdminKPI.tsx`**
 
-| 테이블 | 실제 행 수 | 가져오는 행 수 | 누락률 |
-|--------|-----------|--------------|--------|
-| page_views (30일) | 2,498 | 1,000 | **60% 누락** |
-| budget_items | 1,363 | 1,000 | **27% 누락** |
-| budgets | 46 | 46 | 정상 |
-| profiles | 30 | 30 | 정상 |
+1. 상단에 관리자 user_id 상수 정의:
+```
+const ADMIN_USER_ID = 'f628fbf6-5f2f-4ca1-86e0-21eb2395bc40';
+```
 
-PV가 2,498건인데 1,000건만 가져오므로, 페이지뷰 수치가 실제의 40%만 표시됩니다. budget_items도 마찬가지로 예산 집행률(K15)이 부정확합니다.
+2. 모든 데이터를 fetch한 직후, 관리자 데이터를 클라이언트 측에서 필터링:
+   - `page_views`: `user_id !== ADMIN_USER_ID`인 것만 사용
+   - `profiles`: `user_id !== ADMIN_USER_ID`인 것만 사용
+   - `budgets`: `user_id !== ADMIN_USER_ID`인 것만 사용
+   - `budget_items`: 관리자 소유 budget_id를 제외
+   - `budget_snapshots`: `user_id !== ADMIN_USER_ID`인 것만 사용
+   - `todayPV/weekPV/monthPV`: 관리자 제외 필터
 
-### 버그 2: budgets/budget_items에 기간 필터 미적용
+3. Supabase 쿼리에 `.neq('user_id', ADMIN_USER_ID)`를 직접 추가하는 방식도 가능하지만, `budget_items`는 `user_id` 컬럼이 없어 조인이 필요하므로, 클라이언트 측 필터링이 더 간단합니다. 단, `page_views` 등 user_id가 있는 테이블은 쿼리 레벨에서 `.neq()`로 제외하면 전송량도 줄어들어 효율적입니다.
 
-`budgets`와 `budget_items` 쿼리에 날짜 필터가 없어 전체 기간의 데이터를 가져옵니다. "최근 7일" 필터를 선택해도 K09~K15 지표는 전체 기간 기준으로 계산됩니다.
-
-### 문제 3: 실시간 업데이트 미지원
-
-현재는 페이지 로드 시 1회만 데이터를 가져오고, 새 페이지뷰나 예산 변경이 발생해도 대시보드에 반영되지 않습니다.
+**적용 전략 (하이브리드):**
+- `page_views`, `profiles`, `snapshots`: 쿼리에 `.neq('user_id', ADMIN_USER_ID)` 추가
+- `budgets`: 쿼리에 `.neq('user_id', ADMIN_USER_ID)` 추가
+- `budget_items`: 관리자 소유 budget_id를 먼저 식별 후 클라이언트에서 필터링
+- `shared_budgets`: 관리자 소유 budget_id 제외
 
 ---
 
-## 해결 방안
+## 개선 요청사항 2: 모바일/태블릿 안내 팝업
 
-### 1. 페이지네이션으로 전체 데이터 가져오기 (`useAdminKPI.tsx`)
+### 요구사항
+- 모바일 또는 태블릿에서 로그인 후 "데스크톱 환경에서 가장 편리하게 보실 수 있어요^^" 팝업 표시
+- 사용자별 하루 1번만 표시
+- 반복 표시 방지
 
-1000행 제한을 우회하는 헬퍼 함수를 추가합니다:
+### 해결 방안
 
-```
-async function fetchAllRows(query) {
-  // 1000행씩 반복 요청하여 전체 데이터를 가져옴
-  // .range(from, to) 메서드 사용
-  // 반환된 행이 1000 미만이면 종료
-}
-```
+**새 파일: `src/components/MobileDesktopNotice.tsx`**
 
-적용 대상: `page_views`, `budget_items` (1000행 초과 가능한 테이블)
+1. `useIsMobile()` 훅 + `window.innerWidth < 1024` (태블릿 포함) 체크
+2. `useAuth()`로 로그인 상태 확인
+3. `localStorage`에 `desktop_notice_shown_{userId}_{YYYY-MM-DD}` 키로 표시 여부 저장
+4. 조건 충족 시 `Dialog` 또는 `sonner` toast로 팝업 표시
+5. 닫기 시 localStorage에 오늘 날짜 기록
 
-### 2. 기간 필터 적용 (`useAdminKPI.tsx`)
-
-`budgets`와 `budget_items` 쿼리에도 `.gte('created_at', startDate)` 필터를 추가합니다. 단, K09~K12 등 가입자 기반 지표는 전체 budgets가 필요하므로, 기간 내 budgets와 전체 budgets를 구분하여 쿼리합니다.
-
-### 3. 자동 새로고침 (30초 인터벌)
-
-`Admin.tsx`에 30초마다 자동으로 `fetchData`를 호출하는 인터벌을 추가합니다. 탭이 비활성 상태이면 일시 중지하여 불필요한 요청을 방지합니다.
-
-```
-useEffect(() => {
-  // 30초마다 fetchData 호출
-  // document.visibilityState 체크
-  // 마지막 갱신 시각 표시
-}, [])
-```
-
-### 4. 마지막 갱신 시각 표시
-
-헤더에 "마지막 갱신: 14:32:15" 형태로 표시하여 데이터의 실시간성을 사용자가 확인할 수 있게 합니다.
+**파일: `src/App.tsx`**
+- `<MobileDesktopNotice />` 컴포넌트를 `AppRoutes` 내부에 추가
 
 ---
 
-## 변경 파일
+## 변경 파일 요약
 
-### `src/hooks/useAdminKPI.tsx`
-- `fetchAllRows` 페이지네이션 헬퍼 함수 추가
-- `page_views`, `budget_items` 쿼리에 페이지네이션 적용
-- `budget_items` 쿼리에 기간 필터 추가 (기간 내 생성된 항목만)
-
-### `src/pages/Admin.tsx`
-- 30초 자동 새로고침 `useEffect` 추가
-- `lastUpdated` 상태 추가 및 헤더에 갱신 시각 표시
-- `document.visibilitychange` 이벤트로 탭 활성 시에만 갱신
+| 파일 | 변경 내용 |
+|------|----------|
+| `src/hooks/useAdminKPI.tsx` | 관리자 user_id 상수 추가, 모든 쿼리/계산에서 관리자 제외 |
+| `src/components/MobileDesktopNotice.tsx` | 새 파일 - 모바일/태블릿 안내 팝업 |
+| `src/App.tsx` | MobileDesktopNotice 컴포넌트 추가 |
 
 ---
 
 ## 7가지 검증 시나리오
 
-1. **PV 전체 건수 검증**: SQL로 30일간 PV 수를 조회하고 대시보드 표시값과 비교
-2. **budget_items 전체 건수 검증**: SQL로 budget_items 총 amount를 조회하고 K15와 비교
-3. **기간 필터 7일 vs 30일**: 7일과 30일 선택 시 PV/충성 고객 수치가 다른지 확인
-4. **자동 갱신**: 30초 대기 후 "마지막 갱신" 시각이 업데이트되는지 확인
-5. **빈 데이터 기간**: 데이터가 없는 기간(예: 미래 날짜)에서 0 표시 및 차트 정상 렌더링
-6. **YTD 필터**: 올해 전체 선택 시 1월 24일부터의 데이터가 모두 포함되는지 확인
-7. **탭 비활성 시 갱신 중지**: 다른 탭으로 전환 후 복귀 시 즉시 갱신되는지 확인
+1. **PV에서 관리자 제외 확인**: SQL로 관리자 제외 PV 수 조회 후 대시보드 값과 비교
+2. **DAU/WAU/MAU에서 관리자 제외 확인**: 관리자 user_id가 활성 사용자 수에 포함되지 않는지 확인
+3. **K01(신규 가입자)에서 관리자 제외 확인**: profiles 카운트에서 관리자 제외되는지 확인
+4. **충성 고객에서 관리자 제외 확인**: 관리자가 충성 고객 수에 포함되지 않는지 확인
+5. **모바일 팝업 표시 확인**: 모바일 뷰포트 + 로그인 상태에서 팝업이 뜨는지 확인
+6. **팝업 하루 1회 제한 확인**: 팝업 닫은 후 새로고침 시 다시 뜨지 않는지 확인
+7. **데스크톱에서 팝업 미표시 확인**: 데스크톱 뷰포트에서 팝업이 뜨지 않는지 확인

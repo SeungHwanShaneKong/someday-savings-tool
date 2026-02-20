@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
 
+// 관리자 user_id — 모든 KPI 계산에서 제외
+const ADMIN_USER_ID = 'f628fbf6-5f2f-4ca1-86e0-21eb2395bc40';
+
 export interface SummaryKPIs {
   totalPageViews: number;
   prevTotalPageViews: number;
@@ -92,43 +95,52 @@ export function useAdminKPI(): UseAdminKPIResult {
         todayPVRes, weekPVRes, monthPVRes,
       ] = await Promise.all([
         // profiles — small table, no pagination needed
-        supabase.from('profiles').select('user_id, created_at').gte('created_at', startISO).lte('created_at', endISO).then(r => r.data || []),
-        supabase.from('profiles').select('user_id, created_at').gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
-        // page_views — PAGINATED
+        supabase.from('profiles').select('user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', startISO).lte('created_at', endISO).then(r => r.data || []),
+        supabase.from('profiles').select('user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
+        // page_views — PAGINATED, admin excluded
         fetchAllRows<{ user_id: string | null; created_at: string; page_path: string; duration_seconds: number | null }>(
-          () => supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
+          () => supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').neq('user_id', ADMIN_USER_ID).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
         ),
         fetchAllRows<{ user_id: string | null; created_at: string; duration_seconds: number | null }>(
-          () => supabase.from('page_views').select('user_id, created_at, duration_seconds').gte('created_at', prevStartISO).lte('created_at', prevEndISO).order('created_at', { ascending: true })
+          () => supabase.from('page_views').select('user_id, created_at, duration_seconds').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).order('created_at', { ascending: true })
         ),
-        // budgets — all (for user mapping), small table
-        supabase.from('budgets').select('id, user_id, created_at').then(r => r.data || []),
-        supabase.from('budgets').select('id, user_id, created_at').gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
-        // budget_items — PAGINATED, all (for K15 total)
+        // budgets — all (for user mapping), admin excluded
+        supabase.from('budgets').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).then(r => r.data || []),
+        supabase.from('budgets').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
+        // budget_items — PAGINATED, all (admin budget_ids filtered client-side)
         fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string }>(
           () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at').order('created_at', { ascending: true })
         ),
-        // budget_items filtered to period (for period-specific metrics)
+        // budget_items filtered to period
         fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string }>(
           () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
         ),
         supabase.from('shared_budgets').select('id, budget_id, created_at').then(r => r.data || []),
-        supabase.from('budget_snapshots').select('id, user_id, created_at').then(r => r.data || []),
-        // DAU/WAU/MAU counts — paginated
+        supabase.from('budget_snapshots').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).then(r => r.data || []),
+        // DAU/WAU/MAU counts — paginated, admin excluded
         fetchAllRows<{ user_id: string | null }>(
-          () => supabase.from('page_views').select('user_id').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
+          () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
         ),
         fetchAllRows<{ user_id: string | null }>(
-          () => supabase.from('page_views').select('user_id').gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: true })
+          () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: true })
         ),
         fetchAllRows<{ user_id: string | null }>(
-          () => supabase.from('page_views').select('user_id').gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: true })
+          () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: true })
         ),
       ]);
 
       const todayPV = todayPVRes;
       const weekPV = weekPVRes;
       const monthPV = monthPVRes;
+
+      // Filter budget_items to exclude admin-owned budgets (client-side)
+      const adminBudgetIds = new Set(
+        (await supabase.from('budgets').select('id').eq('user_id', ADMIN_USER_ID).then(r => r.data || []))
+          .map(b => b.id)
+      );
+      const filteredBudgetItems = budgetItems.filter(bi => !adminBudgetIds.has(bi.budget_id));
+      const filteredPeriodBudgetItems = periodBudgetItems.filter(bi => !adminBudgetIds.has(bi.budget_id));
+      const filteredSharedBudgets = sharedBudgets.filter(sb => !adminBudgetIds.has(sb.budget_id));
 
       // Helper: unique user_ids
       const unique = (arr: { user_id: string | null }[]) => new Set(arr.filter(a => a.user_id).map(a => a.user_id!));
@@ -188,7 +200,7 @@ export function useAdminKPI(): UseAdminKPIResult {
       const profileSignupMap: Record<string, number> = {};
       allProfiles.forEach(p => { profileSignupMap[p.user_id] = new Date(p.created_at).getTime(); });
 
-      const itemsWithAmount = budgetItems.filter(bi => bi.amount > 0);
+      const itemsWithAmount = filteredBudgetItems.filter(bi => bi.amount > 0);
       
       let k10Count = 0;
       const ttfvValues: number[] = [];
@@ -224,7 +236,7 @@ export function useAdminKPI(): UseAdminKPIResult {
 
       // K13: 공유 링크 생성률
       const activeUsers = mau || 1;
-      const shareUsers = new Set(sharedBudgets.map(sb => budgetUserMap[sb.budget_id]).filter(Boolean)).size;
+      const shareUsers = new Set(filteredSharedBudgets.map(sb => budgetUserMap[sb.budget_id]).filter(Boolean)).size;
       const k13 = (shareUsers / activeUsers) * 100;
 
       // K14: 스냅샷 사용률
@@ -232,8 +244,8 @@ export function useAdminKPI(): UseAdminKPIResult {
       const k14 = (snapshotUsers / activeUsers) * 100;
 
       // K15: 예산 집행률 — uses period-filtered budget_items
-      const totalAmount = periodBudgetItems.reduce((s, i) => s + (i.amount || 0), 0);
-      const paidAmount = periodBudgetItems.filter(i => i.is_paid).reduce((s, i) => s + (i.amount || 0), 0);
+      const totalAmount = filteredPeriodBudgetItems.reduce((s, i) => s + (i.amount || 0), 0);
+      const paidAmount = filteredPeriodBudgetItems.filter(i => i.is_paid).reduce((s, i) => s + (i.amount || 0), 0);
       const k15 = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
 
       const calcChange = (current: number, prev: number) => {
@@ -298,7 +310,7 @@ export function useAdminKPI(): UseAdminKPIResult {
           ? Math.round(dayDurations.reduce((a, b) => a + b, 0) / dayDurations.length)
           : 0;
 
-        const dayAmountEntered = periodBudgetItems.filter(bi => {
+        const dayAmountEntered = filteredPeriodBudgetItems.filter(bi => {
           const d = new Date(bi.created_at);
           return d >= dayStart && d <= dayEnd && bi.amount > 0;
         }).length;

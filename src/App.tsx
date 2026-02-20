@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { AdSenseLayout } from "@/components/AdSenseLayout";
+import { MobileDesktopNotice } from "@/components/MobileDesktopNotice";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import BudgetFlow from "./pages/BudgetFlow";
@@ -18,8 +19,10 @@ const queryClient = new QueryClient();
 
 function AppRoutes() {
   usePageTracking();
-  
+
   return (
+    <>
+      <MobileDesktopNotice />
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
@@ -28,7 +31,8 @@ function AppRoutes() {
       <Route path="/shared/:token" element={<SharedBudget />} />
       <Route path="/admin" element={<Admin />} />
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

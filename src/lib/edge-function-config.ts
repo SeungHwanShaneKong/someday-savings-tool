@@ -4,8 +4,10 @@
 
 export const EDGE_FUNCTION_URL =
   import.meta.env.VITE_EDGE_FUNCTION_URL ||
-  'https://qllsuouxeojhwgonwpqb.supabase.co';
+  import.meta.env.VITE_SUPABASE_URL ||
+  'https://tnboeqtdimyxpjzsraro.supabase.co';
 
 export const EDGE_FUNCTION_KEY =
   import.meta.env.VITE_EDGE_FUNCTION_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsbHN1b3V4ZW9qaHdnb253cHFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTY3MTgsImV4cCI6MjA4NDg3MjcxOH0._Hfuji9ZNthYiNgU7zqZq_ooflUA3_Jtxbm9uvMEy94';
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuYm9lcXRkaW15eHBqenNyYXJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMzE4MDcsImV4cCI6MjA4NDgwNzgwN30.vW3bVRKZ91key-JpysigzC96qa96DqqFE47CLs6Nhj0';

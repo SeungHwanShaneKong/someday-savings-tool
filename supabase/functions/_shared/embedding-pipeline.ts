@@ -79,7 +79,7 @@ export async function processContent(
           updated_at: new Date().toISOString(),
         });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`Embedding batch ${i / BATCH_SIZE + 1} failed:`, error);
       // Continue with next batch
     }

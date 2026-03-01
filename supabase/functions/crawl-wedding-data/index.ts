@@ -258,7 +258,7 @@ async function updateFreshnessScores(supabase: any) {
           .eq('id', emb.id);
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Freshness update error:', error);
   }
 }
@@ -320,7 +320,7 @@ async function aggregateUserBudgetData(
     }
 
     return records.length;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('User data aggregation error:', error);
     return 0;
   }

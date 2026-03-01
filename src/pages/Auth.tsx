@@ -7,10 +7,10 @@ import { ArrowLeft, ExternalLink, Copy, CheckCircle2, Bug } from 'lucide-react';
 import {
   getBrowserInfo,
   openInExternalBrowserWithFallback,
-  openInExternalBrowser,
   copyToClipboard,
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
+import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
 
 const DEV_TEST_EMAIL = 'dev-test@wedsem-local.dev';
 const DEV_TEST_PASSWORD = 'devtest123456';
@@ -96,13 +96,11 @@ export default function Auth() {
 
       // 2. 로그인 실패 → Edge Function(Admin API)으로 유저 생성 (이메일 발송 없음)
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        const res = await fetch(`${supabaseUrl}/functions/v1/dev-create-user`, {
+        const res = await fetch(`${EDGE_FUNCTION_URL}/functions/v1/dev-create-user`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            apikey: supabaseKey,
+            apikey: EDGE_FUNCTION_KEY,
           },
           body: JSON.stringify({ email: DEV_TEST_EMAIL, password: DEV_TEST_PASSWORD }),
         });
@@ -123,7 +121,7 @@ export default function Auth() {
           return;
         }
         toast({ title: 'Dev 계정 생성 + 로그인 성공!' });
-      } catch (fnError: any) {
+      } catch (fnError: unknown) {
         // Edge Function 미배포 시 → 명확한 안내
         toast({
           title: 'Dev 로그인 실패',

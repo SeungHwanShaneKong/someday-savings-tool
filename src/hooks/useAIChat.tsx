@@ -4,6 +4,7 @@ import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { searchKnowledge } from '@/lib/wedding-knowledge-base';
 import type { Citation } from '@/lib/rag-sources';
+import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -118,7 +119,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         const headers = {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          apikey: EDGE_FUNCTION_KEY,
         };
 
         let reply: string;
@@ -129,7 +130,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         if (feature === 'qa') {
           try {
             const ragResponse = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rag-query`,
+              `${EDGE_FUNCTION_URL}/functions/v1/rag-query`,
               {
                 method: 'POST',
                 headers,
@@ -151,7 +152,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
           } catch {
             // RAG not deployed or failed — fall back to ai-chat
             const response = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`,
+              `${EDGE_FUNCTION_URL}/functions/v1/ai-chat`,
               {
                 method: 'POST',
                 headers,
@@ -177,7 +178,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         } else {
           // Non-Q&A features: use ai-chat directly
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`,
+            `${EDGE_FUNCTION_URL}/functions/v1/ai-chat`,
             {
               method: 'POST',
               headers,

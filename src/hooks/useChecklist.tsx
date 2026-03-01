@@ -67,7 +67,7 @@ export function useChecklist() {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('user_checklist_items')
         .select('*')
         .eq('user_id', user.id)
@@ -98,7 +98,7 @@ export function useChecklist() {
 
     try {
       // Check if items already exist
-      const { count } = await supabase
+      const { count } = await (supabase as any)
         .from('user_checklist_items')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
@@ -143,7 +143,7 @@ export function useChecklist() {
         is_custom: false,
       }));
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('user_checklist_items')
         .insert(newItems);
 
@@ -187,7 +187,7 @@ export function useChecklist() {
       );
 
       try {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('user_checklist_items')
           .update({
             is_completed: newCompleted,
@@ -263,7 +263,7 @@ export function useChecklist() {
       const maxOrder = Math.max(0, ...periodItems.map((i) => i.sort_order));
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('user_checklist_items')
           .insert({
             user_id: user.id,
@@ -301,7 +301,7 @@ export function useChecklist() {
   const deleteItem = useCallback(
     async (itemId: string) => {
       try {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('user_checklist_items')
           .delete()
           .eq('id', itemId);
@@ -326,7 +326,7 @@ export function useChecklist() {
   const updateNotes = useCallback(
     async (itemId: string, notes: string) => {
       try {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('user_checklist_items')
           .update({ notes, updated_at: new Date().toISOString() })
           .eq('id', itemId);

@@ -35,7 +35,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
 
     const loadConversation = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('ai_conversations')
           .select('*')
           .eq('user_id', user.id)
@@ -55,7 +55,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
 
         if (data) {
           setConversationId(data.id);
-          const savedMessages = data.messages as ChatMessage[];
+          const savedMessages = data.messages as unknown as ChatMessage[];
           if (Array.isArray(savedMessages) && savedMessages.length > 0) {
             setMessages(savedMessages);
           }
@@ -216,7 +216,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         if (dbAvailable.current) {
           try {
             if (conversationId) {
-              await supabase
+              await (supabase as any)
                 .from('ai_conversations')
                 .update({
                   messages: finalMessages,
@@ -224,13 +224,13 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
                 })
                 .eq('id', conversationId);
             } else {
-              const { data: newConv } = await supabase
+              const { data: newConv } = await (supabase as any)
                 .from('ai_conversations')
-                .insert({
+                .insert([{
                   user_id: user.id,
                   feature,
                   messages: finalMessages,
-                })
+                }])
                 .select('id')
                 .single();
 
@@ -267,7 +267,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
   const clearMessages = useCallback(async () => {
     setMessages([]);
     if (conversationId) {
-      await supabase
+      await (supabase as any)
         .from('ai_conversations')
         .update({ messages: [], updated_at: new Date().toISOString() })
         .eq('id', conversationId);

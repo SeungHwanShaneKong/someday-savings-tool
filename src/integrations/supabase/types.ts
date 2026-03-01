@@ -14,36 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      ai_conversations: {
-        Row: {
-          id: string
-          user_id: string
-          feature: string
-          messages: Json
-          metadata: Json | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          feature: string
-          messages?: Json
-          metadata?: Json | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          feature?: string
-          messages?: Json
-          metadata?: Json | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       budget_collaborators: {
         Row: {
           budget_id: string
@@ -122,47 +92,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "budget_invitations_budget_id_fkey"
-            columns: ["budget_id"]
-            isOneToOne: false
-            referencedRelation: "budgets"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      budget_insights: {
-        Row: {
-          id: string
-          budget_id: string
-          insight_type: string
-          title: string
-          description: string
-          metadata: Json | null
-          is_dismissed: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          budget_id: string
-          insight_type: string
-          title: string
-          description: string
-          metadata?: Json | null
-          is_dismissed?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          budget_id?: string
-          insight_type?: string
-          title?: string
-          description?: string
-          metadata?: Json | null
-          is_dismissed?: boolean
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "budget_insights_budget_id_fkey"
             columns: ["budget_id"]
             isOneToOne: false
             referencedRelation: "budgets"
@@ -264,119 +193,6 @@ export type Database = {
           },
         ]
       }
-      checklist_templates: {
-        Row: {
-          id: string
-          period: string
-          sort_order: number
-          title: string
-          description: string | null
-          category_link: string | null
-          sub_category_link: string | null
-          nudge_message: string | null
-          depends_on: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          period: string
-          sort_order: number
-          title: string
-          description?: string | null
-          category_link?: string | null
-          sub_category_link?: string | null
-          nudge_message?: string | null
-          depends_on?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          period?: string
-          sort_order?: number
-          title?: string
-          description?: string | null
-          category_link?: string | null
-          sub_category_link?: string | null
-          nudge_message?: string | null
-          depends_on?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "checklist_templates_depends_on_fkey"
-            columns: ["depends_on"]
-            isOneToOne: false
-            referencedRelation: "checklist_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      crawl_jobs: {
-        Row: {
-          id: string
-          source: string
-          status: string
-          records_processed: number
-          error_message: string | null
-          started_at: string | null
-          completed_at: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          source: string
-          status?: string
-          records_processed?: number
-          error_message?: string | null
-          started_at?: string | null
-          completed_at?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          source?: string
-          status?: string
-          records_processed?: number
-          error_message?: string | null
-          started_at?: string | null
-          completed_at?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
-      crawl_sources: {
-        Row: {
-          id: string
-          name: string
-          url_pattern: string
-          crawl_interval_hours: number
-          last_crawled_at: string | null
-          is_active: boolean
-          anti_block_config: Json | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          url_pattern: string
-          crawl_interval_hours?: number
-          last_crawled_at?: string | null
-          is_active?: boolean
-          anti_block_config?: Json | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          url_pattern?: string
-          crawl_interval_hours?: number
-          last_crawled_at?: string | null
-          is_active?: boolean
-          anti_block_config?: Json | null
-          created_at?: string
-        }
-        Relationships: []
-      }
       budgets: {
         Row: {
           created_at: string
@@ -437,48 +253,6 @@ export type Database = {
           title?: string
           type?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      knowledge_embeddings: {
-        Row: {
-          id: string
-          content: string
-          content_hash: string
-          metadata: Json
-          embedding: string
-          source_type: string
-          region: string | null
-          freshness_score: number
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          content: string
-          content_hash: string
-          metadata: Json
-          embedding: string
-          source_type: string
-          region?: string | null
-          freshness_score?: number
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          content?: string
-          content_hash?: string
-          metadata?: Json
-          embedding?: string
-          source_type?: string
-          region?: string | null
-          freshness_score?: number
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -586,88 +360,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_checklist_items: {
-        Row: {
-          id: string
-          user_id: string
-          template_id: string | null
-          budget_id: string | null
-          title: string
-          period: string
-          sort_order: number
-          is_completed: boolean
-          completed_at: string | null
-          due_date: string | null
-          notes: string | null
-          depends_on: string | null
-          category_link: string | null
-          sub_category_link: string | null
-          is_custom: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          template_id?: string | null
-          budget_id?: string | null
-          title: string
-          period: string
-          sort_order?: number
-          is_completed?: boolean
-          completed_at?: string | null
-          due_date?: string | null
-          notes?: string | null
-          depends_on?: string | null
-          category_link?: string | null
-          sub_category_link?: string | null
-          is_custom?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          template_id?: string | null
-          budget_id?: string | null
-          title?: string
-          period?: string
-          sort_order?: number
-          is_completed?: boolean
-          completed_at?: string | null
-          due_date?: string | null
-          notes?: string | null
-          depends_on?: string | null
-          category_link?: string | null
-          sub_category_link?: string | null
-          is_custom?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_checklist_items_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_checklist_items_budget_id_fkey"
-            columns: ["budget_id"]
-            isOneToOne: false
-            referencedRelation: "budgets"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_checklist_items_depends_on_fkey"
-            columns: ["depends_on"]
-            isOneToOne: false
-            referencedRelation: "user_checklist_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -705,24 +397,6 @@ export type Database = {
       is_budget_collaborator: {
         Args: { p_budget_id: string; p_user_id?: string }
         Returns: boolean
-      }
-      match_knowledge: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-          filter_source?: string
-          filter_region?: string
-        }
-        Returns: {
-          id: string
-          content: string
-          metadata: Json
-          source_type: string
-          region: string
-          freshness_score: number
-          similarity: number
-        }[]
       }
     }
     Enums: {

@@ -135,7 +135,10 @@ export default function Landing() {
 
         <div className="w-full max-w-sm space-y-3 mb-12">
           <FeatureItem icon="📊" text="한눈에 보는 예산 현황" />
-          <FeatureItem icon="✅" text="결제 체크리스트로 진행 상황 관리" />
+          <FeatureItem icon="📋" text="D-day 체크리스트로 준비 관리" />
+          <FeatureItem icon="💡" text="숨겨진 비용 경고 & AI 인사이트" />
+          <FeatureItem icon="✈️" text="AI 허니문 큐레이션 & 지도" />
+          <FeatureItem icon="💬" text="웨딩 Q&A AI 챗봇" />
           <FeatureItem icon="🔗" text="예산표 이미지 저장 & 공유" />
         </div>
 

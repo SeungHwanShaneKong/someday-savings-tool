@@ -24,6 +24,7 @@ import {
   type KPIValue
 } from '@/lib/kpi-definitions';
 import type { SummaryKPIs } from '@/hooks/useAdminKPI';
+import { ImpactMetrics } from '@/components/admin/ImpactMetrics';
 
 // ========= 기간 프리셋 =========
 const PERIOD_OPTIONS = [
@@ -57,7 +58,7 @@ export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const { kpiValues, trendData, topPages, summaryKPIs, loading: dataLoading, fetchData } = useAdminKPI();
+  const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, loading: dataLoading, fetchData } = useAdminKPI();
 
   const [period, setPeriod] = useState('30');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -342,8 +343,11 @@ export default function Admin() {
             </div>
           </section>
 
+          {/* ===== 경제적 파급 효과 (Phase 4-A, BRD §7) ===== */}
+          <ImpactMetrics impact={impactSummary} loading={dataLoading} />
+
           <section>
-            <h2 className="text-base sm:text-lg font-bold mb-4 leading-relaxed">📊 15개 핵심 운영 지표</h2>
+            <h2 className="text-base sm:text-lg font-bold mb-4 leading-relaxed">📊 18개 핵심 운영 지표</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               {KPI_DEFINITIONS.map(def => {
                 const kv = kpiValues.find(k => k.id === def.id);
@@ -466,7 +470,7 @@ export default function Admin() {
 
           {/* ===== 15개 핵심 지표 정의 테이블 ===== */}
           <Card className="p-4 sm:p-5">
-            <h2 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">📋 15개 핵심 지표 정의</h2>
+            <h2 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">📋 18개 핵심 지표 정의</h2>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>

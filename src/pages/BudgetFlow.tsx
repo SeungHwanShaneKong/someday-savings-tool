@@ -6,6 +6,7 @@ import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
 import { BudgetTableMobile } from '@/components/BudgetTableMobile';
 import { BudgetComparisonDashboard } from '@/components/BudgetComparisonDashboard';
+import { InsightPanel } from '@/components/budget/InsightPanel';
 import { WeddingCountdown } from '@/components/WeddingCountdown';
 import { RestoreProgressIndicator } from '@/components/RestoreProgressIndicator';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,8 @@ import {
   ChevronDown,
   RotateCcw,
   History,
-  Shield
+  Shield,
+  ClipboardList,
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -413,6 +415,24 @@ export default function BudgetFlow() {
       {/* Main content */}
       {/* pb-32: 모바일/태블릿에서 FAB 버튼과 총계 카드 중첩 방지를 위한 하단 여백, lg(1024px+)부터 축소 */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 pt-4 sm:pt-6 pb-32 lg:pb-6 overflow-x-hidden">
+        {/* Checklist shortcut + Insight Panel */}
+        {viewMode === 'table' && items.length > 0 && (
+          <div className="space-y-3 mb-4">
+            <button
+              onClick={() => navigate('/checklist')}
+              className="w-full flex items-center gap-3 bg-card rounded-xl border border-border p-3.5 hover:bg-muted/30 transition-colors shadow-toss-sm"
+            >
+              <ClipboardList className="w-5 h-5 text-primary" />
+              <div className="flex-1 text-left">
+                <p className="text-sm font-medium text-foreground">D-day 체크리스트</p>
+                <p className="text-xs text-muted-foreground">결혼 준비 진행 상황을 확인하세요</p>
+              </div>
+              <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90" />
+            </button>
+            <InsightPanel items={items} />
+          </div>
+        )}
+
         {viewMode === 'table' ? (
           <>
             {isMobile ? (

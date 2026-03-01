@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
+import { calculateImpact, type ImpactSummary, type BudgetForImpact } from '@/lib/impact-calculator';
 
 // 관리자 user_id — 모든 KPI 계산에서 제외
 const ADMIN_USER_ID = 'f628fbf6-5f2f-4ca1-86e0-21eb2395bc40';
@@ -24,6 +25,7 @@ interface UseAdminKPIResult {
   trendData: TrendDataPoint[];
   topPages: TopPage[];
   summaryKPIs: SummaryKPIs;
+  impactSummary: ImpactSummary;
   loading: boolean;
   error: string | null;
   fetchData: (startDate: Date, endDate: Date) => Promise<void>;
@@ -63,6 +65,11 @@ export function useAdminKPI(): UseAdminKPIResult {
   const [trendData, setTrendData] = useState<TrendDataPoint[]>([]);
   const [topPages, setTopPages] = useState<TopPage[]>([]);
   const [summaryKPIs, setSummaryKPIs] = useState<SummaryKPIs>(defaultSummary);
+  const [impactSummary, setImpactSummary] = useState<ImpactSummary>({
+    totalBudgets: 0, activeBudgets: 0, avgSavingsRate: 0, avgSavingsAmount: 0,
+    totalSavingsEstimate: 0, belowAvgPercent: 0, aboveAvgPercent: 0,
+    avgHiddenCostsIdentified: 0, totalContingencyFund: 0, categoryBreakdown: [],
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,9 +114,9 @@ export function useAdminKPI(): UseAdminKPIResult {
         // budgets — all (for user mapping), admin excluded
         supabase.from('budgets').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).then(r => r.data || []),
         supabase.from('budgets').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
-        // budget_items — PAGINATED, all (admin budget_ids filtered client-side)
-        fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string }>(
-          () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at').order('created_at', { ascending: true })
+        // budget_items — PAGINATED, all (admin budget_ids filtered client-side) — includes category/sub_category for impact calc
+        fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string; category: string; sub_category: string }>(
+          () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at, category, sub_category').order('created_at', { ascending: true })
         ),
         // budget_items filtered to period
         fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string }>(
@@ -390,6 +397,39 @@ export function useAdminKPI(): UseAdminKPIResult {
         weeklyPageViews: weekPV.length,
         monthlyPageViews: monthPV.length,
       });
+
+      // ─── Phase 4-A: 경제적 파급 효과 계산 ───
+      try {
+        // Group budget_items by budget_id to build BudgetForImpact[]
+        const budgetItemsMap: Record<string, BudgetForImpact['items']> = {};
+        for (const bi of filteredBudgetItems) {
+          if (!budgetItemsMap[bi.budget_id]) {
+            budgetItemsMap[bi.budget_id] = [];
+          }
+          budgetItemsMap[bi.budget_id].push({
+            category: (bi as any).category || '',
+            sub_category: (bi as any).sub_category || '',
+            amount: bi.amount,
+          });
+        }
+
+        const budgetsForImpact: BudgetForImpact[] = Object.entries(budgetItemsMap).map(
+          ([id, items]) => ({ id, items })
+        );
+
+        const impact = calculateImpact(budgetsForImpact);
+        setImpactSummary(impact);
+
+        // Add K16-K18 to kpiValues
+        values.push(
+          { id: 'K16', value: Math.round(impact.avgSavingsRate * 10) / 10, change: 0 },
+          { id: 'K17', value: Math.round(impact.avgHiddenCostsIdentified * 10) / 10, change: 0 },
+          { id: 'K18', value: impact.totalContingencyFund > 0 ? Math.round((impact.totalContingencyFund / Math.max(totalAmount, 1)) * 1000) / 10 : 0, change: 0 },
+        );
+        setKpiValues([...values]);
+      } catch (impactErr) {
+        console.warn('Impact calculation error (non-critical):', impactErr);
+      }
     } catch (err) {
       console.error('KPI fetch error:', err);
       setError('데이터를 불러오는 중 오류가 발생했습니다.');
@@ -398,5 +438,5 @@ export function useAdminKPI(): UseAdminKPIResult {
     }
   }, []);
 
-  return { kpiValues, trendData, topPages, summaryKPIs, loading, error, fetchData };
+  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, loading, error, fetchData };
 }

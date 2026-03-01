@@ -31,6 +31,10 @@ export const KPI_DEFINITIONS: KPIDefinition[] = [
   { id: 'K13', name: '공유 링크 생성률', description: '활성 사용자 중 공유 링크 생성 비율', formula: 'shared_budgets 생성자 / 활성 사용자', unit: '%', thresholds: { warn: 10, danger: 5 }, higherIsBetter: true },
   { id: 'K14', name: '스냅샷 사용률', description: '활성 사용자 중 스냅샷 사용 비율', formula: 'budget_snapshots 사용자 / 활성 사용자', unit: '%', thresholds: { warn: 10, danger: 5 }, higherIsBetter: true },
   { id: 'K15', name: '예산 집행률', description: 'is_paid 금액 합 / 전체 금액 합', formula: 'SUM(is_paid) / SUM(amount)', unit: '%', thresholds: { warn: 30, danger: 10 }, higherIsBetter: true },
+  // Phase 4-A: 경제적 파급 효과 KPI (BRD §7)
+  { id: 'K16', name: '평균 절감률', description: '사용자 입력 금액의 전국 평균 대비 절감률', formula: 'Σ(avg-user) / Σ(avg-ref) × 100', unit: '%', higherIsBetter: true },
+  { id: 'K17', name: '숨겨진 비용 인지율', description: '사용자당 평균 숨겨진 비용 경고 인지 건수', formula: '트리거된 hidden cost 규칙 수 / 사용자 수', unit: '건', higherIsBetter: true },
+  { id: 'K18', name: '예비비 준비율', description: '예비비 추정 총액 대비 실 예산 비율', formula: '예비비 경고 총액 / 전체 예산', unit: '%', higherIsBetter: true },
 ];
 
 /** 상태 배지 판별 */

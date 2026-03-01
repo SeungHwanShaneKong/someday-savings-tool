@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Copy, CheckCircle2, Bug } from 'lucide-react';
 import {
   getBrowserInfo,
   openInExternalBrowserWithFallback,
@@ -12,10 +12,14 @@ import {
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
 
+const DEV_TEST_EMAIL = 'dev-test@wedsem-local.dev';
+const DEV_TEST_PASSWORD = 'devtest123456';
+
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signInWithGoogle, loading } = useAuth();
+  const { user, signInWithGoogle, signIn, signUp, loading } = useAuth();
   const { toast } = useToast();
+  const [isDevLoading, setIsDevLoading] = useState(false);
   
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showBridgeUI, setShowBridgeUI] = useState(false);
@@ -75,6 +79,60 @@ export default function Auth() {
       }
     } finally {
       setIsGoogleLoading(false);
+    }
+  };
+
+  // DEV ONLY: 테스트 계정으로 바이패스 로그인
+  const handleDevLogin = async () => {
+    if (!import.meta.env.DEV) return;
+    setIsDevLoading(true);
+    try {
+      // 1. 먼저 password 로그인 시도 (이미 계정 존재+확인 시)
+      const { error: signInError } = await signIn(DEV_TEST_EMAIL, DEV_TEST_PASSWORD);
+      if (!signInError) {
+        toast({ title: 'Dev 로그인 성공!' });
+        return;
+      }
+
+      // 2. 로그인 실패 → Edge Function(Admin API)으로 유저 생성 (이메일 발송 없음)
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        const res = await fetch(`${supabaseUrl}/functions/v1/dev-create-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: supabaseKey,
+          },
+          body: JSON.stringify({ email: DEV_TEST_EMAIL, password: DEV_TEST_PASSWORD }),
+        });
+
+        if (!res.ok) {
+          const result = await res.json().catch(() => ({}));
+          throw new Error(result.error || `Edge Function 오류 (${res.status})`);
+        }
+
+        // 3. 계정 생성/확인됨 → 로그인 재시도
+        const { error: retryError } = await signIn(DEV_TEST_EMAIL, DEV_TEST_PASSWORD);
+        if (retryError) {
+          toast({
+            title: 'Dev 로그인 실패',
+            description: retryError.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+        toast({ title: 'Dev 계정 생성 + 로그인 성공!' });
+      } catch (fnError: any) {
+        // Edge Function 미배포 시 → 명확한 안내
+        toast({
+          title: 'Dev 로그인 실패',
+          description: `signIn: ${signInError.message}\n\n해결: Supabase Dashboard → Auth → Users에서 dev-test@wedsem-local.dev 유저를 직접 생성(Auto Confirm)하거나, dev-create-user Edge Function을 배포하세요.`,
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsDevLoading(false);
     }
   };
 
@@ -209,6 +267,25 @@ export default function Auth() {
           로그인하면 예산 데이터가 안전하게 저장되어<br />
           언제든 다시 확인할 수 있어요
         </p>
+
+        {/* DEV ONLY: 테스트 로그인 바이패스 */}
+        {import.meta.env.DEV && (
+          <div className="mt-8 pt-6 border-t border-dashed border-yellow-500/40">
+            <p className="text-center text-xs text-yellow-600 mb-3 font-mono">
+              ⚠️ DEV MODE ONLY — 프로덕션에서 표시되지 않음
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDevLogin}
+              disabled={isDevLoading}
+              className="w-full h-12 border-yellow-500/50 text-yellow-700 hover:bg-yellow-50 font-mono text-sm"
+            >
+              <Bug className="w-4 h-4 mr-2" />
+              {isDevLoading ? 'Dev 로그인 중...' : 'Dev 테스트 로그인 (Supabase Email)'}
+            </Button>
+          </div>
+        )}
       </main>
     </div>
   );

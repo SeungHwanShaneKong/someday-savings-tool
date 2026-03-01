@@ -82,9 +82,10 @@ export function useChecklist() {
         throw error;
       }
       setItems((data as ChecklistItem[]) || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (dbAvailable.current) {
-        console.warn('[useChecklist] user_checklist_items table not ready:', error.message || error.code);
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn('[useChecklist] user_checklist_items table not ready:', msg);
         dbAvailable.current = false;
       }
     } finally {
@@ -155,11 +156,21 @@ export function useChecklist() {
       });
 
       await fetchItems();
-    } catch (error: any) {
-      console.error('Failed to generate checklist:', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error !== null && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : String(error);
+      console.error('Failed to generate checklist:', message);
+      // Table may not exist on Lovable's project — suppress toast for DB errors
+      if (message.includes('relation') || message.includes('42P01')) {
+        dbAvailable.current = false;
+        return;
+      }
       toast({
         title: '체크리스트 생성 중 오류',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     }
@@ -231,7 +242,7 @@ export function useChecklist() {
         } else {
           setStreak(0);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Revert optimistic update
         setItems((prev) =>
           prev.map((i) =>
@@ -246,7 +257,7 @@ export function useChecklist() {
         );
         toast({
           title: '업데이트 실패',
-          description: error.message,
+          description: error instanceof Error ? error.message : String(error),
           variant: 'destructive',
         });
       }
@@ -286,10 +297,10 @@ export function useChecklist() {
           title: '항목이 추가되었어요',
           description: title,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: '추가 실패',
-          description: error.message,
+          description: error instanceof Error ? error.message : String(error),
           variant: 'destructive',
         });
       }
@@ -311,10 +322,10 @@ export function useChecklist() {
         setItems((prev) => prev.filter((i) => i.id !== itemId));
 
         toast({ title: '항목이 삭제되었어요' });
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: '삭제 실패',
-          description: error.message,
+          description: error instanceof Error ? error.message : String(error),
           variant: 'destructive',
         });
       }
@@ -336,10 +347,10 @@ export function useChecklist() {
         setItems((prev) =>
           prev.map((i) => (i.id === itemId ? { ...i, notes } : i))
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: '메모 저장 실패',
-          description: error.message,
+          description: error instanceof Error ? error.message : String(error),
           variant: 'destructive',
         });
       }

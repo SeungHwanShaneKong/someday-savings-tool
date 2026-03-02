@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          created_at: string | null
+          feature: string
+          id: string
+          messages: Json
+          metadata: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          feature: string
+          id?: string
+          messages?: Json
+          metadata?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          feature?: string
+          id?: string
+          messages?: Json
+          metadata?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       budget_collaborators: {
         Row: {
           budget_id: string
@@ -45,6 +75,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "budget_collaborators_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_insights: {
+        Row: {
+          budget_id: string
+          created_at: string | null
+          description: string
+          id: string
+          insight_type: string
+          is_dismissed: boolean | null
+          metadata: Json | null
+          title: string
+        }
+        Insert: {
+          budget_id: string
+          created_at?: string | null
+          description: string
+          id?: string
+          insight_type: string
+          is_dismissed?: boolean | null
+          metadata?: Json | null
+          title: string
+        }
+        Update: {
+          budget_id?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          insight_type?: string
+          is_dismissed?: boolean | null
+          metadata?: Json | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_insights_budget_id_fkey"
             columns: ["budget_id"]
             isOneToOne: false
             referencedRelation: "budgets"
@@ -223,6 +294,86 @@ export type Database = {
         }
         Relationships: []
       }
+      checklist_templates: {
+        Row: {
+          category_link: string | null
+          created_at: string | null
+          depends_on: string | null
+          description: string | null
+          id: string
+          nudge_message: string | null
+          period: string
+          sort_order: number
+          sub_category_link: string | null
+          title: string
+        }
+        Insert: {
+          category_link?: string | null
+          created_at?: string | null
+          depends_on?: string | null
+          description?: string | null
+          id?: string
+          nudge_message?: string | null
+          period: string
+          sort_order: number
+          sub_category_link?: string | null
+          title: string
+        }
+        Update: {
+          category_link?: string | null
+          created_at?: string | null
+          depends_on?: string | null
+          description?: string | null
+          id?: string
+          nudge_message?: string | null
+          period?: string
+          sort_order?: number
+          sub_category_link?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_depends_on_fkey"
+            columns: ["depends_on"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crawl_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          records_processed: number | null
+          source: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          records_processed?: number | null
+          source: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          records_processed?: number | null
+          source?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -335,6 +486,88 @@ export type Database = {
             columns: ["budget_id"]
             isOneToOne: false
             referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_checklist_items: {
+        Row: {
+          budget_id: string | null
+          category_link: string | null
+          completed_at: string | null
+          created_at: string | null
+          depends_on: string | null
+          due_date: string | null
+          id: string
+          is_completed: boolean | null
+          is_custom: boolean | null
+          notes: string | null
+          period: string
+          sort_order: number
+          sub_category_link: string | null
+          template_id: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          budget_id?: string | null
+          category_link?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          depends_on?: string | null
+          due_date?: string | null
+          id?: string
+          is_completed?: boolean | null
+          is_custom?: boolean | null
+          notes?: string | null
+          period: string
+          sort_order?: number
+          sub_category_link?: string | null
+          template_id?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          budget_id?: string | null
+          category_link?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          depends_on?: string | null
+          due_date?: string | null
+          id?: string
+          is_completed?: boolean | null
+          is_custom?: boolean | null
+          notes?: string | null
+          period?: string
+          sort_order?: number
+          sub_category_link?: string | null
+          template_id?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_checklist_items_budget_id_fkey"
+            columns: ["budget_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_checklist_items_depends_on_fkey"
+            columns: ["depends_on"]
+            isOneToOne: false
+            referencedRelation: "user_checklist_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_checklist_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
         ]

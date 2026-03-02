@@ -1,6 +1,7 @@
 import { useNavigate, Navigate } from 'react-router-dom';
-import { ArrowLeft, MapIcon } from 'lucide-react';
+import { ArrowLeft, MapIcon, MapPin, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChat } from '@/hooks/useAIChat';
 import { useHoneymoonMap } from '@/hooks/useHoneymoonMap';
@@ -51,6 +52,9 @@ export default function Honeymoon() {
     },
   });
 
+  // Check if any destinations match filters
+  const hasFilterResults = scoredDestinations.some(({ score }) => score > 0.5);
+
   // Auth check
   if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
@@ -64,17 +68,28 @@ export default function Honeymoon() {
           <button
             onClick={() => navigate('/budget')}
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="허니문 나가기"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-base font-semibold text-foreground">
-            ✈️ AI 허니문 큐레이션
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold text-foreground">
+              AI 허니문 큐레이션
+            </h1>
+            <Badge
+              variant="outline"
+              className="animate-shimmer bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-primary/20 px-2 py-0.5"
+            >
+              <Sparkles className="w-3 h-3 mr-1 text-primary" aria-hidden="true" />
+              <span className="text-[11px] font-medium text-primary">AI</span>
+            </Badge>
+          </div>
           <Button
             variant="ghost"
             size="sm"
             className="text-xs"
             onClick={resetView}
+            aria-label="지도 초기화"
           >
             <MapIcon className="w-4 h-4 mr-1" />
             전체보기
@@ -86,8 +101,8 @@ export default function Honeymoon() {
       {isMobile ? (
         // Mobile: stacked layout
         <div className="flex-1 flex flex-col">
-          {/* Map (50vh) */}
-          <div className="h-[45vh] relative">
+          {/* Map */}
+          <div className="h-[50vh] min-h-[300px] relative animate-fade-up">
             <HoneymoonMap
               viewState={viewState}
               onViewStateChange={setViewState}
@@ -104,25 +119,43 @@ export default function Honeymoon() {
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-24">
-            <FilterSliders
-              filters={filters}
-              onUpdate={updateFilter}
-              onReset={resetFilters}
-            />
+            <div className="animate-fade-up" style={{ animationDelay: '0.05s' }}>
+              <FilterSliders
+                filters={filters}
+                onUpdate={updateFilter}
+                onReset={resetFilters}
+              />
+            </div>
+
+            {/* Empty state when no filter results */}
+            {!hasFilterResults && (
+              <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-up" style={{ animationDelay: '0.1s' }}>
+                <MapPin className="w-12 h-12 text-muted-foreground/40 mb-4" aria-hidden="true" />
+                <p className="text-muted-foreground font-medium">조건에 맞는 여행지가 없어요</p>
+                <p className="text-sm text-muted-foreground/60 mt-1">필터를 조정해보세요</p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={resetFilters}>
+                  필터 초기화
+                </Button>
+              </div>
+            )}
 
             {selectedDestinations.length > 0 && (
-              <ComparisonCards
-                destinations={selectedDestinations}
-                onRemove={toggleSelection}
-              />
+              <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+                <ComparisonCards
+                  destinations={selectedDestinations}
+                  onRemove={toggleSelection}
+                />
+              </div>
             )}
 
             {popupDestination && (
-              <BookingTimeline destination={popupDestination} />
+              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
+                <BookingTimeline destination={popupDestination} />
+              </div>
             )}
 
             {/* Chat */}
-            <div className="bg-card rounded-xl border border-border overflow-hidden h-[400px]">
+            <div className="bg-card rounded-xl border border-border overflow-hidden h-[400px] animate-fade-up" style={{ animationDelay: '0.2s' }}>
               <div className="px-3 py-2 border-b border-border bg-muted/30">
                 <h3 className="text-xs font-semibold">🤖 AI 허니문 어드바이저</h3>
               </div>
@@ -143,7 +176,7 @@ export default function Honeymoon() {
         <div className="flex-1 flex max-w-7xl mx-auto w-full">
           {/* Left Panel: Map + Filters (60%) */}
           <div className="w-[60%] flex flex-col p-4 gap-4">
-            <div className="flex-1 rounded-xl overflow-hidden border border-border shadow-toss-sm min-h-[400px]">
+            <div className="flex-1 rounded-xl overflow-hidden border border-border shadow-toss-sm min-h-[400px] animate-fade-up">
               <HoneymoonMap
                 viewState={viewState}
                 onViewStateChange={setViewState}
@@ -157,17 +190,31 @@ export default function Honeymoon() {
                 onToggleSelection={toggleSelection}
               />
             </div>
-            <FilterSliders
-              filters={filters}
-              onUpdate={updateFilter}
-              onReset={resetFilters}
-            />
+            <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <FilterSliders
+                filters={filters}
+                onUpdate={updateFilter}
+                onReset={resetFilters}
+              />
+            </div>
+
+            {/* Empty state when no filter results — desktop */}
+            {!hasFilterResults && (
+              <div className="flex flex-col items-center justify-center py-12 text-center animate-fade-up" style={{ animationDelay: '0.15s' }}>
+                <MapPin className="w-10 h-10 text-muted-foreground/40 mb-3" aria-hidden="true" />
+                <p className="text-muted-foreground font-medium">조건에 맞는 여행지가 없어요</p>
+                <p className="text-sm text-muted-foreground/60 mt-1">필터를 조정해보세요</p>
+                <Button variant="outline" size="sm" className="mt-3" onClick={resetFilters}>
+                  필터 초기화
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Right Panel: Chat + Comparison (40%) */}
           <div className="w-[40%] flex flex-col p-4 pl-0 gap-4">
             {/* Chat */}
-            <div className="flex-1 bg-card rounded-xl border border-border overflow-hidden min-h-[300px]">
+            <div className="flex-1 bg-card rounded-xl border border-border overflow-hidden min-h-[300px] animate-fade-up" style={{ animationDelay: '0.05s' }}>
               <div className="px-3 py-2 border-b border-border bg-muted/30">
                 <h3 className="text-xs font-semibold">🤖 AI 허니문 어드바이저</h3>
               </div>
@@ -184,15 +231,19 @@ export default function Honeymoon() {
 
             {/* Comparison Cards */}
             {selectedDestinations.length > 0 && (
-              <ComparisonCards
-                destinations={selectedDestinations}
-                onRemove={toggleSelection}
-              />
+              <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+                <ComparisonCards
+                  destinations={selectedDestinations}
+                  onRemove={toggleSelection}
+                />
+              </div>
             )}
 
             {/* Booking Timeline */}
             {popupDestination && (
-              <BookingTimeline destination={popupDestination} />
+              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
+                <BookingTimeline destination={popupDestination} />
+              </div>
             )}
           </div>
         </div>

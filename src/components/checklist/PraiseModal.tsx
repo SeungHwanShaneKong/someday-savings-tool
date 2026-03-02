@@ -26,7 +26,7 @@ export function PraiseModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-xs text-center sm:max-w-sm">
         <DialogHeader className="items-center space-y-3 pt-4">
-          <div className="text-6xl animate-bounce">{emoji}</div>
+          <div className="text-6xl animate-bounce-limited">{emoji}</div>
           <DialogTitle className="text-xl">{title}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
             {description}

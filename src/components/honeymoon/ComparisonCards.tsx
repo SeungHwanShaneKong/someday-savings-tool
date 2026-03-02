@@ -18,12 +18,19 @@ export function ComparisonCards({
   const maxBudget = Math.max(...destinations.map((d) => d.budgetRange.max));
 
   return (
-    <div className="bg-card rounded-xl border border-border p-4">
+    <div className="bg-card rounded-xl border border-border p-4 hover:shadow-toss transition-all duration-200">
       <h3 className="text-sm font-semibold text-foreground mb-3">
         🔍 여행지 비교 ({destinations.length}개)
       </h3>
 
-      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${destinations.length}, 1fr)` }}>
+      <div
+        className={cn(
+          'grid gap-3',
+          destinations.length === 1 && 'grid-cols-1',
+          destinations.length === 2 && 'grid-cols-1 sm:grid-cols-2',
+          destinations.length >= 3 && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+        )}
+      >
         {destinations.map((dest) => {
           const totalMin =
             dest.costBreakdown.flight.min +
@@ -37,12 +44,13 @@ export function ComparisonCards({
           return (
             <div
               key={dest.id}
-              className="relative bg-muted/30 rounded-lg p-3 border border-border/50"
+              className="group relative bg-muted/30 rounded-lg p-3 border border-border/50 hover:shadow-toss-sm transition-all duration-200"
             >
-              {/* Remove button */}
+              {/* Remove button — visible on hover */}
               <button
                 onClick={() => onRemove(dest.id)}
-                className="absolute top-1.5 right-1.5 p-0.5 text-muted-foreground hover:text-foreground"
+                className="absolute top-2 right-2 p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 rounded-full hover:bg-destructive/10"
+                aria-label={`${dest.name} 비교에서 제거`}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -53,7 +61,7 @@ export function ComparisonCards({
                 <h4 className="text-sm font-bold text-foreground mt-1">
                   {dest.name}
                 </h4>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground">
                   {dest.nights}박
                 </p>
               </div>

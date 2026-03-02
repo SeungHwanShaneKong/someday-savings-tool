@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Plus, Calendar } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
 import { ChecklistProgress } from '@/components/checklist/ChecklistProgress';
@@ -86,6 +87,7 @@ export default function Checklist() {
           <button
             onClick={() => navigate('/budget')}
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="체크리스트 나가기"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -97,6 +99,7 @@ export default function Checklist() {
             size="sm"
             className="text-xs"
             onClick={() => setShowAddForm(!showAddForm)}
+            aria-label="새 항목 추가"
           >
             <Plus className="w-4 h-4 mr-1" />
             추가
@@ -105,13 +108,15 @@ export default function Checklist() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 pb-24 space-y-5">
-        {/* Loading state */}
+        {/* Loading state — Skeleton UI */}
         {loading && (
-          <div className="text-center py-16">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm text-muted-foreground mt-3">
-              체크리스트 불러오는 중...
-            </p>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2 animate-fade-up" style={{ animationDelay: `${i * 0.1}s` }}>
+                <Skeleton className="h-6 w-1/3 rounded-lg" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+              </div>
+            ))}
           </div>
         )}
 
@@ -192,26 +197,35 @@ export default function Checklist() {
           <NudgeBanner type="incomplete" />
         )}
 
-        {/* Period sections */}
+        {/* Period sections — staggered animation */}
         {!loading &&
           items.length > 0 &&
-          PERIOD_ORDER.map((period) => {
-            const periodItems = items.filter((i) => i.period === period);
-            if (periodItems.length === 0) return null;
+          (() => {
+            let visibleIndex = 0;
+            return PERIOD_ORDER.map((period) => {
+              const periodItems = items.filter((i) => i.period === period);
+              if (periodItems.length === 0) return null;
 
-            return (
-              <ChecklistPeriodSection
-                key={period}
-                period={period}
-                items={periodItems}
-                isActive={period === activePeriod}
-                onToggle={toggleItem}
-                onDelete={deleteItem}
-                onUpdateNotes={updateNotes}
-                onBudgetLink={handleBudgetLink}
-              />
-            );
-          })}
+              const idx = visibleIndex++;
+              return (
+                <div
+                  key={period}
+                  className="animate-fade-up"
+                  style={{ animationDelay: `${idx * 0.08}s` }}
+                >
+                  <ChecklistPeriodSection
+                    period={period}
+                    items={periodItems}
+                    isActive={period === activePeriod}
+                    onToggle={toggleItem}
+                    onDelete={deleteItem}
+                    onUpdateNotes={updateNotes}
+                    onBudgetLink={handleBudgetLink}
+                  />
+                </div>
+              );
+            });
+          })()}
       </main>
 
       {/* Praise Modal */}

@@ -32,10 +32,16 @@ const ACCOMMODATION_OPTIONS: { value: AccommodationType; label: string; emoji: s
 
 export function FilterSliders({ filters, onUpdate, onReset }: FilterSlidersProps) {
   return (
-    <div className="space-y-4 bg-card rounded-xl border border-border p-4">
+    <div className="space-y-4 bg-card rounded-xl border border-border p-4 hover:shadow-toss transition-all duration-200">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">필터</h3>
-        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onReset}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={onReset}
+          aria-label="필터 초기화"
+        >
           <RotateCcw className="w-3 h-3 mr-1" />
           초기화
         </Button>
@@ -55,6 +61,7 @@ export function FilterSliders({ filters, onUpdate, onReset }: FilterSlidersProps
           max={15000000}
           step={500000}
           onValueChange={([v]) => onUpdate('maxBudget', v)}
+          aria-label="예산 범위"
         />
       </div>
 
@@ -75,6 +82,7 @@ export function FilterSliders({ filters, onUpdate, onReset }: FilterSlidersProps
             onUpdate('minNights', min);
             onUpdate('maxNights', max);
           }}
+          aria-label="여행 기간"
         />
       </div>
 

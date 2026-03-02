@@ -1,8 +1,19 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Trash2, ChevronDown, ChevronUp, LinkIcon } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { getUrgencyLevel } from '@/lib/checklist-nudges';
 import { CHECKLIST_TEMPLATES } from '@/lib/checklist-templates';
 import type { ChecklistItem as ChecklistItemType } from '@/hooks/useChecklist';
@@ -37,7 +48,43 @@ export function ChecklistItem({
   onBudgetLink,
 }: ChecklistItemProps) {
   const [expanded, setExpanded] = useState(false);
+  const [checkPop, setCheckPop] = useState(false);
+  const [localNotes, setLocalNotes] = useState(item.notes || '');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const urgency = getUrgencyLevel(item.due_date, item.is_completed);
+
+  // Sync local notes when item.notes changes externally
+  useEffect(() => {
+    setLocalNotes(item.notes || '');
+  }, [item.notes]);
+
+  // Debounced notes update
+  const handleNotesChange = useCallback(
+    (value: string) => {
+      setLocalNotes(value);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        onUpdateNotes(item.id, value);
+      }, 300);
+    },
+    [item.id, onUpdateNotes]
+  );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  // Check-pop animation on toggle
+  const handleToggle = useCallback(() => {
+    if (!item.is_completed) {
+      setCheckPop(true);
+      setTimeout(() => setCheckPop(false), 300);
+    }
+    onToggle(item.id);
+  }, [item.id, item.is_completed, onToggle]);
 
   // Find nudge message from template
   const template = CHECKLIST_TEMPLATES.find(
@@ -47,21 +94,23 @@ export function ChecklistItem({
   return (
     <div
       className={cn(
-        'rounded-xl bg-card border border-border transition-all duration-200',
+        'rounded-xl bg-card border border-border transition-all duration-200 hover:shadow-toss',
         URGENCY_STYLES[urgency],
         item.is_completed && 'opacity-60'
       )}
     >
       <div className="flex items-start gap-3 p-3.5">
-        {/* Checkbox */}
-        <Checkbox
-          checked={item.is_completed}
-          onCheckedChange={() => onToggle(item.id)}
-          className={cn(
-            'mt-0.5 h-5 w-5 rounded-full transition-all',
-            item.is_completed && 'bg-primary border-primary'
-          )}
-        />
+        {/* Checkbox with check-pop animation */}
+        <div className={cn(checkPop && 'animate-check-pop')}>
+          <Checkbox
+            checked={item.is_completed}
+            onCheckedChange={handleToggle}
+            className={cn(
+              'mt-0.5 h-5 w-5 rounded-full transition-all',
+              item.is_completed && 'bg-primary border-primary'
+            )}
+          />
+        </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -75,14 +124,14 @@ export function ChecklistItem({
               {item.title}
             </span>
 
-            {/* Urgency badge */}
+            {/* Urgency badge — WCAG contrast fix */}
             {!item.is_completed && URGENCY_LABELS[urgency] && (
               <span
                 className={cn(
                   'text-[11px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0',
                   urgency === 'overdue' && 'bg-destructive/10 text-destructive',
-                  urgency === 'urgent' && 'bg-orange-100 text-orange-700',
-                  urgency === 'soon' && 'bg-yellow-100 text-yellow-700'
+                  urgency === 'urgent' && 'bg-orange-100 text-orange-800',
+                  urgency === 'soon' && 'bg-yellow-100 text-yellow-800'
                 )}
               >
                 {URGENCY_LABELS[urgency]}
@@ -113,6 +162,7 @@ export function ChecklistItem({
         <button
           onClick={() => setExpanded(!expanded)}
           className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={expanded ? '접기' : '펼치기'}
         >
           {expanded ? (
             <ChevronUp className="w-4 h-4" />
@@ -126,10 +176,10 @@ export function ChecklistItem({
       {expanded && (
         <div className="px-3.5 pb-3.5 pt-0 space-y-2.5 border-t border-border/50 mt-0">
           <div className="pt-2.5">
-            {/* Notes */}
+            {/* Notes — debounced */}
             <textarea
-              value={item.notes || ''}
-              onChange={(e) => onUpdateNotes(item.id, e.target.value)}
+              value={localNotes}
+              onChange={(e) => handleNotesChange(e.target.value)}
               placeholder="메모를 추가하세요..."
               className="w-full text-sm bg-muted/50 rounded-lg p-2.5 border-0 resize-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground/60"
               rows={2}
@@ -152,17 +202,37 @@ export function ChecklistItem({
               </Button>
             )}
 
-            {/* Delete (only custom items) */}
+            {/* Delete with confirmation (only custom items) */}
             {item.is_custom && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs h-7 text-destructive hover:text-destructive"
-                onClick={() => onDelete(item.id)}
-              >
-                <Trash2 className="w-3 h-3 mr-1" />
-                삭제
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs h-7 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    삭제
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>항목을 삭제하시겠어요?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      "{item.title}" 항목이 영구 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>취소</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => onDelete(item.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      삭제
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </div>

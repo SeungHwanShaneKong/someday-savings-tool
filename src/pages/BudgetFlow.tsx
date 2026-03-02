@@ -160,7 +160,7 @@ export default function BudgetFlow() {
       <RestoreProgressIndicator progress={restoreProgress} />
       
       {/* Header - Mobile Optimized */}
-      <header className="sticky top-0 bg-background/95 backdrop-blur-lg z-40 border-b border-border">
+      <header className="sticky top-0 bg-background/80 backdrop-blur-lg z-30 border-b border-border/50">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           {/* Top Row: D-Day Countdown (if set) */}
           <div className="flex items-center justify-center mb-2 sm:mb-3">

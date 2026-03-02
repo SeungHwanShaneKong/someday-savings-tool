@@ -79,7 +79,7 @@ export function ChecklistItem({
             {!item.is_completed && URGENCY_LABELS[urgency] && (
               <span
                 className={cn(
-                  'text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0',
+                  'text-[11px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0',
                   urgency === 'overdue' && 'bg-destructive/10 text-destructive',
                   urgency === 'urgent' && 'bg-orange-100 text-orange-700',
                   urgency === 'soon' && 'bg-yellow-100 text-yellow-700'

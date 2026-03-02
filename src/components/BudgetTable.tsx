@@ -95,7 +95,7 @@ function SortableCategory({
               <GripVertical className={cn("h-4 w-4 transition-colors", isDragging ? "text-primary" : "text-muted-foreground")} />
             </div>
             <span className="text-base sm:text-lg">{category.icon}</span>
-            <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
+            <span className="text-[11px] sm:text-sm text-center break-keep">{category.name}</span>
           </div>
         </td>
         <td colSpan={5} className="text-muted-foreground text-xs sm:text-sm px-1 sm:px-4">
@@ -344,7 +344,7 @@ export function BudgetTable({
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
               </div>
               <span className="text-base sm:text-lg">{category.icon}</span>
-              <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
+              <span className="text-[11px] sm:text-sm text-center break-keep">{category.name}</span>
             </div>
           </TableCell>}
         <TableCell className="text-center px-1 sm:px-2">
@@ -419,7 +419,7 @@ export function BudgetTable({
                   </div>
                 </PopoverContent>
               </Popover>}
-            {isEditing ? <Input type="text" inputMode="numeric" value={tempValue} onChange={e => handleAmountChange(e.target.value)} onBlur={() => handleAmountBlur(category.id, subCat.id)} onKeyDown={e => handleKeyDown(e, category.id, subCat.id)} className="h-6 sm:h-8 text-right text-[10px] sm:text-sm w-20 sm:w-28" autoFocus placeholder="금액 입력" /> : <button onClick={() => handleAmountClick(category.id, subCat.id, item.amount || 0)} className={cn("text-right px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-muted transition-colors text-[10px] sm:text-sm", item.amount ? "text-foreground font-medium" : "text-muted-foreground/60 italic")}>
+            {isEditing ? <Input type="text" inputMode="numeric" value={tempValue} onChange={e => handleAmountChange(e.target.value)} onBlur={() => handleAmountBlur(category.id, subCat.id)} onKeyDown={e => handleKeyDown(e, category.id, subCat.id)} className="h-6 sm:h-8 text-right text-[11px] sm:text-sm w-20 sm:w-28" autoFocus placeholder="금액 입력" /> : <button onClick={() => handleAmountClick(category.id, subCat.id, item.amount || 0)} className={cn("text-right px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-muted transition-colors text-[11px] sm:text-sm", item.amount ? "text-foreground font-medium" : "text-muted-foreground/60 italic")}>
                 {item.amount ? `₩${item.amount.toLocaleString()}` : '금액 입력'}
               </button>}
           </div>
@@ -429,7 +429,7 @@ export function BudgetTable({
         </TableCell>
         <TableCell className="w-14 sm:w-20 px-1 sm:px-4">
           {onCostSplitChange && <Select value={item.cost_split || '-'} onValueChange={(value: CostSplitType) => onCostSplitChange(item.id, value)}>
-              <SelectTrigger className="h-6 sm:h-8 text-[10px] sm:text-xs w-full px-1 sm:px-3">
+              <SelectTrigger className="h-6 sm:h-8 text-[11px] sm:text-xs w-full px-1 sm:px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -440,7 +440,7 @@ export function BudgetTable({
             </Select>}
         </TableCell>
         <TableCell className="px-1 sm:px-4">
-          <Input type="text" value={tempNotes[item.id] !== undefined ? tempNotes[item.id] : item.notes || ''} onChange={e => handleNotesChange(item.id, e.target.value)} onFocus={() => handleNotesFocus(item.id, item.notes)} onBlur={() => handleNotesBlur(item.id, item.notes)} onCompositionStart={() => handleCompositionStart(item.id)} onCompositionEnd={() => handleCompositionEnd(item.id)} className="h-6 sm:h-8 text-[10px] sm:text-sm border-0 bg-transparent focus:bg-background" placeholder="메모..." />
+          <Input type="text" value={tempNotes[item.id] !== undefined ? tempNotes[item.id] : item.notes || ''} onChange={e => handleNotesChange(item.id, e.target.value)} onFocus={() => handleNotesFocus(item.id, item.notes)} onBlur={() => handleNotesBlur(item.id, item.notes)} onCompositionStart={() => handleCompositionStart(item.id)} onCompositionEnd={() => handleCompositionEnd(item.id)} className="h-6 sm:h-8 text-[11px] sm:text-sm border-0 bg-transparent focus:bg-background" placeholder="메모..." />
         </TableCell>
       </TableRow>;
   };
@@ -478,7 +478,7 @@ export function BudgetTable({
                                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                                   </div>
                                   <span className="text-base sm:text-lg">{category.icon}</span>
-                                  <span className="text-[10px] sm:text-sm text-center break-keep">{category.name}</span>
+                                  <span className="text-[11px] sm:text-sm text-center break-keep">{category.name}</span>
                                 </div>
                               </TableCell>
                               <TableCell colSpan={5} className="px-1 sm:px-4">
@@ -499,17 +499,17 @@ export function BudgetTable({
                           }}>
                                       <X className="h-3 w-3" />
                                     </Button>
-                                  </div> : <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[10px] sm:text-sm px-1 sm:px-3" onClick={() => setAddingToCategory(category.id)}>
+                                  </div> : <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[11px] sm:text-sm px-1 sm:px-3" onClick={() => setAddingToCategory(category.id)}>
                                     <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                                     항목 추가
                                   </Button>}
                               </TableCell>
                             </TableRow>
                             <TableRow className="bg-warning/10 border-b-2 border-warning/30">
-                              <TableCell colSpan={3} className="font-semibold text-right text-[10px] sm:text-sm px-1 sm:px-4">
+                              <TableCell colSpan={3} className="font-semibold text-right text-[11px] sm:text-sm px-1 sm:px-4">
                                 {category.name} 총 비용
                               </TableCell>
-                              <TableCell className="text-right font-bold text-primary text-[10px] sm:text-sm px-1 sm:px-4">
+                              <TableCell className="text-right font-bold text-primary text-[11px] sm:text-sm px-1 sm:px-4">
                                 ₩0
                               </TableCell>
                               <TableCell></TableCell>
@@ -541,17 +541,17 @@ export function BudgetTable({
                           }}>
                                       <X className="h-3 w-3" />
                                     </Button>
-                                  </div> : <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[10px] sm:text-sm px-1 sm:px-3" onClick={() => setAddingToCategory(category.id)}>
+                                  </div> : <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground h-6 sm:h-8 text-[11px] sm:text-sm px-1 sm:px-3" onClick={() => setAddingToCategory(category.id)}>
                                     <Plus className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                                     항목 추가
                                   </Button>}
                               </TableCell>
                             </TableRow>
                             <TableRow className="bg-warning/10 border-b-2 border-warning/30">
-                              <TableCell colSpan={3} className="font-semibold text-right text-[10px] sm:text-sm px-1 sm:px-4">
+                              <TableCell colSpan={3} className="font-semibold text-right text-[11px] sm:text-sm px-1 sm:px-4">
                                 {category.name} 총 비용
                               </TableCell>
-                              <TableCell className="text-right font-bold text-primary text-[10px] sm:text-sm px-1 sm:px-4">
+                              <TableCell className="text-right font-bold text-primary text-[11px] sm:text-sm px-1 sm:px-4">
                                 ₩{categoryTotal.toLocaleString()}
                               </TableCell>
                               <TableCell></TableCell>
@@ -568,7 +568,7 @@ export function BudgetTable({
                   ₩{getOverallTotal().toLocaleString()}
                 </TableCell>
                 <TableCell className="px-1 sm:px-4">
-                  <span className="text-[10px] sm:text-sm text-muted-foreground">
+                  <span className="text-[11px] sm:text-sm text-muted-foreground">
                     {formatKoreanWon(getOverallTotal())}
                   </span>
                 </TableCell>

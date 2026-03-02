@@ -225,4 +225,60 @@
       box-shadow: 0 6px 28px rgba(0, 100, 255, 0.55);
     }
   }
+
+  /* Landing — staggered fade-in */
+  .animate-fade-up {
+    animation: fadeUpLanding 0.6s cubic-bezier(0.4, 0, 0.2, 1) both;
+  }
+  @keyframes fadeUpLanding {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Landing — AI badge shimmer */
+  .animate-shimmer {
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Landing — AI card glow ring */
+  .ai-glow {
+    box-shadow: 0 0 0 1px hsl(213 100% 50% / 0.15),
+                0 0 20px 0 hsl(213 100% 50% / 0.08);
+  }
+
+  /* Landing — hero icon float */
+  .animate-float {
+    animation: softFloat 3s ease-in-out infinite;
+  }
+  @keyframes softFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+  }
+
+  /* Shadow utilities */
+  .shadow-toss-sm {
+    box-shadow: 0 1px 4px 0 rgba(0,0,0,0.03), 0 2px 8px 0 rgba(0,0,0,0.03);
+  }
+  .shadow-primary-glow {
+    box-shadow: 0 4px 20px hsl(213 100% 50% / 0.4);
+  }
+  .shadow-primary-glow-lg {
+    box-shadow: 0 6px 30px hsl(213 100% 50% / 0.5);
+  }
+
+  /* Accessibility — reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up,
+    .animate-shimmer,
+    .animate-float,
+    .animate-pulse-subtle,
+    .animate-bounce {
+      animation: none !important;
+    }
+  }
 }

@@ -118,7 +118,7 @@ export default function Admin() {
     <TooltipProvider delayDuration={200}>
       <div className="min-h-screen bg-background">
         {/* ===== 헤더 ===== */}
-        <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border">
+        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full shrink-0">
               <ArrowLeft className="h-5 w-5" />

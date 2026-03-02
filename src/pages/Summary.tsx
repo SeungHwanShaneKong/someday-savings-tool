@@ -32,21 +32,7 @@ import html2canvas from 'html2canvas';
 import { downloadImage } from '@/lib/download-image';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
-
-const CHART_COLORS = [
-  'hsl(213, 100%, 50%)',
-  'hsl(145, 65%, 42%)',
-  'hsl(38, 92%, 50%)',
-  'hsl(340, 75%, 55%)',
-  'hsl(262, 83%, 58%)',
-];
-
-const COST_SPLIT_COLORS: Record<CostSplitType, string> = {
-  'groom': 'hsl(221, 83%, 53%)',
-  'bride': 'hsl(340, 75%, 55%)',
-  'together': 'hsl(145, 65%, 42%)',
-  '-': 'hsl(var(--muted-foreground))',
-};
+import { CHART_COLORS, COST_SPLIT_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/chart-colors';
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -268,7 +254,7 @@ export default function Summary() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 bg-background/80 backdrop-blur-lg z-40 px-4 py-4">
+      <header className="sticky top-0 bg-background/80 backdrop-blur-lg z-30 px-4 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Button
             variant="ghost"
@@ -373,13 +359,9 @@ export default function Summary() {
                 <BarChart data={comparisonChartData} layout="vertical">
                   <XAxis type="number" tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
                   <YAxis type="category" dataKey="name" width={80} />
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value: number) => formatKoreanWon(value)}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '12px',
-                    }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
                   />
                   <Bar dataKey="total" radius={[0, 8, 8, 0]}>
                     {comparisonChartData.map((entry, index) => (

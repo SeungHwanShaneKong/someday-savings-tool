@@ -1,18 +1,11 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
 import { BudgetItem } from '@/hooks/useBudget';
+import { CHART_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/chart-colors';
 
 interface BudgetDonutChartProps {
   items: BudgetItem[];
 }
-
-const COLORS = [
-  'hsl(213, 100%, 50%)',  // Primary blue
-  'hsl(340, 75%, 55%)',   // Pink
-  'hsl(145, 65%, 42%)',   // Green
-  'hsl(38, 92%, 50%)',    // Orange
-  'hsl(262, 83%, 58%)',   // Purple
-];
 
 export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
   const data = BUDGET_CATEGORIES.map((category, index) => {
@@ -22,7 +15,7 @@ export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
       name: category.name,
       value: total,
       icon: category.icon,
-      color: COLORS[index % COLORS.length],
+      color: CHART_COLORS[index % CHART_COLORS.length],
     };
   }).filter(d => d.value > 0);
 
@@ -56,12 +49,7 @@ export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
           </Pie>
           <Tooltip
             formatter={(value: number) => formatKoreanWon(value)}
-            contentStyle={{
-              backgroundColor: 'hsl(var(--card))',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: '12px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-            }}
+            contentStyle={CHART_TOOLTIP_STYLE}
           />
         </PieChart>
       </ResponsiveContainer>

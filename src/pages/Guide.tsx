@@ -127,7 +127,7 @@ const HOW_TO_STEPS = [
 
 /* ─── Guide Page ─── */
 export default function Guide() {
-  const breadcrumbItems = [{ label: '결혼 예산 가이드' }];
+  const breadcrumbItems = [{ label: '결혼 예산 가이드', href: '/guide' }];
 
   const jsonLd = useMemo(
     () => [
@@ -135,7 +135,7 @@ export default function Guide() {
       {
         '@context': 'https://schema.org',
         '@type': 'HowTo',
-        name: '결혼 예산 계획하는 방법 - 2025년 완벽 가이드',
+        name: '결혼 예산 계획하는 방법 - 2026년 완벽 가이드',
         description:
           '결혼 준비 비용을 체계적으로 계획하고 관리하는 5단계 가이드. 항목별 평균 비용과 절약 팁을 확인하세요.',
         step: HOW_TO_STEPS.map((step, index) => ({
@@ -150,9 +150,9 @@ export default function Guide() {
   );
 
   useSEO({
-    title: '2025 결혼 예산 가이드 - 항목별 비용 총정리 | 웨딩셈',
+    title: '2026 결혼 예산 가이드 - 항목별 비용 총정리 | 웨딩셈',
     description:
-      '2025년 결혼 비용 항목별 평균 가격, 비용 절약 팁, 예산 계획 5단계 가이드. 예식장, 스드메, 혼수, 신혼여행까지 총정리.',
+      '2026년 결혼 비용 항목별 평균 가격, 비용 절약 팁, 예산 계획 5단계 가이드. 예식장, 스드메, 혼수, 신혼여행까지 총정리.',
     path: '/guide',
     jsonLd,
   });
@@ -166,7 +166,7 @@ export default function Guide() {
           {/* Header */}
           <div className="mb-10">
             <span className="inline-block text-xs font-medium text-primary bg-primary/10 rounded-full px-3 py-1 mb-3">
-              2025년 최신 기준
+              2026년 최신 기준
             </span>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">
               결혼 예산 완벽 가이드
@@ -183,7 +183,7 @@ export default function Guide() {
               항목별 평균 비용 범위
             </h2>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              2025년 AI 설문 데이터 기반 한국 평균 결혼 비용입니다. 지역과 규모에 따라 차이가 있으며, 아래 범위를 참고하여 본인에게 맞는 예산을 설정하세요.
+              2026년 AI 설문 데이터 기반 한국 평균 결혼 비용입니다. 지역과 규모에 따라 차이가 있으며, 아래 범위를 참고하여 본인에게 맞는 예산을 설정하세요.
             </p>
 
             <div className="space-y-3">

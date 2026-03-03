@@ -22,7 +22,7 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     question: '결혼 준비 비용은 평균 얼마인가요?',
     answer:
-      '2025년 기준 한국 평균 결혼 비용은 약 2억~3억 원 수준입니다. 여기에는 예식장, 스드메(스튜디오·드레스·메이크업), 식대, 혼수, 예물, 신혼여행 등이 포함됩니다. 지역, 규모, 개인 취향에 따라 큰 차이가 있으며, 웨딩셈에서 항목별로 정확히 시뮬레이션해볼 수 있습니다.',
+      '2026년 기준 한국 평균 결혼 비용은 약 2억~3억 원 수준입니다. 여기에는 예식장, 스드메(스튜디오·드레스·메이크업), 식대, 혼수, 예물, 신혼여행 등이 포함됩니다. 지역, 규모, 개인 취향에 따라 큰 차이가 있으며, 웨딩셈에서 항목별로 정확히 시뮬레이션해볼 수 있습니다.',
   },
   {
     question: '스드메(스튜디오·드레스·메이크업) 비용은 얼마나 드나요?',
@@ -88,7 +88,7 @@ const FAQ_ITEMS: FAQItem[] = [
 
 /* ─── FAQ Page ─── */
 export default function FAQ() {
-  const breadcrumbItems = [{ label: '자주 묻는 질문' }];
+  const breadcrumbItems = [{ label: '자주 묻는 질문', href: '/faq' }];
 
   // Memoize JSON-LD to prevent unnecessary re-renders
   const jsonLd = useMemo(

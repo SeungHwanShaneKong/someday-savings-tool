@@ -11,6 +11,7 @@ import {
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { useSEO } from '@/hooks/useSEO';
 
 const DEV_TEST_EMAIL = 'dev-test@wedsem-local.dev';
 const DEV_TEST_PASSWORD = 'devtest123456';
@@ -19,6 +20,12 @@ export default function Auth() {
   const navigate = useNavigate();
   const { user, signInWithGoogle, signIn, signUp, loading } = useAuth();
   const { toast } = useToast();
+
+  useSEO({
+    title: '로그인 - 웨딩셈',
+    description: 'Google 계정으로 간편하게 로그인하고 결혼 예산 관리를 시작하세요.',
+    path: '/auth',
+  });
   const [isDevLoading, setIsDevLoading] = useState(false);
   
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);

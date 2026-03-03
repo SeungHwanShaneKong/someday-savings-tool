@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useSEO } from '@/hooks/useSEO';
 import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
@@ -54,6 +55,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 export default function BudgetFlow() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  useSEO({
+    title: '예산 관리 - 웨딩셈',
+    description: '결혼 예산을 항목별로 입력하고 관리하세요. 스드메, 식대, 혼수까지 실시간 계산되는 웨딩 예산 관리 도구.',
+    path: '/budget',
+  });
   const { 
     budgets, 
     activeBudgetId, 

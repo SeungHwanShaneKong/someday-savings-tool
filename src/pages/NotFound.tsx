@@ -1,8 +1,15 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { useSEO } from '@/hooks/useSEO';
 
 const NotFound = () => {
   const location = useLocation();
+
+  useSEO({
+    title: '페이지를 찾을 수 없습니다 - 웨딩셈',
+    description: '요청하신 페이지를 찾을 수 없습니다.',
+    path: location.pathname,
+  });
 
   useEffect(() => {
     console.error("404 Error: User attempted to access non-existent route:", location.pathname);

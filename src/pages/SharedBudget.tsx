@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useSEO } from '@/hooks/useSEO';
 import { supabase } from '@/integrations/supabase/client';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
@@ -29,6 +30,12 @@ export default function SharedBudget() {
   const [data, setData] = useState<SharedBudgetData>({ items: [], budgetOwnerId: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useSEO({
+    title: '공유 예산표 - 웨딩셈',
+    description: '공유된 결혼 예산표를 확인하세요. 항목별 비용과 총 예산을 한눈에 볼 수 있습니다.',
+    path: `/shared/${token || ''}`,
+  });
 
   const isOwner = user && data.budgetOwnerId && user.id === data.budgetOwnerId;
 

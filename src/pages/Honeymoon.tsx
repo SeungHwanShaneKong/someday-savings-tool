@@ -11,11 +11,18 @@ import { FilterSliders } from '@/components/honeymoon/FilterSliders';
 import { ComparisonCards } from '@/components/honeymoon/ComparisonCards';
 import { BookingTimeline } from '@/components/honeymoon/BookingTimeline';
 import { ChatContainer } from '@/components/chat/ChatContainer';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function Honeymoon() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
+
+  useSEO({
+    title: '신혼여행 - 웨딩셈',
+    description: '예산과 일정에 맞는 신혼여행지를 AI가 추천해드려요. 인기 여행지 비교와 예약 타임라인 제공.',
+    path: '/honeymoon',
+  });
 
   const {
     viewState,

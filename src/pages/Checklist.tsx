@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
+import { useSEO } from '@/hooks/useSEO';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +24,13 @@ import { PERIOD_ORDER, PERIOD_LABELS, type ChecklistPeriod } from '@/lib/checkli
 export default function Checklist() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  useSEO({
+    title: '체크리스트 - 웨딩셈',
+    description: '결혼 준비 체크리스트로 일정별 할 일을 관리하세요. D-365부터 D-Day까지 시기별 준비 사항 안내.',
+    path: '/checklist',
+  });
+
   const {
     items,
     loading,

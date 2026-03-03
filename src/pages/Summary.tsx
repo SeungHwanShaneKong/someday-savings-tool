@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useSEO } from '@/hooks/useSEO';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
@@ -37,9 +38,16 @@ import { CHART_COLORS, COST_SPLIT_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/char
 export default function Summary() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { 
-    budgets, 
-    activeBudgetId, 
+
+  useSEO({
+    title: '예산 요약 - 웨딩셈',
+    description: '결혼 예산 현황을 한눈에 확인하세요. 카테고리별 차트와 비용 분석 대시보드 제공.',
+    path: '/summary',
+  });
+
+  const {
+    budgets,
+    activeBudgetId,
     setActiveBudgetId,
     items, 
     loading: budgetLoading, 

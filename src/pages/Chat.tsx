@@ -4,10 +4,17 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChat } from '@/hooks/useAIChat';
 import { ChatContainer } from '@/components/chat/ChatContainer';
+import { useSEO } from '@/hooks/useSEO';
 
 export default function Chat() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  useSEO({
+    title: 'AI 상담 - 웨딩셈',
+    description: '결혼 준비에 대한 궁금한 점을 AI에게 물어보세요. 예산, 일정, 웨딩 트렌드 등 맞춤 상담.',
+    path: '/chat',
+  });
 
   const {
     messages,

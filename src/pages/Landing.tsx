@@ -24,6 +24,7 @@ import {
   copyToClipboard,
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
+import { useSEO } from '@/hooks/useSEO';
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -90,6 +91,12 @@ const FEATURES: Feature[] = [
 export default function Landing() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+
+  useSEO({
+    title: '웨딩셈 - 결혼 예산 계산기, 결혼 비용 계산기',
+    description: '결혼 준비의 시작, 결혼 예산 관리부터 결혼 체크 리스트까지 스마트하게! 웨딩셈으로 복잡한 결혼 비용을 항목별로 깔끔하게 정리하세요. 스드메, 식대, 혼수까지 실시간 계산.',
+    path: '/',
+  });
   const [browserInfo] = useState(() => getBrowserInfo());
   const [showBridgeUI, setShowBridgeUI] = useState(false);
   const [copied, setCopied] = useState(false);

@@ -4,6 +4,7 @@ interface SEOConfig {
   title: string;
   description?: string;
   path?: string;
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
 
 const BASE_DOMAIN = 'https://wedsem.moderninsightspot.com';
@@ -11,7 +12,9 @@ const DEFAULT_TITLE = '웨딩셈 - 결혼 예산 계산기, 결혼 비용 계산
 const DEFAULT_DESCRIPTION =
   '결혼 준비의 시작, 결혼 예산 관리부터 결혼 체크 리스트까지 스마트하게! 결혼 비용, 웨딩 예산 계산기 \'웨딩셈\'으로 복잡한 결혼 비용을 항목별로 깔끔하게 정리하세요.';
 
-export function useSEO({ title, description, path }: SEOConfig) {
+const JSON_LD_ID = 'dynamic-jsonld';
+
+export function useSEO({ title, description, path, jsonLd }: SEOConfig) {
   useEffect(() => {
     const prevTitle = document.title;
 
@@ -60,9 +63,27 @@ export function useSEO({ title, description, path }: SEOConfig) {
       twDesc.setAttribute('content', description || DEFAULT_DESCRIPTION);
     }
 
-    // Cleanup: restore previous title on unmount
+    // Dynamic JSON-LD structured data injection
+    const existingScript = document.getElementById(JSON_LD_ID);
+    if (existingScript) {
+      existingScript.remove();
+    }
+
+    if (jsonLd) {
+      const script = document.createElement('script');
+      script.id = JSON_LD_ID;
+      script.type = 'application/ld+json';
+      script.textContent = JSON.stringify(jsonLd);
+      document.head.appendChild(script);
+    }
+
+    // Cleanup: restore previous title + remove dynamic JSON-LD on unmount
     return () => {
       document.title = prevTitle;
+      const scriptToRemove = document.getElementById(JSON_LD_ID);
+      if (scriptToRemove) {
+        scriptToRemove.remove();
+      }
     };
-  }, [title, description, path]);
+  }, [title, description, path, jsonLd]);
 }

@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Share2,
 } from 'lucide-react';
+import Footer from '@/components/Footer';
 import type { LucideIcon } from 'lucide-react';
 import {
   getBrowserInfo,
@@ -362,14 +363,7 @@ export default function Landing() {
       </main>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-border/50 py-8 text-center">
-        <p className="text-xs text-muted-foreground">
-          결혼셈 · AI 기반 결혼 준비 플랫폼
-        </p>
-        <p className="text-[11px] text-muted-foreground/60 mt-1">
-          © 2025 WeddingSem
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 }

@@ -20,6 +20,38 @@ export default defineConfig(({ mode }) => ({
       'import.meta.env.VITE_SUPABASE_PROJECT_ID': JSON.stringify("tnboeqtdimyxpjzsraro"),
     }),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core vendor chunk (React, React-DOM, Router)
+          'vendor-core': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+          ],
+          // UI library chunk (Radix + Lucide)
+          'vendor-ui': [
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-collapsible',
+            'lucide-react',
+          ],
+          // Data & utility chunk
+          'vendor-data': [
+            '@tanstack/react-query',
+            '@supabase/supabase-js',
+          ],
+          // Chart library (heavy)
+          'vendor-chart': [
+            'recharts',
+          ],
+        },
+      },
+    },
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {

@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Check, X, Users, Trash2, ChevronDown, ChevronUp, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Check, X, Users, Trash2, ChevronDown, ChevronUp, GripVertical, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
@@ -85,6 +86,7 @@ export function BudgetTableMobile({
   onDeleteItem,
   onCostSplitChange
 }: BudgetTableMobileProps) {
+  const navigate = useNavigate();
   const { orderedCategories, reorderCategories } = useCategoryOrder();
   
   // Expanded categories state
@@ -339,6 +341,15 @@ export function BudgetTableMobile({
                           <span className="text-xs text-muted-foreground">
                             ({categoryItems.length}개)
                           </span>
+                          {category.id === 'honeymoon' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/honeymoon'); }}
+                              className="flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors animate-pulse-subtle"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              추천
+                            </button>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-primary text-sm">

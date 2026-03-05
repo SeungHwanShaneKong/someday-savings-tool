@@ -55,6 +55,10 @@ export default defineConfig(({ mode }) => ({
             '@tanstack/react-query',
             '@supabase/supabase-js',
           ],
+          // Map library (MapLibre GL)
+          'vendor-map': [
+            'maplibre-gl',
+          ],
           // Chart library (heavy)
           'vendor-chart': [
             'recharts',

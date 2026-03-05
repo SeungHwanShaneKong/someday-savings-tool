@@ -11,6 +11,8 @@ export interface MapViewState {
   longitude: number;
   latitude: number;
   zoom: number;
+  pitch?: number;    // 3D 틸트 (0~60)
+  bearing?: number;  // 회전각 (0~360)
 }
 
 export interface HoneymoonFilters {
@@ -25,6 +27,8 @@ const DEFAULT_VIEW_STATE: MapViewState = {
   longitude: 100,
   latitude: 15,
   zoom: 1.8,
+  pitch: 20,    // 약간의 3D 틸트
+  bearing: 0,
 };
 
 const DEFAULT_FILTERS: HoneymoonFilters = {
@@ -50,12 +54,14 @@ export function useHoneymoonMap() {
     score: getMatchScore(d, filters),
   }));
 
-  // Fly to destination
+  // Fly to destination — 3D 프리미엄 카메라 이동
   const flyTo = useCallback((destination: Destination) => {
     setViewState({
       longitude: destination.coordinates[0],
       latitude: destination.coordinates[1],
       zoom: 5,
+      pitch: 45,       // 3D 클로즈업
+      bearing: -17,    // 약간 회전
     });
     setPopupDestination(destination);
   }, []);
@@ -93,7 +99,7 @@ export function useHoneymoonMap() {
     setFilters(DEFAULT_FILTERS);
   }, []);
 
-  // Reset view
+  // Reset view — 전체보기
   const resetView = useCallback(() => {
     setViewState(DEFAULT_VIEW_STATE);
     setPopupDestination(null);

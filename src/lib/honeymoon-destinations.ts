@@ -1,6 +1,6 @@
 /**
  * 허니문 여행지 매트릭스 데이터 (BRD §3.2)
- * 좌표 포함 — Mapbox GL 지도 마커용
+ * 좌표 포함 — MapLibre GL 지도 마커용
  */
 
 export type HoneymoonConcept = '휴양' | '관광' | '쇼핑' | '액티비티';

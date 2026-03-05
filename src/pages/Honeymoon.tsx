@@ -3,14 +3,13 @@ import { ArrowLeft, MapIcon, MapPin, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { useAIChat } from '@/hooks/useAIChat';
 import { useHoneymoonMap } from '@/hooks/useHoneymoonMap';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { HoneymoonMap } from '@/components/honeymoon/HoneymoonMap';
 import { FilterSliders } from '@/components/honeymoon/FilterSliders';
 import { ComparisonCards } from '@/components/honeymoon/ComparisonCards';
 import { BookingTimeline } from '@/components/honeymoon/BookingTimeline';
-import { ChatContainer } from '@/components/chat/ChatContainer';
+import { RecommendationPanel } from '@/components/honeymoon/RecommendationPanel';
 import { useSEO } from '@/hooks/useSEO';
 
 export default function Honeymoon() {
@@ -19,8 +18,8 @@ export default function Honeymoon() {
   const isMobile = useIsMobile();
 
   useSEO({
-    title: '신혼여행 - 웨딩셈',
-    description: '예산과 일정에 맞는 신혼여행지를 AI가 추천해드려요. 인기 여행지 비교와 예약 타임라인 제공.',
+    title: '신혼여행 추천 - 웨딩셈',
+    description: '예산과 일정에 맞는 신혼여행지를 추천해드려요. 인기 여행지 비교와 예약 타임라인 제공.',
     path: '/honeymoon',
   });
 
@@ -41,23 +40,6 @@ export default function Honeymoon() {
     flyTo,
     resetView,
   } = useHoneymoonMap();
-
-  const {
-    messages,
-    isLoading,
-    sendMessage,
-    messagesEndRef,
-  } = useAIChat({
-    feature: 'honeymoon',
-    context: {
-      selectedDestinations: selectedDestinations.map((d) => d.name),
-      filters: {
-        maxBudget: filters.maxBudget,
-        nights: `${filters.minNights}~${filters.maxNights}`,
-        concepts: filters.concepts,
-      },
-    },
-  });
 
   // Check if any destinations match filters
   const hasFilterResults = scoredDestinations.some(({ score }) => score > 0.5);
@@ -81,7 +63,7 @@ export default function Honeymoon() {
           </button>
           <div className="flex items-center gap-2">
             <h1 className="text-base font-semibold text-foreground">
-              AI 허니문 큐레이션
+              허니문 큐레이션
             </h1>
             <Badge
               variant="outline"
@@ -146,8 +128,18 @@ export default function Honeymoon() {
               </div>
             )}
 
+            {/* Recommendation Panel */}
+            <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <RecommendationPanel
+                scoredDestinations={scoredDestinations}
+                selectedIds={selectedIds}
+                onFlyTo={flyTo}
+                onToggleSelection={toggleSelection}
+              />
+            </div>
+
             {selectedDestinations.length > 0 && (
-              <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
                 <ComparisonCards
                   destinations={selectedDestinations}
                   onRemove={toggleSelection}
@@ -156,26 +148,10 @@ export default function Honeymoon() {
             )}
 
             {popupDestination && (
-              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
+              <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
                 <BookingTimeline destination={popupDestination} />
               </div>
             )}
-
-            {/* Chat */}
-            <div className="bg-card rounded-xl border border-border overflow-hidden h-[400px] animate-fade-up" style={{ animationDelay: '0.2s' }}>
-              <div className="px-3 py-2 border-b border-border bg-muted/30">
-                <h3 className="text-xs font-semibold">🤖 AI 허니문 어드바이저</h3>
-              </div>
-              <ChatContainer
-                messages={messages}
-                isLoading={isLoading}
-                onSend={sendMessage}
-                messagesEndRef={messagesEndRef}
-                placeholder="허니문에 대해 물어보세요..."
-                welcomeMessage="어떤 스타일의 신혼여행을 꿈꾸세요? 예산, 기간, 선호하는 컨셉을 알려주시면 맞춤 추천해 드릴게요! 🏝️"
-                className="h-[calc(100%-36px)]"
-              />
-            </div>
           </div>
         </div>
       ) : (
@@ -218,21 +194,15 @@ export default function Honeymoon() {
             )}
           </div>
 
-          {/* Right Panel: Chat + Comparison (40%) */}
+          {/* Right Panel: Recommendation + Comparison (40%) */}
           <div className="w-[40%] flex flex-col p-4 pl-0 gap-4">
-            {/* Chat */}
-            <div className="flex-1 bg-card rounded-xl border border-border overflow-hidden min-h-[300px] animate-fade-up" style={{ animationDelay: '0.05s' }}>
-              <div className="px-3 py-2 border-b border-border bg-muted/30">
-                <h3 className="text-xs font-semibold">🤖 AI 허니문 어드바이저</h3>
-              </div>
-              <ChatContainer
-                messages={messages}
-                isLoading={isLoading}
-                onSend={sendMessage}
-                messagesEndRef={messagesEndRef}
-                placeholder="허니문에 대해 물어보세요..."
-                welcomeMessage="어떤 스타일의 신혼여행을 꿈꾸세요? 예산, 기간, 선호하는 컨셉을 알려주시면 맞춤 추천해 드릴게요! 🏝️"
-                className="h-[calc(100%-36px)]"
+            {/* Recommendation Panel */}
+            <div className="flex-1 animate-fade-up" style={{ animationDelay: '0.05s' }}>
+              <RecommendationPanel
+                scoredDestinations={scoredDestinations}
+                selectedIds={selectedIds}
+                onFlyTo={flyTo}
+                onToggleSelection={toggleSelection}
               />
             </div>
 

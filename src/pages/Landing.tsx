@@ -35,6 +35,7 @@ interface Feature {
   isAI: boolean;
   gradient: string;
   iconColor: string;
+  link?: string;
 }
 
 const FEATURES: Feature[] = [
@@ -69,6 +70,7 @@ const FEATURES: Feature[] = [
     isAI: true,
     gradient: 'from-amber-500/10 to-amber-600/5',
     iconColor: 'text-amber-500',
+    link: '/honeymoon',
   },
   {
     icon: MessageCircle,
@@ -281,7 +283,7 @@ export default function Landing() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {FEATURES.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} />
+              <FeatureCard key={feature.title} feature={feature} onNavigate={feature.link ? () => navigate(feature.link!) : undefined} />
             ))}
           </div>
         </section>
@@ -369,16 +371,18 @@ export default function Landing() {
 }
 
 /* ─── Feature Card Component ─── */
-function FeatureCard({ feature }: { feature: Feature }) {
+function FeatureCard({ feature, onNavigate }: { feature: Feature; onNavigate?: () => void }) {
   const Icon = feature.icon;
 
   return (
     <Card
       className={cn(
         'p-4 transition-all duration-200 hover:shadow-toss hover:scale-[1.02]',
-        feature.isAI && 'ai-glow border-primary/20'
+        feature.isAI && 'ai-glow border-primary/20',
+        onNavigate && 'cursor-pointer'
       )}
       role="article"
+      onClick={onNavigate}
     >
       <div className="flex items-start gap-3">
         {/* Icon */}
@@ -412,6 +416,11 @@ function FeatureCard({ feature }: { feature: Feature }) {
           <p className="text-xs text-muted-foreground leading-relaxed">
             {feature.description}
           </p>
+          {onNavigate && (
+            <p className="text-xs text-primary font-medium mt-1.5">
+              체험하기 →
+            </p>
+          )}
         </div>
       </div>
     </Card>

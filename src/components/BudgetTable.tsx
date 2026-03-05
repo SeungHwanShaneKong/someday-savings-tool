@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Check, X, Users, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Check, X, Users, Trash2, GripVertical, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -138,6 +139,7 @@ export function BudgetTable({
   onDeleteItem,
   onCostSplitChange
 }: BudgetTableProps) {
+  const navigate = useNavigate();
   const {
     orderedCategories,
     reorderCategories
@@ -345,6 +347,15 @@ export function BudgetTable({
               </div>
               <span className="text-base sm:text-lg">{category.icon}</span>
               <span className="text-[11px] sm:text-sm text-center break-keep">{category.name}</span>
+              {category.id === 'honeymoon' && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate('/honeymoon'); }}
+                  className="mt-1 flex items-center gap-0.5 text-[10px] sm:text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors animate-pulse-subtle"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  추천
+                </button>
+              )}
             </div>
           </TableCell>}
         <TableCell className="text-center px-1 sm:px-2">
@@ -479,6 +490,15 @@ export function BudgetTable({
                                   </div>
                                   <span className="text-base sm:text-lg">{category.icon}</span>
                                   <span className="text-[11px] sm:text-sm text-center break-keep">{category.name}</span>
+                                  {category.id === 'honeymoon' && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); navigate('/honeymoon'); }}
+                                      className="mt-1 flex items-center gap-0.5 text-[10px] sm:text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors animate-pulse-subtle"
+                                    >
+                                      <Sparkles className="w-3 h-3" />
+                                      추천
+                                    </button>
+                                  )}
                                 </div>
                               </TableCell>
                               <TableCell colSpan={5} className="px-1 sm:px-4">

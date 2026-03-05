@@ -1,14 +1,18 @@
-import { useCallback, useState } from 'react';
-import Map, { Marker, Popup, NavigationControl } from 'react-map-gl/mapbox';
+import { useCallback, useState, useMemo, useEffect } from 'react';
+import Map, { Marker, Popup, NavigationControl, Source, Layer, useMap } from 'react-map-gl/maplibre';
 import { cn } from '@/lib/utils';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MapPin } from 'lucide-react';
 import type { Destination } from '@/lib/honeymoon-destinations';
 import type { MapViewState } from '@/hooks/useHoneymoonMap';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+/** 인천공항 좌표 (비행 아크 출발점) */
+const ICN_COORDS: [number, number] = [126.45, 37.47];
+
+/** CARTO Voyager — 프리미엄 무료 벡터 타일 */
+const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
 interface ScoredDestination {
   destination: Destination;
@@ -28,6 +32,76 @@ interface HoneymoonMapProps {
   onToggleSelection: (id: string) => void;
 }
 
+/* ─── 대원항로(Great Circle) 보간 ─── */
+function greatCircleArc(
+  start: [number, number],
+  end: [number, number],
+  segments = 64
+): [number, number][] {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const [lon1, lat1] = [toRad(start[0]), toRad(start[1])];
+  const [lon2, lat2] = [toRad(end[0]), toRad(end[1])];
+
+  const d =
+    2 *
+    Math.asin(
+      Math.sqrt(
+        Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
+          Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)
+      )
+    );
+
+  if (d === 0) return [start, end];
+
+  const points: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    const f = i / segments;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+    points.push([toDeg(Math.atan2(y, x)), toDeg(Math.atan2(z, Math.sqrt(x * x + y * y)))]);
+  }
+  return points;
+}
+
+/* ─── MapController: viewState ↔ map.flyTo 동기화 ─── */
+function MapController({
+  viewState,
+}: {
+  viewState: MapViewState;
+}) {
+  const { current: map } = useMap();
+  const [lastView, setLastView] = useState<MapViewState | null>(null);
+
+  useEffect(() => {
+    if (!map) return;
+    if (
+      lastView &&
+      lastView.longitude === viewState.longitude &&
+      lastView.latitude === viewState.latitude &&
+      lastView.zoom === viewState.zoom &&
+      lastView.pitch === viewState.pitch &&
+      lastView.bearing === viewState.bearing
+    )
+      return;
+
+    map.flyTo({
+      center: [viewState.longitude, viewState.latitude],
+      zoom: viewState.zoom,
+      pitch: viewState.pitch ?? 20,
+      bearing: viewState.bearing ?? 0,
+      duration: 2000,
+      essential: true,
+    });
+    setLastView(viewState);
+  }, [map, viewState, lastView]);
+
+  return null;
+}
+
 export function HoneymoonMap({
   viewState,
   onViewStateChange,
@@ -42,6 +116,7 @@ export function HoneymoonMap({
 }: HoneymoonMapProps) {
   const isMobile = useIsMobile();
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [initialFlyDone, setInitialFlyDone] = useState(false);
 
   const handleMove = useCallback(
     (evt: { viewState: MapViewState }) => {
@@ -50,21 +125,37 @@ export function HoneymoonMap({
     [onViewStateChange]
   );
 
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-muted/30 rounded-xl">
-        <div className="text-center p-6">
-          <span className="text-4xl">🗺️</span>
-          <p className="text-sm text-muted-foreground mt-2">
-            지도를 표시하려면 Mapbox 토큰이 필요해요
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            VITE_MAPBOX_ACCESS_TOKEN 환경변수를 설정해주세요
-          </p>
-        </div>
-      </div>
-    );
-  }
+  /* ─── 비행 아크 GeoJSON ─── */
+  const arcGeoJSON = useMemo(() => {
+    const features = scoredDestinations.map(({ destination, score }) => {
+      const coords = greatCircleArc(ICN_COORDS, destination.coordinates);
+      const isSelected = selectedIds.includes(destination.id);
+      return {
+        type: 'Feature' as const,
+        properties: {
+          id: destination.id,
+          score,
+          selected: isSelected,
+          opacity: isSelected ? 0.8 : score > 0.5 ? 0.25 : 0.08,
+          width: isSelected ? 2.5 : 1.2,
+          dashArray: isSelected ? [1, 0] : [4, 4],
+        },
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: coords,
+        },
+      };
+    });
+    return { type: 'FeatureCollection' as const, features };
+  }, [scoredDestinations, selectedIds]);
+
+  /* ─── 초기 로딩 후 한 번만 초기 뷰로 flyTo ─── */
+  const handleLoad = useCallback(() => {
+    setMapLoaded(true);
+    if (!initialFlyDone) {
+      setInitialFlyDone(true);
+    }
+  }, [initialFlyDone]);
 
   return (
     <div className="relative w-full h-full">
@@ -79,18 +170,53 @@ export function HoneymoonMap({
       )}
 
       <Map
-        {...viewState}
+        initialViewState={{
+          longitude: viewState.longitude,
+          latitude: viewState.latitude,
+          zoom: viewState.zoom,
+          pitch: viewState.pitch ?? 20,
+          bearing: viewState.bearing ?? 0,
+        }}
         onMove={handleMove}
-        onLoad={() => setMapLoaded(true)}
-        mapboxAccessToken={MAPBOX_TOKEN}
-        mapStyle="mapbox://styles/mapbox/light-v11"
+        onLoad={handleLoad}
+        mapStyle={MAP_STYLE}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
+        maxPitch={60}
         reuseMaps
       >
+        <MapController viewState={viewState} />
+
         {!isMobile && <NavigationControl position="top-right" />}
 
-        {/* Destination markers */}
+        {/* ─── 비행 아크 라인 ─── */}
+        <Source id="flight-arcs" type="geojson" data={arcGeoJSON}>
+          <Layer
+            id="flight-arcs-layer"
+            type="line"
+            paint={{
+              'line-color': '#3b82f6',
+              'line-opacity': ['get', 'opacity'],
+              'line-width': ['get', 'width'],
+              'line-dasharray': [4, 4],
+            }}
+            layout={{
+              'line-cap': 'round',
+              'line-join': 'round',
+            }}
+          />
+        </Source>
+
+        {/* ─── 서울 마커 (출발점) ─── */}
+        <Marker longitude={ICN_COORDS[0]} latitude={ICN_COORDS[1]} anchor="center">
+          <div className="flex flex-col items-center">
+            <div className="rounded-full bg-blue-600 text-white w-6 h-6 flex items-center justify-center text-[10px] font-bold shadow-md border-2 border-white">
+              ICN
+            </div>
+          </div>
+        </Marker>
+
+        {/* ─── 여행지 마커 ─── */}
         {scoredDestinations.map(({ destination, score }) => {
           const isSelected = selectedIds.includes(destination.id);
           const isHovered = hoveredId === destination.id;
@@ -121,16 +247,16 @@ export function HoneymoonMap({
                 <div
                   className={cn(
                     'relative flex flex-col items-center',
-                    isSelected && 'drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]'
+                    isSelected && 'drop-shadow-[0_0_12px_hsl(var(--primary)/0.5)]'
                   )}
                 >
                   <div
                     className={cn(
-                      'rounded-full px-2.5 py-1.5 text-center shadow-md border-2 bg-white',
+                      'rounded-full px-2.5 py-1.5 text-center shadow-md border-2 bg-white transition-all',
                       isSelected
-                        ? 'border-primary'
+                        ? 'border-primary ring-4 ring-primary/20'
                         : isHovered
-                          ? 'border-blue-300'
+                          ? 'border-blue-300 shadow-lg'
                           : 'border-white'
                     )}
                   >
@@ -149,7 +275,7 @@ export function HoneymoonMap({
                   {/* Pin tail */}
                   <div
                     className={cn(
-                      'w-2 h-2 rotate-45 -mt-1',
+                      'w-2 h-2 rotate-45 -mt-1 transition-colors',
                       isSelected ? 'bg-primary' : 'bg-white'
                     )}
                   />
@@ -159,7 +285,7 @@ export function HoneymoonMap({
           );
         })}
 
-        {/* Popup */}
+        {/* ─── 팝업 ─── */}
         {popupDestination && (
           <Popup
             longitude={popupDestination.coordinates[0]}
@@ -168,7 +294,7 @@ export function HoneymoonMap({
             offset={30}
             closeOnClick={false}
             onClose={onPopupClose}
-            className="!max-w-xs"
+            className="!max-w-xs animate-fade-up"
           >
             <div className="p-2 min-w-[180px]">
               <div className="flex items-center gap-2 mb-2">

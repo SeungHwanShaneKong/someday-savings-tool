@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -40,14 +40,13 @@ const URGENCY_LABELS: Record<string, string> = {
   soon: '이번 달',
 };
 
-// [FORWARDREF-FIX-20260307-170945] Radix Collapsible ref 경고 수정
-export const ChecklistItem = forwardRef<HTMLDivElement, ChecklistItemProps>(function ChecklistItem({
+export function ChecklistItem({
   item,
   onToggle,
   onDelete,
   onUpdateNotes,
   onBudgetLink,
-}, ref) {
+}: ChecklistItemProps) {
   const [expanded, setExpanded] = useState(false);
   const [checkPop, setCheckPop] = useState(false);
   const [localNotes, setLocalNotes] = useState(item.notes || '');
@@ -240,4 +239,4 @@ export const ChecklistItem = forwardRef<HTMLDivElement, ChecklistItemProps>(func
       )}
     </div>
   );
-});
+}

@@ -1,4 +1,4 @@
-import { useState, forwardRef } from 'react';
+import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -22,8 +22,7 @@ interface ChecklistPeriodSectionProps {
   onBudgetLink?: (categoryLink: string, subCategoryLink: string) => void;
 }
 
-// [FORWARDREF-FIX-20260307-170945] Radix Collapsible ref 경고 수정
-export const ChecklistPeriodSection = forwardRef<HTMLDivElement, ChecklistPeriodSectionProps>(function ChecklistPeriodSection({
+export function ChecklistPeriodSection({
   period,
   items,
   isActive,
@@ -31,7 +30,7 @@ export const ChecklistPeriodSection = forwardRef<HTMLDivElement, ChecklistPeriod
   onDelete,
   onUpdateNotes,
   onBudgetLink,
-}, ref) {
+}: ChecklistPeriodSectionProps) {
   const [isOpen, setIsOpen] = useState(isActive);
   const completed = items.filter((i) => i.is_completed).length;
   const percentage =
@@ -138,4 +137,4 @@ export const ChecklistPeriodSection = forwardRef<HTMLDivElement, ChecklistPeriod
       </div>
     </Collapsible>
   );
-});
+}

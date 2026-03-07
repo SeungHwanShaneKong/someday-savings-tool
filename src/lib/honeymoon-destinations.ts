@@ -219,3 +219,38 @@ export function getMatchScore(
 export function getDestinationById(id: string): Destination | undefined {
   return DESTINATIONS.find((d) => d.id === id);
 }
+
+// [HONEYMOON-UPGRADE-2026-03-07] 스마트 배지 시스템
+export interface Badge {
+  label: string;
+  color: string; // tailwind bg + text class pair
+}
+
+export function computeBadges(destination: Destination): Badge[] {
+  const badges: Badge[] = [];
+
+  // "가성비 최고" — 1박당 최저 비용이 전체 중 가장 낮은 경우
+  const perNightMin = destination.budgetRange.min / destination.nights;
+  const allPerNight = DESTINATIONS.map((d) => d.budgetRange.min / d.nights);
+  const lowestPerNight = Math.min(...allPerNight);
+  if (perNightMin === lowestPerNight) {
+    badges.push({ label: '가성비 최고', color: 'bg-emerald-100 text-emerald-700' });
+  }
+
+  // "인기 허니문" — concepts 3개 이상 또는 accommodationTypes 3개 이상
+  if (destination.concepts.length >= 2 && destination.accommodationTypes.length >= 2) {
+    badges.push({ label: '인기 허니문', color: 'bg-rose-100 text-rose-700' });
+  }
+
+  // "비자 불필요"
+  if (!destination.visaRequired) {
+    badges.push({ label: '비자 불필요', color: 'bg-sky-100 text-sky-700' });
+  }
+
+  // "단기 추천" — 4박 이하
+  if (destination.nights <= 4) {
+    badges.push({ label: '단기 추천', color: 'bg-amber-100 text-amber-700' });
+  }
+
+  return badges.slice(0, 2); // 최대 2개
+}

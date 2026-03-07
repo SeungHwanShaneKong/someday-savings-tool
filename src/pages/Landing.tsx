@@ -46,6 +46,7 @@ const FEATURES: Feature[] = [
     isAI: false,
     gradient: 'from-blue-500/10 to-blue-600/5',
     iconColor: 'text-blue-500',
+    link: '/budget',
   },
   {
     icon: CalendarCheck,
@@ -54,6 +55,7 @@ const FEATURES: Feature[] = [
     isAI: true,
     gradient: 'from-emerald-500/10 to-emerald-600/5',
     iconColor: 'text-emerald-500',
+    link: '/checklist',
   },
   {
     icon: Brain,
@@ -62,6 +64,7 @@ const FEATURES: Feature[] = [
     isAI: true,
     gradient: 'from-violet-500/10 to-violet-600/5',
     iconColor: 'text-violet-500',
+    link: '/budget',
   },
   {
     icon: MapPin,
@@ -79,6 +82,7 @@ const FEATURES: Feature[] = [
     isAI: true,
     gradient: 'from-rose-500/10 to-rose-600/5',
     iconColor: 'text-rose-500',
+    link: '/chat',
   },
   {
     icon: Share2,
@@ -87,6 +91,7 @@ const FEATURES: Feature[] = [
     isAI: false,
     gradient: 'from-slate-500/10 to-slate-600/5',
     iconColor: 'text-slate-500',
+    link: '/summary',
   },
 ];
 

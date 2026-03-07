@@ -1,3 +1,5 @@
+// [HONEYMOON-UPGRADE-2026-03-07] 새 컴포넌트 통합
+import { useRef, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { ArrowLeft, MapIcon, MapPin, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,9 @@ import { FilterSliders } from '@/components/honeymoon/FilterSliders';
 import { ComparisonCards } from '@/components/honeymoon/ComparisonCards';
 import { BookingTimeline } from '@/components/honeymoon/BookingTimeline';
 import { RecommendationPanel } from '@/components/honeymoon/RecommendationPanel';
+import { ItineraryPanel } from '@/components/honeymoon/ItineraryPanel';
+import { ItineraryCostCalculator } from '@/components/honeymoon/ItineraryCostCalculator';
+import { ItineraryExport } from '@/components/honeymoon/ItineraryExport';
 import { useSEO } from '@/hooks/useSEO';
 
 export default function Honeymoon() {
@@ -33,6 +38,7 @@ export default function Honeymoon() {
     selectedIds,
     selectedDestinations,
     toggleSelection,
+    reorderItinerary,
     hoveredId,
     setHoveredId,
     popupDestination,
@@ -40,6 +46,13 @@ export default function Honeymoon() {
     flyTo,
     resetView,
   } = useHoneymoonMap();
+
+  // [HONEYMOON-UPGRADE-2026-03-07] 캡처용 ref + 스코어 맵
+  const captureRef = useRef<HTMLDivElement>(null);
+  const scoreMap = useMemo(
+    () => new Map(scoredDestinations.map(({ destination, score }) => [destination.id, score])),
+    [scoredDestinations]
+  );
 
   // Check if any destinations match filters
   const hasFilterResults = scoredDestinations.some(({ score }) => score > 0.5);
@@ -138,17 +151,40 @@ export default function Honeymoon() {
               />
             </div>
 
+            {/* [HONEYMOON-UPGRADE-2026-03-07] 여행 일정 패널 */}
+            <div className="animate-fade-up" style={{ animationDelay: '0.15s' }} ref={captureRef}>
+              <ItineraryPanel
+                destinations={selectedDestinations}
+                selectedIds={selectedIds}
+                onReorder={reorderItinerary}
+                onRemove={toggleSelection}
+              />
+              {selectedDestinations.length > 0 && (
+                <div className="mt-2">
+                  <ItineraryExport destinations={selectedDestinations} captureRef={captureRef} />
+                </div>
+              )}
+            </div>
+
             {selectedDestinations.length > 0 && (
-              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
+              <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
                 <ComparisonCards
                   destinations={selectedDestinations}
+                  scores={scoreMap}
                   onRemove={toggleSelection}
                 />
               </div>
             )}
 
+            {/* [HONEYMOON-UPGRADE-2026-03-07] 비용 합산기 */}
+            {selectedDestinations.length > 0 && (
+              <div className="animate-fade-up" style={{ animationDelay: '0.25s' }}>
+                <ItineraryCostCalculator destinations={selectedDestinations} />
+              </div>
+            )}
+
             {popupDestination && (
-              <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
+              <div className="animate-fade-up" style={{ animationDelay: '0.3s' }}>
                 <BookingTimeline destination={popupDestination} />
               </div>
             )}
@@ -194,10 +230,10 @@ export default function Honeymoon() {
             )}
           </div>
 
-          {/* Right Panel: Recommendation + Comparison (40%) */}
-          <div className="w-[40%] flex flex-col p-4 pl-0 gap-4">
+          {/* Right Panel: Recommendation + Itinerary + Comparison (40%) */}
+          <div className="w-[40%] flex flex-col p-4 pl-0 gap-4 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
             {/* Recommendation Panel */}
-            <div className="flex-1 animate-fade-up" style={{ animationDelay: '0.05s' }}>
+            <div className="animate-fade-up" style={{ animationDelay: '0.05s' }}>
               <RecommendationPanel
                 scoredDestinations={scoredDestinations}
                 selectedIds={selectedIds}
@@ -206,19 +242,42 @@ export default function Honeymoon() {
               />
             </div>
 
+            {/* [HONEYMOON-UPGRADE-2026-03-07] 여행 일정 패널 */}
+            <div className="animate-fade-up" style={{ animationDelay: '0.1s' }} ref={captureRef}>
+              <ItineraryPanel
+                destinations={selectedDestinations}
+                selectedIds={selectedIds}
+                onReorder={reorderItinerary}
+                onRemove={toggleSelection}
+              />
+              {selectedDestinations.length > 0 && (
+                <div className="mt-2">
+                  <ItineraryExport destinations={selectedDestinations} captureRef={captureRef} />
+                </div>
+              )}
+            </div>
+
             {/* Comparison Cards */}
             {selectedDestinations.length > 0 && (
-              <div className="animate-fade-up" style={{ animationDelay: '0.1s' }}>
+              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
                 <ComparisonCards
                   destinations={selectedDestinations}
+                  scores={scoreMap}
                   onRemove={toggleSelection}
                 />
               </div>
             )}
 
+            {/* [HONEYMOON-UPGRADE-2026-03-07] 비용 합산기 */}
+            {selectedDestinations.length > 0 && (
+              <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
+                <ItineraryCostCalculator destinations={selectedDestinations} />
+              </div>
+            )}
+
             {/* Booking Timeline */}
             {popupDestination && (
-              <div className="animate-fade-up" style={{ animationDelay: '0.15s' }}>
+              <div className="animate-fade-up" style={{ animationDelay: '0.25s' }}>
                 <BookingTimeline destination={popupDestination} />
               </div>
             )}

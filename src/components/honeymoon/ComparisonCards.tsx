@@ -1,15 +1,25 @@
+// [HONEYMOON-UPGRADE-2026-03-07] 레이더 차트 비교 추가
+import { useMemo } from 'react';
 import { X } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { cn } from '@/lib/utils';
+import {
+  RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend,
+} from 'recharts';
 import type { Destination } from '@/lib/honeymoon-destinations';
 
 interface ComparisonCardsProps {
   destinations: Destination[];
+  scores?: Map<string, number>; // [HONEYMOON-UPGRADE-2026-03-07] 매치 스코어 전달
   onRemove: (id: string) => void;
 }
 
+// [HONEYMOON-UPGRADE-2026-03-07] 레이더 차트 색상 팔레트
+const RADAR_COLORS = ['#3b82f6', '#f97316', '#22c55e'];
+
 export function ComparisonCards({
   destinations,
+  scores,
   onRemove,
 }: ComparisonCardsProps) {
   if (destinations.length === 0) return null;
@@ -17,11 +27,69 @@ export function ComparisonCards({
   // Find max budget for relative bar widths
   const maxBudget = Math.max(...destinations.map((d) => d.budgetRange.max));
 
+  // [HONEYMOON-UPGRADE-2026-03-07] 레이더 차트 데이터 계산
+  const radarData = useMemo(() => {
+    const axes = ['예산', '숙박일수', '컨셉', '비자', '매치점수'];
+    const maxNights = Math.max(...destinations.map((d) => d.nights), 1);
+    const maxBudgetVal = Math.max(...destinations.map((d) => d.budgetRange.max), 1);
+
+    return axes.map((axis) => {
+      const point: Record<string, string | number> = { axis };
+      destinations.forEach((d) => {
+        let value = 0;
+        switch (axis) {
+          case '예산':
+            // 반전: 저렴할수록 높은 점수
+            value = Math.round((1 - d.budgetRange.min / maxBudgetVal) * 100);
+            break;
+          case '숙박일수':
+            value = Math.round((d.nights / maxNights) * 100);
+            break;
+          case '컨셉':
+            value = Math.round((d.concepts.length / 4) * 100);
+            break;
+          case '비자':
+            value = d.visaRequired ? 30 : 100;
+            break;
+          case '매치점수':
+            value = Math.round((scores?.get(d.id) ?? 0.5) * 100);
+            break;
+        }
+        point[d.name] = value;
+      });
+      return point;
+    });
+  }, [destinations, scores]);
+
   return (
     <div className="bg-card rounded-xl border border-border p-4 hover:shadow-toss transition-all duration-200">
       <h3 className="text-sm font-semibold text-foreground mb-3">
         🔍 여행지 비교 ({destinations.length}개)
       </h3>
+
+      {/* [HONEYMOON-UPGRADE-2026-03-07] 레이더 차트 비교 */}
+      {destinations.length >= 2 && (
+        <div className="mb-4 bg-muted/20 rounded-lg p-3">
+          <ResponsiveContainer width="100%" height={220}>
+            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
+              <PolarGrid strokeDasharray="3 3" />
+              <PolarAngleAxis dataKey="axis" tick={{ fontSize: 11 }} />
+              {destinations.map((d, i) => (
+                <Radar
+                  key={d.id}
+                  name={d.name}
+                  dataKey={d.name}
+                  stroke={RADAR_COLORS[i % RADAR_COLORS.length]}
+                  fill={RADAR_COLORS[i % RADAR_COLORS.length]}
+                  fillOpacity={0.15}
+                  strokeWidth={2}
+                />
+              ))}
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       <div
         className={cn(

@@ -105,10 +105,15 @@ export function useHoneymoonMap() {
     setPopupDestination(null);
   }, []);
 
-  // Get selected destinations
-  const selectedDestinations = DESTINATIONS.filter((d) =>
-    selectedIds.includes(d.id)
-  );
+  // [HONEYMOON-UPGRADE-2026-03-07] 선택 순서 보존: filter → map 방식으로 변경
+  const selectedDestinations = selectedIds
+    .map((id) => DESTINATIONS.find((d) => d.id === id))
+    .filter((d): d is Destination => d !== undefined);
+
+  // [HONEYMOON-UPGRADE-2026-03-07] 여행 일정 순서 변경 (드래그 정렬용)
+  const reorderItinerary = useCallback((newOrder: string[]) => {
+    setSelectedIds(newOrder);
+  }, []);
 
   return {
     viewState,
@@ -120,6 +125,7 @@ export function useHoneymoonMap() {
     selectedIds,
     selectedDestinations,
     toggleSelection,
+    reorderItinerary,
     hoveredId,
     setHoveredId,
     popupDestination,

@@ -149,6 +149,29 @@ export function HoneymoonMap({
     return { type: 'FeatureCollection' as const, features };
   }, [scoredDestinations, selectedIds]);
 
+  // [HONEYMOON-UPGRADE-2026-03-07] 도시 간 여행 경로선 GeoJSON (주황색 점선)
+  const itineraryRouteGeoJSON = useMemo(() => {
+    if (selectedIds.length < 2) {
+      return { type: 'FeatureCollection' as const, features: [] as GeoJSON.Feature[] };
+    }
+    const selectedDests = selectedIds
+      .map((id) => scoredDestinations.find((s) => s.destination.id === id)?.destination)
+      .filter((d): d is Destination => d !== undefined);
+
+    const features: GeoJSON.Feature[] = [];
+    for (let i = 0; i < selectedDests.length - 1; i++) {
+      const from = selectedDests[i];
+      const to = selectedDests[i + 1];
+      const coords = greatCircleArc(from.coordinates, to.coordinates);
+      features.push({
+        type: 'Feature',
+        properties: { order: i },
+        geometry: { type: 'LineString', coordinates: coords },
+      });
+    }
+    return { type: 'FeatureCollection' as const, features };
+  }, [selectedIds, scoredDestinations]);
+
   /* ─── 초기 로딩 후 한 번만 초기 뷰로 flyTo ─── */
   const handleLoad = useCallback(() => {
     setMapLoaded(true);
@@ -207,6 +230,24 @@ export function HoneymoonMap({
           />
         </Source>
 
+        {/* ─── [HONEYMOON-UPGRADE-2026-03-07] 도시 간 여행 경로선 (주황색 점선) ─── */}
+        <Source id="itinerary-route" type="geojson" data={itineraryRouteGeoJSON}>
+          <Layer
+            id="itinerary-route-layer"
+            type="line"
+            paint={{
+              'line-color': '#f97316',
+              'line-opacity': 0.8,
+              'line-width': 3,
+              'line-dasharray': [6, 4],
+            }}
+            layout={{
+              'line-cap': 'round',
+              'line-join': 'round',
+            }}
+          />
+        </Source>
+
         {/* ─── 서울 마커 (출발점) ─── */}
         <Marker longitude={ICN_COORDS[0]} latitude={ICN_COORDS[1]} anchor="center">
           <div className="flex flex-col items-center">
@@ -221,6 +262,8 @@ export function HoneymoonMap({
           const isSelected = selectedIds.includes(destination.id);
           const isHovered = hoveredId === destination.id;
           const isActive = score > 0.5;
+          // [HONEYMOON-UPGRADE-2026-03-07] 선택 순서 번호 (1-based)
+          const selectionOrder = isSelected ? selectedIds.indexOf(destination.id) + 1 : 0;
 
           return (
             <Marker
@@ -250,6 +293,12 @@ export function HoneymoonMap({
                     isSelected && 'drop-shadow-[0_0_12px_hsl(var(--primary)/0.5)]'
                   )}
                 >
+                  {/* [HONEYMOON-UPGRADE-2026-03-07] 번호 배지 */}
+                  {isSelected && selectionOrder > 0 && (
+                    <div className="absolute -top-1.5 -left-1.5 z-10 bg-primary text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-md border border-white">
+                      {selectionOrder}
+                    </div>
+                  )}
                   <div
                     className={cn(
                       'rounded-full px-2.5 py-1.5 text-center shadow-md border-2 bg-white transition-all',

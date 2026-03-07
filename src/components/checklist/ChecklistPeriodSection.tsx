@@ -137,4 +137,4 @@ export function ChecklistPeriodSection({
       </div>
     </Collapsible>
   );
-});
+}

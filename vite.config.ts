@@ -23,15 +23,18 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        // [VITE-CHUNK-FIX-20260308-143200] vendor-core 병합 — Lovable 빌드에서 vendor-core가
-        // orphan chunk로 빠지며 react-router-dom 미로드 → 빈 화면 이슈 수정.
-        // react, react-dom, react-router-dom을 vendor-ui에 통합하여 항상 import되도록 보장.
+        // [VITE-CHUNK-FIX-20260308-021800] 순환 의존성 해결 — vendor-data ↔ vendor-ui
+        // 순환 참조로 React.createContext undefined 에러 발생.
+        // React 코어 + UI + 데이터 라이브러리를 단일 vendor 청크로 통합하여
+        // 모듈 초기화 순서 문제를 근본적으로 해결. vendor-chart, vendor-map은 독립적이므로 분리 유지.
         manualChunks: {
-          // UI + Core vendor chunk (React + React-DOM + Router + Radix + Lucide)
-          'vendor-ui': [
+          // 통합 vendor 청크 (React + Router + Radix + Lucide + Query + Supabase)
+          'vendor': [
             'react',
             'react-dom',
             'react-router-dom',
+            '@tanstack/react-query',
+            '@supabase/supabase-js',
             '@radix-ui/react-accordion',
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',
@@ -50,16 +53,11 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-slider',
             'lucide-react',
           ],
-          // Data & utility chunk
-          'vendor-data': [
-            '@tanstack/react-query',
-            '@supabase/supabase-js',
-          ],
-          // Map library (MapLibre GL)
+          // Map library (MapLibre GL — heavy, 독립적)
           'vendor-map': [
             'maplibre-gl',
           ],
-          // Chart library (heavy)
+          // Chart library (Recharts — heavy, 독립적)
           'vendor-chart': [
             'recharts',
           ],

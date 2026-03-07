@@ -3,15 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { searchKnowledge } from '@/lib/wedding-knowledge-base';
-import type { Citation } from '@/lib/rag-sources';
+import type { Citation, FreshnessInfo } from '@/lib/rag-sources';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
 
+// [ZERO-COST-PIPELINE-2026-03-07] freshnessInfo 필드 추가
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  citations?: Citation[];   // RAG citations (assistant only)
-  ragUsed?: boolean;        // Whether RAG was used for this response
+  citations?: Citation[];        // RAG citations (assistant only)
+  ragUsed?: boolean;             // Whether RAG was used for this response
+  freshnessInfo?: FreshnessInfo; // [ZERO-COST-PIPELINE-2026-03-07] 신선도 메타
 }
 
 export type AIFeature = 'honeymoon' | 'qa' | 'budget';
@@ -125,6 +127,8 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         let reply: string;
         let citations: Citation[] | undefined;
         let ragUsed = false;
+        // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보
+        let freshnessInfo: FreshnessInfo | undefined;
 
         // Phase 3: Try RAG query first for Q&A feature
         if (feature === 'qa') {
@@ -146,6 +150,8 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
               reply = ragData.reply;
               citations = ragData.citations;
               ragUsed = ragData.rag_used || false;
+              // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 파싱
+              freshnessInfo = ragData.freshness_info || undefined;
             } else {
               throw new Error('RAG unavailable');
             }
@@ -208,6 +214,8 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
           timestamp: new Date().toISOString(),
           citations,
           ragUsed,
+          // [ZERO-COST-PIPELINE-2026-03-07] 신선도 메타 전달
+          freshnessInfo,
         };
 
         const finalMessages = [...updatedMessages, assistantMessage];

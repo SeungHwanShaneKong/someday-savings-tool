@@ -11,9 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
+// [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
+import { useTimelineOptimizer } from '@/hooks/useTimelineOptimizer';
+import TimelinePanel from '@/components/planning/TimelinePanel';
 import { ChecklistProgress } from '@/components/checklist/ChecklistProgress';
 import { ChecklistPeriodSection } from '@/components/checklist/ChecklistPeriodSection';
 import { NudgeBanner } from '@/components/checklist/NudgeBanner';
@@ -31,6 +34,7 @@ export default function Checklist() {
     path: '/checklist',
   });
 
+  // [DDAY-INLINE-PICKER-2026-03-07] updateWeddingDate 추가 — NudgeBanner 인라인 날짜 선택용
   const {
     items,
     loading,
@@ -42,8 +46,13 @@ export default function Checklist() {
     addCustomItem,
     deleteItem,
     updateNotes,
+    updateWeddingDate,
     hasWeddingDate,
   } = useChecklist();
+
+  // [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
+  const { result: timelineResult, loading: timelineLoading, error: timelineError, optimize: optimizeTimeline } = useTimelineOptimizer();
+  const [timelineOpen, setTimelineOpen] = useState(false);
 
   // Add custom item state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -128,17 +137,37 @@ export default function Checklist() {
           </div>
         )}
 
-        {/* No D-day nudge */}
+        {/* [DDAY-INLINE-PICKER-2026-03-07] No D-day nudge — 인라인 날짜 선택기 */}
         {!loading && !hasWeddingDate && (
           <NudgeBanner
             type="no-dday"
-            onAction={() => navigate('/budget')}
+            onSave={async (date, time) => {
+              await updateWeddingDate(date, time);
+            }}
             actionLabel="D-day 설정하기"
           />
         )}
 
         {/* Progress */}
         {!loading && items.length > 0 && <ChecklistProgress stats={stats} />}
+
+        {/* [AGENT-TEAM-9-20260307] P2 AI 일정 최적화 버튼 */}
+        {!loading && hasWeddingDate && items.length > 0 && (
+          <button
+            onClick={() => {
+              const completedItems = items.filter(i => i.completed).map(i => i.title);
+              const weddingDate = items[0]?.wedding_date;
+              if (weddingDate) {
+                optimizeTimeline(weddingDate, completedItems);
+                setTimelineOpen(true);
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-sm font-medium hover:from-blue-100 hover:to-indigo-100 transition-all active:scale-[0.98]"
+          >
+            <Sparkles className="w-4 h-4" />
+            AI 일정 최적화
+          </button>
+        )}
 
         {/* Add custom item form */}
         {showAddForm && (
@@ -254,6 +283,15 @@ export default function Checklist() {
         categoryLink={budgetLinkCategory}
         subCategoryLink={budgetLinkSubCategory}
         onSaveAmount={handleSaveAmount}
+      />
+
+      {/* [AGENT-TEAM-9-20260307] P2 일정 최적화 패널 */}
+      <TimelinePanel
+        open={timelineOpen}
+        onOpenChange={setTimelineOpen}
+        result={timelineResult}
+        loading={timelineLoading}
+        error={timelineError}
       />
     </div>
   );

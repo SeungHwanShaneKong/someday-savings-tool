@@ -1,12 +1,14 @@
 // crawl-wedding-data: Main crawler for wedding cost data (BRD §5)
-// Triggered by pg_cron (every 3 days) or manual admin call
+// Triggered by GitHub Actions cron (3x/day) or manual admin call
+// [ZERO-COST-PIPELINE-2026-03-07] robots.txt 준수, PII 마스킹, raw 저장, URL 중복제거 추가
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
-import { safeFetch, extractTextFromHtml, chunkText, contentHash } from '../_shared/anti-block.ts';
+import { safeFetch, extractTextFromHtml, chunkText, contentHash, checkRobotsTxt, urlHash } from '../_shared/anti-block.ts';
 import { filterOutliers, filterByCategory } from '../_shared/outlier-filter.ts';
 import { processContent, calculateFreshnessScore } from '../_shared/embedding-pipeline.ts';
+import { maskPII } from '../_shared/pii-masker.ts';
 
 const openai = new OpenAI({
   apiKey: Deno.env.get('OPENAI_API_KEY')!,
@@ -113,6 +115,17 @@ serve(async (req) => {
 
         console.log(`Crawling source: ${source.name} (${source.url_pattern})`);
 
+        // [ZERO-COST-PIPELINE-2026-03-07] robots.txt 준수 체크
+        const robotsAllowed = await checkRobotsTxt(source.url_pattern);
+        if (!robotsAllowed) {
+          console.log(`Skipping ${source.name}: blocked by robots.txt`);
+          errors.push(`${source.name}: blocked by robots.txt`);
+          continue;
+        }
+
+        // [ZERO-COST-PIPELINE-2026-03-07] URL 기반 중복제거
+        const sourceUrlHash = await urlHash(source.url_pattern);
+
         // 3. Fetch page with anti-block measures
         const delayConfig = source.config?.delay_ms
           ? { min: source.config.delay_ms, max: source.config.delay_ms * 2 }
@@ -129,6 +142,22 @@ serve(async (req) => {
         }
 
         const html = await response.text();
+
+        // [ZERO-COST-PIPELINE-2026-03-07] raw HTML을 Supabase Storage에 보관
+        try {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const storagePath = `${source.name.replace(/\s+/g, '_')}/${timestamp}.html`;
+          await supabase.storage
+            .from('raw-crawl-data')
+            .upload(storagePath, html, {
+              contentType: 'text/html',
+              upsert: false,
+            });
+        } catch (storageErr: unknown) {
+          // Storage 미설정 시 무시 (핵심 기능이 아님)
+          console.warn('Raw storage save skipped:', storageErr);
+        }
+
         const text = extractTextFromHtml(html);
 
         if (text.length < 100) {
@@ -136,14 +165,19 @@ serve(async (req) => {
           continue;
         }
 
+        // [ZERO-COST-PIPELINE-2026-03-07] PII 마스킹 적용
+        const cleanText = maskPII(text);
+        const crawledAt = new Date().toISOString();
+
         // 4. Process and embed content
         const records = await processContent(openai, [
           {
-            content: text,
+            content: cleanText,
             metadata: {
               source: source.name,
               url: source.url_pattern,
-              crawled_at: new Date().toISOString(),
+              crawled_at: crawledAt,
+              url_hash: sourceUrlHash,
               category: 'wedding_cost',
             },
             source_type: 'platform_crawl',

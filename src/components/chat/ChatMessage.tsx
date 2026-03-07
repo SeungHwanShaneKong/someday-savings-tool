@@ -1,6 +1,14 @@
+// [ZERO-COST-PIPELINE-2026-03-07] FreshnessBadge + ComparisonTable 통합
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType } from '@/hooks/useAIChat';
-import { formatInlineCitation, getConfidenceLevel, getConfidenceLabel } from '@/lib/rag-sources';
+import {
+  formatInlineCitation,
+  getConfidenceLevel,
+  getConfidenceLabel,
+  formatFreshnessLabel,
+} from '@/lib/rag-sources';
+import { FreshnessBadge } from './FreshnessBadge';
+import { ComparisonTable, containsMarkdownTable } from './ComparisonTable';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -32,13 +40,39 @@ export function ChatMessage({ message }: ChatMessageProps) {
               : 'bg-muted/50 text-foreground rounded-bl-md'
           )}
         >
-          {/* Parse markdown-like content */}
-          {message.content.split('\n').map((line, i) => (
-            <p key={i} className={cn(i > 0 && 'mt-1.5')}>
-              {line || '\u00A0'}
-            </p>
-          ))}
+          {/* [ZERO-COST-PIPELINE-2026-03-07] 마크다운 테이블 감지 → ComparisonTable */}
+          {!isUser && containsMarkdownTable(message.content) ? (
+            <>
+              {/* 테이블 이전 텍스트 렌더링 */}
+              {message.content
+                .split('\n')
+                .filter((line) => {
+                  const t = line.trim();
+                  return !(t.startsWith('|') && t.endsWith('|'));
+                })
+                .map((line, i) => (
+                  <p key={i} className={cn(i > 0 && 'mt-1.5')}>
+                    {line || '\u00A0'}
+                  </p>
+                ))}
+              <ComparisonTable markdown={message.content} />
+            </>
+          ) : (
+            /* 기존 텍스트 렌더링 */
+            message.content.split('\n').map((line, i) => (
+              <p key={i} className={cn(i > 0 && 'mt-1.5')}>
+                {line || '\u00A0'}
+              </p>
+            ))
+          )}
         </div>
+
+        {/* [ZERO-COST-PIPELINE-2026-03-07] 신선도 배지 */}
+        {!isUser && message.freshnessInfo && (
+          <div className="mt-1 px-2">
+            <FreshnessBadge freshnessInfo={message.freshnessInfo} />
+          </div>
+        )}
 
         {/* RAG Citations block */}
         {hasCitations && (
@@ -55,7 +89,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   className="text-[10px] text-muted-foreground/70 flex items-start gap-1"
                 >
                   <span className="text-muted-foreground/50 mt-px">📎</span>
-                  <span>{formatInlineCitation(citation)}</span>
+                  <span>
+                    {formatInlineCitation(citation)}
+                    {/* [ZERO-COST-PIPELINE-2026-03-07] 수집 시각 표시 */}
+                    {citation.crawled_at && (
+                      <span className="ml-1 opacity-60">
+                        · {formatFreshnessLabel(citation.crawled_at)}
+                      </span>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>

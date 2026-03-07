@@ -1,5 +1,6 @@
 // Anti-block utilities for web crawling (BRD §5.2)
-// User-Agent rotation, request delays, and proxy support
+// User-Agent rotation, request delays, proxy support, and robots.txt compliance
+// [ZERO-COST-PIPELINE-2026-03-07] robots.txt 체크 + 광고 제거 강화 추가
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -77,13 +78,18 @@ export async function safeFetch(
 
 /**
  * Extract text content from HTML (simple parser for Deno)
- * Strips tags and normalizes whitespace
+ * Strips tags, removes ad/noise elements, and normalizes whitespace
+ * [ZERO-COST-PIPELINE-2026-03-07] 광고/노이즈 제거 패턴 강화
  */
 export function extractTextFromHtml(html: string): string {
   return html
     // Remove script and style blocks
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
+    // [ZERO-COST-PIPELINE-2026-03-07] 광고/노이즈 요소 제거
+    .replace(/<(div|section|aside|nav|footer|header)[^>]*(class|id)\s*=\s*["'][^"']*(ad[-_]?|ads[-_]?|banner|sidebar|popup|modal|cookie|gdpr|newsletter|promo|sponsor|social[-_]share|comment[-_]section)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
     // Remove HTML tags
     .replace(/<[^>]+>/g, ' ')
     // Decode common HTML entities
@@ -142,4 +148,136 @@ export async function contentHash(text: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ──────────────────────────────────────────────────────────────
+// [ZERO-COST-PIPELINE-2026-03-07] robots.txt compliance
+// ──────────────────────────────────────────────────────────────
+
+/** robots.txt 캐시 (도메인 → { disallowPaths, fetchedAt }) */
+const robotsTxtCache = new Map<
+  string,
+  { disallowPaths: string[]; fetchedAt: number }
+>();
+const ROBOTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5분
+
+/**
+ * Extract base URL (scheme + host) from a full URL
+ */
+function getBaseUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Parse robots.txt content and return Disallow paths for '*' or 'WeddingSemBot'
+ */
+function parseRobotsTxt(content: string): string[] {
+  const lines = content.split('\n');
+  const disallowPaths: string[] = [];
+  let inRelevantBlock = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const lower = line.toLowerCase();
+
+    if (lower.startsWith('user-agent:')) {
+      const agent = lower.replace('user-agent:', '').trim();
+      inRelevantBlock = agent === '*' || agent.includes('weddingsem');
+    } else if (lower.startsWith('disallow:') && inRelevantBlock) {
+      const path = line.replace(/^disallow:\s*/i, '').trim();
+      if (path) {
+        disallowPaths.push(path);
+      }
+    }
+  }
+
+  return disallowPaths;
+}
+
+/**
+ * Check robots.txt for a given URL and determine if crawling is allowed.
+ * Caches results for 5 minutes per domain.
+ *
+ * @returns true if crawling is allowed, false if blocked by robots.txt
+ */
+export async function checkRobotsTxt(url: string): Promise<boolean> {
+  const baseUrl = getBaseUrl(url);
+  if (!baseUrl) return true; // Invalid URL → allow (will fail at fetch anyway)
+
+  // Check cache
+  const cached = robotsTxtCache.get(baseUrl);
+  if (cached && Date.now() - cached.fetchedAt < ROBOTS_CACHE_TTL_MS) {
+    return isPathAllowed(url, cached.disallowPaths);
+  }
+
+  // Fetch robots.txt
+  try {
+    const robotsUrl = `${baseUrl}/robots.txt`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const resp = await fetch(robotsUrl, {
+      headers: { 'User-Agent': 'WeddingSemBot/1.0' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      // No robots.txt or error → allow crawling
+      robotsTxtCache.set(baseUrl, { disallowPaths: [], fetchedAt: Date.now() });
+      return true;
+    }
+
+    const text = await resp.text();
+    const disallowPaths = parseRobotsTxt(text);
+    robotsTxtCache.set(baseUrl, { disallowPaths, fetchedAt: Date.now() });
+
+    return isPathAllowed(url, disallowPaths);
+  } catch {
+    // Network error → allow crawling (be permissive)
+    robotsTxtCache.set(baseUrl, { disallowPaths: [], fetchedAt: Date.now() });
+    return true;
+  }
+}
+
+/**
+ * Check if a specific URL path is allowed given Disallow rules
+ */
+function isPathAllowed(url: string, disallowPaths: string[]): boolean {
+  try {
+    const u = new URL(url);
+    const path = u.pathname;
+
+    for (const disallow of disallowPaths) {
+      if (disallow === '/') return false; // Entire site blocked
+      if (path.startsWith(disallow)) return false;
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Generate a URL-based hash for deduplication
+ * [ZERO-COST-PIPELINE-2026-03-07] URL 기반 중복제거용
+ */
+export async function urlHash(url: string): Promise<string> {
+  // Normalize URL: remove trailing slash, fragment, and sort query params
+  try {
+    const u = new URL(url);
+    u.hash = '';
+    const normalized = u.toString().replace(/\/+$/, '');
+    return contentHash(normalized);
+  } catch {
+    return contentHash(url);
+  }
 }

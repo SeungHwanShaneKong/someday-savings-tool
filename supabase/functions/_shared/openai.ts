@@ -10,7 +10,8 @@ export const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
-export const DEFAULT_MODEL = 'gpt-4.1-mini';
+// [AGENT-TEAM-9-20260307] GPT-5-mini 업그레이드
+export const DEFAULT_MODEL = 'gpt-5-mini';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';

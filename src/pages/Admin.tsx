@@ -25,6 +25,18 @@ import {
 } from '@/lib/kpi-definitions';
 import type { SummaryKPIs } from '@/hooks/useAdminKPI';
 import { ImpactMetrics } from '@/components/admin/ImpactMetrics';
+// [ADMIN-RAG-MONITOR-2026-03-07] RAG 모니터링 통합
+import { useAdminRAGStats } from '@/hooks/useAdminRAGStats';
+import { RAGMonitor } from '@/components/admin/RAGMonitor';
+// [AGENT-TEAM-9-20260307] 4개 신규 에이전트 Admin 통합
+import { usePerformanceSentinel } from '@/hooks/usePerformanceSentinel';
+import { useDataQualityGuardian } from '@/hooks/useDataQualityGuardian';
+import { useEmbeddingTuner } from '@/hooks/useEmbeddingTuner';
+import { useSEOAmplifier } from '@/hooks/useSEOAmplifier';
+import { PerformancePanel } from '@/components/admin/PerformancePanel';
+import { DataQualityPanel } from '@/components/admin/DataQualityPanel';
+import { EmbeddingTunerPanel } from '@/components/admin/EmbeddingTunerPanel';
+import { SEOAmplifierPanel } from '@/components/admin/SEOAmplifierPanel';
 
 // ========= 기간 프리셋 =========
 const PERIOD_OPTIONS = [
@@ -59,6 +71,14 @@ export default function Admin() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, loading: dataLoading, fetchData } = useAdminKPI();
+  // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계 hook
+  const { ragStats, loading: ragLoading, fetchRAGStats } = useAdminRAGStats();
+
+  // [AGENT-TEAM-9-20260307] 4개 신규 에이전트 hooks
+  const { metrics: perfMetrics, loading: perfLoading, error: perfError, fetchMetrics } = usePerformanceSentinel();
+  const { result: dqResult, loading: dqLoading, error: dqError, runScan } = useDataQualityGuardian();
+  const { result: etResult, loading: etLoading, error: etError, analyze: analyzeEmbeddings } = useEmbeddingTuner();
+  const { content: seoContent, loading: seoLoading, error: seoError, generate: generateSEO } = useSEOAmplifier();
 
   const [period, setPeriod] = useState('30');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -75,9 +95,15 @@ export default function Admin() {
   }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
   // Fetch + record timestamp
+  // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계도 병렬 fetch
+  // [AGENT-TEAM-9-20260307] 성능 감시 자동 fetch 추가
   const doFetch = useCallback(() => {
-    fetchData(startDate, endDate).then(() => setLastUpdated(new Date()));
-  }, [fetchData, startDate, endDate]);
+    Promise.all([
+      fetchData(startDate, endDate),
+      fetchRAGStats(),
+      fetchMetrics(),
+    ]).then(() => setLastUpdated(new Date()));
+  }, [fetchData, startDate, endDate, fetchRAGStats, fetchMetrics]);
 
   useEffect(() => {
     if (isAdmin) doFetch();
@@ -345,6 +371,41 @@ export default function Admin() {
 
           {/* ===== 경제적 파급 효과 (Phase 4-A, BRD §7) ===== */}
           <ImpactMetrics impact={impactSummary} loading={dataLoading} />
+
+          {/* ===== AI Q&A 파이프라인 모니터링 [ADMIN-RAG-MONITOR-2026-03-07] ===== */}
+          <RAGMonitor stats={ragStats} loading={ragLoading} />
+
+          {/* ===== [AGENT-TEAM-9-20260307] E3 성능 감시 ===== */}
+          <PerformancePanel
+            metrics={perfMetrics}
+            loading={perfLoading}
+            error={perfError}
+            onRefresh={fetchMetrics}
+          />
+
+          {/* ===== [AGENT-TEAM-9-20260307] E1 데이터 품질 감시 ===== */}
+          <DataQualityPanel
+            result={dqResult}
+            loading={dqLoading}
+            error={dqError}
+            onScan={runScan}
+          />
+
+          {/* ===== [AGENT-TEAM-9-20260307] E2 임베딩 커버리지 분석 ===== */}
+          <EmbeddingTunerPanel
+            result={etResult}
+            loading={etLoading}
+            error={etError}
+            onAnalyze={analyzeEmbeddings}
+          />
+
+          {/* ===== [AGENT-TEAM-9-20260307] M2 SEO 콘텐츠 생성 ===== */}
+          <SEOAmplifierPanel
+            content={seoContent}
+            loading={seoLoading}
+            error={seoError}
+            onGenerate={generateSEO}
+          />
 
           <section>
             <h2 className="text-base sm:text-lg font-bold mb-4 leading-relaxed">📊 18개 핵심 운영 지표</h2>

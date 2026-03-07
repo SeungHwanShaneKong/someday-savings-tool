@@ -1,5 +1,5 @@
 // [HONEYMOON-UPGRADE-2026-03-07] 새 컴포넌트 통합
-import { useRef, useMemo } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { ArrowLeft, MapIcon, MapPin, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,9 @@ import { ItineraryPanel } from '@/components/honeymoon/ItineraryPanel';
 import { ItineraryCostCalculator } from '@/components/honeymoon/ItineraryCostCalculator';
 import { ItineraryExport } from '@/components/honeymoon/ItineraryExport';
 import { useSEO } from '@/hooks/useSEO';
+// [AGENT-TEAM-9-20260307] P3 신혼여행 기획 에이전트
+import { useHoneymoonPlanner } from '@/hooks/useHoneymoonPlanner';
+import { HoneymoonPlannerPanel } from '@/components/planning/HoneymoonPlannerPanel';
 
 export default function Honeymoon() {
   const navigate = useNavigate();
@@ -46,6 +49,10 @@ export default function Honeymoon() {
     flyTo,
     resetView,
   } = useHoneymoonMap();
+
+  // [AGENT-TEAM-9-20260307] P3 신혼여행 기획 에이전트
+  const { plan: honeymoonPlan, loading: plannerLoading, error: plannerError, planTrip } = useHoneymoonPlanner();
+  const [plannerOpen, setPlannerOpen] = useState(false);
 
   // [HONEYMOON-UPGRADE-2026-03-07] 캡처용 ref + 스코어 맵
   const captureRef = useRef<HTMLDivElement>(null);
@@ -121,6 +128,18 @@ export default function Honeymoon() {
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-24">
+            {/* [AGENT-TEAM-9-20260307] P3 AI 여행 플래너 버튼 */}
+            <button
+              onClick={() => {
+                planTrip(5000000, 7, ['동남아', '유럽'], '휴양');
+                setPlannerOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-sm font-medium hover:from-emerald-100 hover:to-teal-100 transition-all active:scale-[0.98]"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI 여행 플래너
+            </button>
+
             <div className="animate-fade-up" style={{ animationDelay: '0.05s' }}>
               <FilterSliders
                 filters={filters}
@@ -232,6 +251,18 @@ export default function Honeymoon() {
 
           {/* Right Panel: Recommendation + Itinerary + Comparison (40%) */}
           <div className="w-[40%] flex flex-col p-4 pl-0 gap-4 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
+            {/* [AGENT-TEAM-9-20260307] P3 AI 여행 플래너 버튼 (desktop) */}
+            <button
+              onClick={() => {
+                planTrip(5000000, 7, ['동남아', '유럽'], '휴양');
+                setPlannerOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-sm font-medium hover:from-emerald-100 hover:to-teal-100 transition-all active:scale-[0.98]"
+            >
+              <Sparkles className="w-4 h-4" />
+              AI 여행 플래너
+            </button>
+
             {/* Recommendation Panel */}
             <div className="animate-fade-up" style={{ animationDelay: '0.05s' }}>
               <RecommendationPanel
@@ -284,6 +315,15 @@ export default function Honeymoon() {
           </div>
         </div>
       )}
+
+      {/* [AGENT-TEAM-9-20260307] P3 신혼여행 기획 패널 */}
+      <HoneymoonPlannerPanel
+        plan={honeymoonPlan}
+        loading={plannerLoading}
+        error={plannerError}
+        open={plannerOpen}
+        onOpenChange={setPlannerOpen}
+      />
     </div>
   );
 }

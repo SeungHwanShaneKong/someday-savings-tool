@@ -50,7 +50,8 @@ interface PraiseEvent {
 
 export function useChecklist() {
   const { user } = useAuth();
-  const { weddingDate } = useWeddingDate();
+  // [DDAY-INLINE-PICKER-2026-03-07] updateWeddingDate 노출하여 체크리스트 페이지에서 직접 D-day 설정 가능
+  const { weddingDate, updateWeddingDate } = useWeddingDate();
   const { toast } = useToast();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -422,6 +423,7 @@ export function useChecklist() {
     addCustomItem,
     deleteItem,
     updateNotes,
+    updateWeddingDate, // [DDAY-INLINE-PICKER-2026-03-07] 체크리스트 페이지에서 직접 D-day 설정
     refetch: fetchItems,
     generateFromTemplates,
     hasWeddingDate: !!weddingDate,

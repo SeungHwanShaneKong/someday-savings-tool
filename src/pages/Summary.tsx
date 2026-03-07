@@ -34,6 +34,13 @@ import { downloadImage } from '@/lib/download-image';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
 import { CHART_COLORS, COST_SPLIT_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/chart-colors';
+// [AGENT-TEAM-9-20260307] P1 협상 코치 에이전트
+import { useNegotiateCoach } from '@/hooks/useNegotiateCoach';
+import { NegotiationTips } from '@/components/planning/NegotiationTips';
+// [AGENT-TEAM-9-20260307] M1 공유 이미지 생성 에이전트
+import { useShareImageGen } from '@/hooks/useShareImageGen';
+import ShareCardPreview from '@/components/marketing/ShareCardPreview';
+import { Sparkles, Image as ImageIcon } from 'lucide-react';
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -56,6 +63,13 @@ export default function Summary() {
   } = useMultipleBudgets();
   const { toast } = useToast();
   const summaryRef = useRef<HTMLDivElement>(null);
+  // [AGENT-TEAM-9-20260307] P1 협상 코치 에이전트
+  const { result: negotiateResult, loading: negotiateLoading, error: negotiateError, askCoach } = useNegotiateCoach();
+  const [negotiateOpen, setNegotiateOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  // [AGENT-TEAM-9-20260307] M1 공유 이미지 생성 에이전트
+  const { result: shareCardResult, loading: shareCardLoading, error: shareCardError, generate: generateShareCard } = useShareImageGen();
+
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
@@ -533,17 +547,26 @@ export default function Summary() {
                   const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
                   
                   return (
-                    <div 
+                    <div
                       key={category.id}
-                      className="flex items-center justify-between p-3 bg-secondary rounded-xl"
+                      className="flex items-center justify-between p-3 bg-secondary rounded-xl cursor-pointer hover:bg-secondary/80 transition-colors group"
+                      onClick={() => {
+                        setSelectedCategory(category.name);
+                        askCoach(category.name, categoryTotal);
+                        setNegotiateOpen(true);
+                      }}
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-xl">{category.icon}</span>
                         <span className="text-body font-medium">{category.name}</span>
                       </div>
-                      <div className="text-right">
-                        <span className="text-body font-semibold">{formatKoreanWon(categoryTotal)}</span>
-                        <span className="text-caption text-muted-foreground ml-2">({percentage}%)</span>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <span className="text-body font-semibold">{formatKoreanWon(categoryTotal)}</span>
+                          <span className="text-caption text-muted-foreground ml-2">({percentage}%)</span>
+                        </div>
+                        {/* [AGENT-TEAM-9-20260307] P1 협상 팁 아이콘 */}
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
                   );
@@ -581,7 +604,7 @@ export default function Summary() {
               </>
             )}
           </Button>
-          
+
           <Button
             onClick={handleGenerateShareLink}
             disabled={isGeneratingShare}
@@ -591,7 +614,40 @@ export default function Summary() {
             {isGeneratingShare ? '생성 중...' : '링크 공유'}
           </Button>
         </div>
+
+        {/* [AGENT-TEAM-9-20260307] M1 공유 카드 만들기 버튼 + 프리뷰 */}
+        <div className="mt-4 space-y-4">
+          <Button
+            onClick={() => {
+              const cats = BUDGET_CATEGORIES
+                .map(c => ({ name: c.name, amount: getCategoryTotal(c.id, items) }))
+                .filter(c => c.amount > 0);
+              generateShareCard(total, cats);
+            }}
+            variant="outline"
+            className="w-full h-12 text-body font-medium rounded-xl gap-2 border-pink-200 text-pink-700 hover:bg-pink-50"
+            disabled={shareCardLoading}
+          >
+            <ImageIcon className="h-5 w-5" />
+            {shareCardLoading ? '카드 생성 중...' : '공유 카드 만들기'}
+          </Button>
+          <ShareCardPreview
+            result={shareCardResult}
+            loading={shareCardLoading}
+            error={shareCardError}
+          />
+        </div>
       </main>
+
+      {/* [AGENT-TEAM-9-20260307] P1 협상 코치 Sheet */}
+      <NegotiationTips
+        open={negotiateOpen}
+        category={selectedCategory}
+        result={negotiateResult}
+        loading={negotiateLoading}
+        error={negotiateError}
+        onClose={() => setNegotiateOpen(false)}
+      />
 
       {/* Share dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>

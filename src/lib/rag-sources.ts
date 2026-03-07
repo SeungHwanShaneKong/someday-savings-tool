@@ -1,4 +1,5 @@
 // RAG source citation formatting utility
+// [ZERO-COST-PIPELINE-2026-03-07] 신선도(freshness) 필드 + 포맷터 추가
 
 export interface Citation {
   source: string;
@@ -7,7 +8,20 @@ export interface Citation {
   date?: string;
   url?: string;
   similarity: number;
+  // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보
+  crawled_at?: string;
+  freshness_score?: number;
 }
+
+/** [ZERO-COST-PIPELINE-2026-03-07] RAG 응답의 신선도 메타 정보 */
+export interface FreshnessInfo {
+  latest_source_time: string | null;
+  freshness_label: string;
+  avg_freshness_score: number;
+}
+
+/** 신선도 레벨: 시간 기반 */
+export type FreshnessLevel = 'realtime' | 'today' | 'recent' | 'stale';
 
 /**
  * Format citations into a readable Korean string
@@ -90,4 +104,66 @@ function formatDate(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+// ──────────────────────────────────────────────────────────────
+// [ZERO-COST-PIPELINE-2026-03-07] 신선도 관련 유틸리티
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * 신선도 레벨 계산 (crawled_at 기반)
+ */
+export function getFreshnessLevel(crawledAt?: string): FreshnessLevel {
+  if (!crawledAt) return 'stale';
+
+  try {
+    const date = new Date(crawledAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    if (diffHours <= 1) return 'realtime';
+    if (diffHours <= 24) return 'today';
+    if (diffHours <= 168) return 'recent'; // 7일
+    return 'stale';
+  } catch {
+    return 'stale';
+  }
+}
+
+/**
+ * 신선도 라벨 포맷 (한국어 상대 시간)
+ */
+export function formatFreshnessLabel(crawledAt?: string): string {
+  if (!crawledAt) return '';
+
+  try {
+    const date = new Date(crawledAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+    if (diffMinutes < 60) return `방금 전(${timeStr}) 업데이트된 정보`;
+    if (diffHours < 24) return `오늘 ${timeStr} 업데이트된 정보`;
+    if (diffDays === 1) return `어제 업데이트된 정보`;
+    if (diffDays < 7) return `${diffDays}일 전 업데이트된 정보`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전 업데이트된 정보`;
+    return `${Math.floor(diffDays / 30)}개월 전 업데이트된 정보`;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * FreshnessInfo에서 최적 라벨 추출
+ */
+export function getFreshnessInfoLabel(info?: FreshnessInfo | null): string {
+  if (!info) return '';
+  if (info.freshness_label) return info.freshness_label;
+  if (info.latest_source_time) return formatFreshnessLabel(info.latest_source_time);
+  return '';
 }

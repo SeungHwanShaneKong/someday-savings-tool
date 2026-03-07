@@ -1,4 +1,5 @@
-// rag-query: Vector search → top-5 → GPT-5-mini response with citations
+// rag-query: Vector search → top-5 → GPT-4.1-mini response with citations
+// [ZERO-COST-PIPELINE-2026-03-07] freshness_info 응답 추가
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
@@ -26,6 +27,9 @@ interface Citation {
   date?: string;
   url?: string;
   similarity: number;
+  // [ZERO-COST-PIPELINE-2026-03-07] 신선도 필드 추가
+  crawled_at?: string;
+  freshness_score?: number;
 }
 
 serve(async (req) => {
@@ -116,6 +120,9 @@ serve(async (req) => {
       date: m.metadata?.date || undefined,
       url: m.metadata?.url || undefined,
       similarity: m.similarity,
+      // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 추가
+      crawled_at: m.metadata?.crawled_at || undefined,
+      freshness_score: m.freshness_score || undefined,
     }));
 
     // Step 4: Build system prompt with RAG context
@@ -134,6 +141,9 @@ serve(async (req) => {
 
     const reply = completion.choices[0]?.message?.content || '응답을 생성하지 못했습니다.';
 
+    // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 계산
+    const freshnessInfo = buildFreshnessInfo(citations);
+
     return new Response(
       JSON.stringify({
         reply,
@@ -141,6 +151,7 @@ serve(async (req) => {
         sources_count: citations.length,
         model: DEFAULT_MODEL,
         rag_used: citations.length > 0,
+        freshness_info: freshnessInfo,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -183,4 +194,73 @@ ${ragContext}
 
 현재 검색된 관련 데이터가 없습니다. 일반적인 한국 결혼 준비 지식을 기반으로 답변해주세요.
 정확한 가격이나 통계가 필요한 질문은 "최신 데이터 확인이 필요합니다"라고 안내해주세요.`;
+}
+
+// [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 빌드
+interface FreshnessInfo {
+  latest_source_time: string | null;
+  freshness_label: string;
+  avg_freshness_score: number;
+}
+
+function buildFreshnessInfo(citations: Citation[]): FreshnessInfo | null {
+  if (!citations || citations.length === 0) return null;
+
+  // 가장 최근 crawled_at 찾기
+  const crawledDates = citations
+    .map((c) => c.crawled_at)
+    .filter((d): d is string => !!d)
+    .map((d) => new Date(d))
+    .filter((d) => !isNaN(d.getTime()));
+
+  const latestTime = crawledDates.length > 0
+    ? new Date(Math.max(...crawledDates.map((d) => d.getTime())))
+    : null;
+
+  // 평균 freshness_score
+  const scores = citations
+    .map((c) => c.freshness_score)
+    .filter((s): s is number => s !== undefined && s !== null);
+  const avgScore = scores.length > 0
+    ? scores.reduce((a, b) => a + b, 0) / scores.length
+    : 0;
+
+  // 신선도 라벨 생성
+  const label = latestTime
+    ? formatFreshnessLabel(latestTime)
+    : '데이터 수집 시각 미확인';
+
+  return {
+    latest_source_time: latestTime ? latestTime.toISOString() : null,
+    freshness_label: label,
+    avg_freshness_score: Math.round(avgScore * 100) / 100,
+  };
+}
+
+function formatFreshnessLabel(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // 시간 포맷 (HH:MM)
+  const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+  if (diffMinutes < 60) {
+    return `방금 전(${timeStr}) 업데이트된 정보`;
+  }
+  if (diffHours < 24) {
+    return `오늘 ${timeStr} 업데이트된 정보`;
+  }
+  if (diffDays === 1) {
+    return `어제 ${timeStr} 업데이트된 정보`;
+  }
+  if (diffDays < 7) {
+    return `${diffDays}일 전 업데이트된 정보`;
+  }
+  if (diffDays < 30) {
+    return `${Math.floor(diffDays / 7)}주 전 업데이트된 정보`;
+  }
+  return `${Math.floor(diffDays / 30)}개월 전 업데이트된 정보`;
 }

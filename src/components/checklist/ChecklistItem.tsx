@@ -240,4 +240,4 @@ export const ChecklistItem = forwardRef<HTMLDivElement, ChecklistItemProps>(func
       )}
     </div>
   );
-}
+});

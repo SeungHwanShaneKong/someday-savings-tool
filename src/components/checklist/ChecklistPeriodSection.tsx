@@ -138,4 +138,4 @@ export const ChecklistPeriodSection = forwardRef<HTMLDivElement, ChecklistPeriod
       </div>
     </Collapsible>
   );
-}
+});

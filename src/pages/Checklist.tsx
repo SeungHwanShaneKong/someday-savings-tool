@@ -155,8 +155,8 @@ export default function Checklist() {
         {!loading && hasWeddingDate && items.length > 0 && (
           <button
             onClick={() => {
-              const completedItems = items.filter(i => i.completed).map(i => i.title);
-              const weddingDate = items[0]?.wedding_date;
+              const completedItems = items.filter(i => i.is_completed).map(i => i.title);
+              const weddingDate = items[0]?.due_date;
               if (weddingDate) {
                 optimizeTimeline(weddingDate, completedItems);
                 setTimelineOpen(true);

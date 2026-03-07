@@ -23,15 +23,15 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
+        // [VITE-CHUNK-FIX-20260308-143200] vendor-core 병합 — Lovable 빌드에서 vendor-core가
+        // orphan chunk로 빠지며 react-router-dom 미로드 → 빈 화면 이슈 수정.
+        // react, react-dom, react-router-dom을 vendor-ui에 통합하여 항상 import되도록 보장.
         manualChunks: {
-          // Core vendor chunk (React, React-DOM, Router)
-          'vendor-core': [
+          // UI + Core vendor chunk (React + React-DOM + Router + Radix + Lucide)
+          'vendor-ui': [
             'react',
             'react-dom',
             'react-router-dom',
-          ],
-          // UI library chunk (Radix + Lucide)
-          'vendor-ui': [
             '@radix-ui/react-accordion',
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',

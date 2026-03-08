@@ -427,5 +427,6 @@ export function useChecklist() {
     refetch: fetchItems,
     generateFromTemplates,
     hasWeddingDate: !!weddingDate,
+    weddingDate, // [CL-TIMELINE-FIX-20260308-203000] AI 일정 최적화에 실제 결혼 날짜 전달
   };
 }

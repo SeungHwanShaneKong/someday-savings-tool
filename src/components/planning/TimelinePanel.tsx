@@ -1,5 +1,6 @@
 // [AGENT-TEAM-9-20260307]
-import React, { useState } from 'react';
+// [CL-AI-LOADING-MSG-20260308-201500] skeleton → AI 로딩 메시지
+import React, { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -10,12 +11,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { TimelineResult, TimelineMonth, TimelineTask } from '@/hooks/useTimelineOptimizer';
 
+// [CL-TIMELINE-FIX-20260308-203000] onRetry 콜백 추가
 interface TimelinePanelProps {
   result: TimelineResult | null;
   loading: boolean;
   error: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRetry?: () => void;
 }
 
 const PRIORITY_STYLES: Record<TimelineTask['priority'], { label: string; className: string }> = {
@@ -36,24 +39,89 @@ function formatDeadline(deadline: string): string {
   return `${month}/${day}까지`;
 }
 
-/* ── Skeleton placeholder while loading ── */
+/* ── [CL-AI-LOADING-MSG-20260308-201500] AI 로딩 메시지 ── */
+const AI_LOADING_MESSAGES = [
+  { text: 'AI가 최적의 일정을 산출하고 있습니다', icon: '🤖' },
+  { text: '결혼 준비 일정을 분석 중이에요', icon: '📊' },
+  { text: '맞춤 타임라인을 생성하고 있어요', icon: '✨' },
+  { text: '중요도에 따라 우선순위를 정하는 중', icon: '📋' },
+  { text: '최적의 일정 배치를 계산하고 있어요', icon: '🧮' },
+];
+
 function LoadingSkeleton() {
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [dots, setDots] = useState('');
+
+  // 3초마다 메시지 순환
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % AI_LOADING_MESSAGES.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 점(.) 애니메이션 — 0.5초마다
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const current = AI_LOADING_MESSAGES[msgIndex];
+
   return (
-    <div className="space-y-4 mt-4">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="space-y-2">
-          <div className="h-5 w-32 rounded bg-blue-100 animate-pulse" />
-          <div className="space-y-2">
-            {[1, 2].map((j) => (
-              <div key={j} className="rounded-lg border p-4 space-y-2">
-                <div className="h-4 w-3/4 rounded bg-blue-50 animate-pulse" />
-                <div className="h-3 w-1/2 rounded bg-blue-50 animate-pulse" />
-                <div className="h-3 w-2/3 rounded bg-blue-50 animate-pulse" />
-              </div>
-            ))}
-          </div>
+    <div className="mt-4 space-y-5">
+      {/* AI 로딩 메시지 영역 */}
+      <div className="rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 border border-blue-100 p-5 text-center">
+        {/* 아이콘 펄스 */}
+        <div className="relative mx-auto w-14 h-14 mb-4 flex items-center justify-center">
+          <span className="absolute inset-0 rounded-full bg-blue-200/40 animate-ping" />
+          <span className="relative text-3xl animate-bounce" style={{ animationDuration: '2s' }}>
+            {current.icon}
+          </span>
         </div>
-      ))}
+
+        {/* 메시지 + 타이핑 dots */}
+        <p className="text-sm font-semibold text-blue-800 transition-all duration-500">
+          {current.text}{dots}
+        </p>
+        <p className="text-xs text-blue-500/80 mt-1.5">
+          잠시만 기다려 주세요
+        </p>
+
+        {/* 프로그레스 바 */}
+        <div className="mt-4 mx-auto max-w-[200px] h-1.5 rounded-full bg-blue-100 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-500"
+            style={{
+              animation: 'loadingProgress 3s ease-in-out infinite',
+            }}
+          />
+        </div>
+      </div>
+
+      {/* 스켈레톤 — 콘텐츠 프리뷰 힌트 */}
+      <div className="space-y-3 opacity-40">
+        {[1, 2].map((i) => (
+          <div key={i} className="space-y-2">
+            <div className="h-4 w-28 rounded bg-blue-100 animate-pulse" />
+            <div className="rounded-lg border border-blue-50 p-3 space-y-1.5">
+              <div className="h-3.5 w-3/4 rounded bg-blue-50 animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-blue-50 animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* keyframes 인라인 스타일 */}
+      <style>{`
+        @keyframes loadingProgress {
+          0%   { width: 5%; }
+          50%  { width: 80%; }
+          100% { width: 5%; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -110,12 +178,14 @@ function MonthSection({ monthData }: { monthData: TimelineMonth }) {
 }
 
 /* ── Main Panel ── */
+// [CL-TIMELINE-FIX-20260308-203000] onRetry 추가
 export default function TimelinePanel({
   result,
   loading,
   error,
   open,
   onOpenChange,
+  onRetry,
 }: TimelinePanelProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -137,11 +207,21 @@ export default function TimelinePanel({
           {/* Loading state */}
           {loading && <LoadingSkeleton />}
 
-          {/* Error state */}
+          {/* [CL-TIMELINE-FIX-20260308-203000] Error state + 재시도 버튼 */}
           {error && !loading && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              <p className="font-medium mb-1">오류 발생</p>
-              <p>{error}</p>
+            <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-center">
+              <div className="text-3xl mb-3">😥</div>
+              <p className="text-sm font-semibold text-red-800 mb-1">오류가 발생했어요</p>
+              <p className="text-xs text-red-600/80 mb-4">{error}</p>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-sm"
+                >
+                  <span>🔄</span>
+                  다시 시도하기
+                </button>
+              )}
             </div>
           )}
 

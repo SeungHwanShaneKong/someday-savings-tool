@@ -1,10 +1,12 @@
 // [CL-AI-HIERARCHY-20260308-163000]
+// [CL-TREE-HIERARCHY-20260308-190000] flat → grouped tree rendering
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChecklistItem } from './ChecklistItem';
+import { ChecklistCategoryGroup } from './ChecklistCategoryGroup';
+import { groupItemsByCategory } from '@/lib/checklist-tree';
 import {
   PERIOD_LABELS,
   PERIOD_EMOJI,
@@ -108,31 +110,24 @@ export function ChecklistPeriodSection({
           </button>
         </CollapsibleTrigger>
 
-        {/* Items — animated expand/collapse */}
+        {/* [CL-TREE-HIERARCHY-20260308-190000] Items — 카테고리 그룹 트리 */}
         <CollapsibleContent className="collapsible-content">
-          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2 sm:space-y-2.5">
+          <div className="px-3 sm:px-4 pb-4 sm:pb-5 space-y-1">
             {/* Progress message */}
             <p className="text-xs text-muted-foreground px-1 pb-1">
               {getProgressMessage(completed, items.length)}
             </p>
 
-            {items
-              .sort((a, b) => {
-                // Incomplete first, then by sort_order
-                if (a.is_completed !== b.is_completed)
-                  return a.is_completed ? 1 : -1;
-                return a.sort_order - b.sort_order;
-              })
-              .map((item) => (
-                <ChecklistItem
-                  key={item.id}
-                  item={item}
-                  onToggle={onToggle}
-                  onDelete={onDelete}
-                  onUpdateNotes={onUpdateNotes}
-                  onBudgetLink={onBudgetLink}
-                />
-              ))}
+            {groupItemsByCategory(items).map((group) => (
+              <ChecklistCategoryGroup
+                key={group.key}
+                group={group}
+                onToggle={onToggle}
+                onDelete={onDelete}
+                onUpdateNotes={onUpdateNotes}
+                onBudgetLink={onBudgetLink}
+              />
+            ))}
           </div>
         </CollapsibleContent>
       </div>

@@ -36,6 +36,7 @@ export default function Checklist() {
   });
 
   // [DDAY-INLINE-PICKER-2026-03-07] updateWeddingDate 추가 — NudgeBanner 인라인 날짜 선택용
+  // [CL-TIMELINE-FIX-20260308-203000] weddingDate 추가 — AI 일정 최적화에 실제 결혼 날짜 전달
   const {
     items,
     loading,
@@ -49,10 +50,12 @@ export default function Checklist() {
     updateNotes,
     updateWeddingDate,
     hasWeddingDate,
+    weddingDate,
   } = useChecklist();
 
   // [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
-  const { result: timelineResult, loading: timelineLoading, error: timelineError, optimize: optimizeTimeline } = useTimelineOptimizer();
+  // [CL-TIMELINE-FIX-20260308-203000] retry 추가
+  const { result: timelineResult, loading: timelineLoading, error: timelineError, optimize: optimizeTimeline, retry: retryTimeline } = useTimelineOptimizer();
   const [timelineOpen, setTimelineOpen] = useState(false);
 
   // Add custom item state
@@ -156,11 +159,11 @@ export default function Checklist() {
         {!loading && items.length > 0 && <ChecklistProgress stats={stats} />}
 
         {/* [AGENT-TEAM-9-20260307] P2 AI 일정 최적화 버튼 */}
+        {/* [CL-TIMELINE-FIX-20260308-203000] items[0].due_date → 실제 weddingDate 사용 */}
         {!loading && hasWeddingDate && items.length > 0 && (
           <button
             onClick={() => {
               const completedItems = items.filter(i => i.is_completed).map(i => i.title);
-              const weddingDate = items[0]?.due_date;
               if (weddingDate) {
                 optimizeTimeline(weddingDate, completedItems);
                 setTimelineOpen(true);
@@ -292,12 +295,14 @@ export default function Checklist() {
       />
 
       {/* [AGENT-TEAM-9-20260307] P2 일정 최적화 패널 */}
+      {/* [CL-TIMELINE-FIX-20260308-203000] onRetry 추가 */}
       <TimelinePanel
         open={timelineOpen}
         onOpenChange={setTimelineOpen}
         result={timelineResult}
         loading={timelineLoading}
         error={timelineError}
+        onRetry={retryTimeline}
       />
     </div>
   );

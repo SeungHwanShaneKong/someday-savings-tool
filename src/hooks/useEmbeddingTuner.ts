@@ -1,10 +1,9 @@
-// [AGENT-TEAM-9-20260307]
+// [EF-RESILIENCE-20260308-041500]
 // 임베딩 자동 조정 (Embedding Tuner) Hook
 // Edge Function(embedding-tuner)을 호출하여 커버리지 분석 결과 반환
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
 
 // ── 인터페이스 ──
 export interface CoverageEntry {
@@ -45,36 +44,13 @@ export function useEmbeddingTuner(): UseEmbeddingTunerReturn {
     setError(null);
 
     try {
-      // Get auth token from main Supabase project
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (!token) {
-        throw new Error('인증 토큰이 없습니다');
-      }
-
-      const response = await fetch(
-        `${EDGE_FUNCTION_URL}/functions/v1/embedding-tuner`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            apikey: EDGE_FUNCTION_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API 오류 (${response.status})`);
-      }
-
-      const data: EmbeddingTunerResult = await response.json();
+      const data = await edgeFunctionFetch<EmbeddingTunerResult>({
+        functionName: 'embedding-tuner',
+      });
       setResult(data);
-    } catch (err: any) {
-      console.warn('[useEmbeddingTuner] Fetch failed:', err.message);
-      setError(err.message);
+    } catch (err) {
+      console.warn('[useEmbeddingTuner] Fetch failed:', err);
+      setError(getUserFriendlyError(err));
       // Keep previous result on error to avoid UI flicker
     } finally {
       setLoading(false);

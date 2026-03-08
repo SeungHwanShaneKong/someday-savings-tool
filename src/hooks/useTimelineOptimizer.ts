@@ -1,7 +1,6 @@
-// [AGENT-TEAM-9-20260307]
+// [EF-RESILIENCE-20260308-041500] 일정 최적화 Hook
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
 
 export interface TimelineTask {
   task: string;
@@ -31,40 +30,18 @@ export function useTimelineOptimizer() {
       setError(null);
 
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-
-        if (!token) {
-          throw new Error('인증이 필요합니다. 로그인 후 다시 시도해주세요.');
-        }
-
-        const response = await fetch(
-          `${EDGE_FUNCTION_URL}/functions/v1/timeline-optimizer`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              apikey: EDGE_FUNCTION_KEY,
-            },
-            body: JSON.stringify({
-              wedding_date: weddingDate,
-              completed_items: completedItems,
-              budget_total: budgetTotal,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `일정 최적화 실패 (${response.status})`);
-        }
-
-        const data: TimelineResult = await response.json();
+        const data = await edgeFunctionFetch<TimelineResult>({
+          functionName: 'timeline-optimizer',
+          body: {
+            wedding_date: weddingDate,
+            completed_items: completedItems,
+            budget_total: budgetTotal,
+          },
+        });
         setResult(data);
-      } catch (err: any) {
+      } catch (err) {
         console.error('Timeline optimizer error:', err);
-        setError(err.message || '일정 최적화 중 오류가 발생했습니다.');
+        setError(getUserFriendlyError(err));
       } finally {
         setLoading(false);
       }

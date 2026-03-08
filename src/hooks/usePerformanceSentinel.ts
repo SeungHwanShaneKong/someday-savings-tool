@@ -1,7 +1,6 @@
-// [AGENT-TEAM-9-20260307] Edge Function 성능 모니터링 Hook
+// [EF-RESILIENCE-20260308-041500] Edge Function 성능 모니터링 Hook
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
 
 export interface FunctionMetrics {
   name: string;
@@ -41,35 +40,13 @@ export function usePerformanceSentinel(): UsePerformanceSentinelResult {
     setError(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (!token) {
-        throw new Error('인증 토큰이 없습니다');
-      }
-
-      const response = await fetch(
-        `${EDGE_FUNCTION_URL}/functions/v1/performance-sentinel`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            apikey: EDGE_FUNCTION_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API 오류 (${response.status})`);
-      }
-
-      const data: PerformanceResult = await response.json();
+      const data = await edgeFunctionFetch<PerformanceResult>({
+        functionName: 'performance-sentinel',
+      });
       setMetrics(data);
-    } catch (err: any) {
-      console.warn('[usePerformanceSentinel] Fetch failed:', err.message);
-      setError(err.message);
+    } catch (err) {
+      console.warn('[usePerformanceSentinel] Fetch failed:', err);
+      setError(getUserFriendlyError(err));
     } finally {
       setLoading(false);
     }

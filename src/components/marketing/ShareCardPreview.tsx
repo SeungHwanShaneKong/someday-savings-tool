@@ -1,4 +1,4 @@
-// [AGENT-TEAM-9-20260307] 공유 카드 미리보기 컴포넌트
+// [EF-RESILIENCE-20260308-041500] 공유 카드 미리보기 컴포넌트
 // ShareCardPreview — 생성된 공유 카드 HTML을 미리보기 및 복사/다운로드
 
 import { useState } from 'react';
@@ -6,16 +6,17 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Image, Copy, Download, Check } from 'lucide-react';
+import { Image, Copy, Download, Check, RefreshCw } from 'lucide-react';
 import type { ShareCardResult } from '@/hooks/useShareImageGen';
 
 interface ShareCardPreviewProps {
   result: ShareCardResult | null;
   loading: boolean;
   error: string | null;
+  onRetry?: () => void;
 }
 
-export default function ShareCardPreview({ result, loading, error }: ShareCardPreviewProps) {
+export default function ShareCardPreview({ result, loading, error, onRetry }: ShareCardPreviewProps) {
   const [copied, setCopied] = useState(false);
 
   // ── HTML 클립보드 복사 ──
@@ -85,6 +86,17 @@ export default function ShareCardPreview({ result, loading, error }: ShareCardPr
           <h3 className="text-lg font-semibold text-red-900">공유 카드 미리보기</h3>
         </div>
         <p className="text-sm text-red-700">{error}</p>
+        {onRetry && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="mt-3 border-red-300 text-red-600 hover:bg-red-100"
+          >
+            <RefreshCw className="w-4 h-4 mr-1" />
+            다시 시도
+          </Button>
+        )}
       </Card>
     );
   }

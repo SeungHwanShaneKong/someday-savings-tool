@@ -135,6 +135,7 @@ serve(async (req) => {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question },
       ],
+      // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored standard params
       temperature: 0.7,
       max_tokens: 1000,
     });

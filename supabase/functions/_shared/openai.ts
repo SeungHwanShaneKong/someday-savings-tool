@@ -10,8 +10,8 @@ export const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
-// [AGENT-TEAM-9-20260307] GPT-5-mini 업그레이드
-export const DEFAULT_MODEL = 'gpt-5-mini';
+// [EF-RESILIENCE-20260308-051500] gpt-4o-mini 롤백 — gpt-5-mini는 temperature 미지원 + 60초 초과 타임아웃
+export const DEFAULT_MODEL = 'gpt-4o-mini';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,6 +29,7 @@ export async function chatCompletion(
   const response = await openai.chat.completions.create({
     model: options?.model ?? DEFAULT_MODEL,
     messages,
+    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini supports standard params
     temperature: options?.temperature ?? 0.7,
     max_tokens: options?.maxTokens ?? 2048,
   });

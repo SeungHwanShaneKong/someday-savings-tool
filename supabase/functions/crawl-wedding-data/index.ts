@@ -5,6 +5,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
+import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 import { safeFetch, extractTextFromHtml, chunkText, contentHash, checkRobotsTxt, urlHash } from '../_shared/anti-block.ts';
 import { filterOutliers, filterByCategory } from '../_shared/outlier-filter.ts';
 import { processContent, calculateFreshnessScore } from '../_shared/embedding-pipeline.ts';
@@ -35,21 +37,25 @@ serve(async (req) => {
       );
     }
 
+    // [EF-ADMIN-FIX-20260308-110000] Cross-project auth + admin check on main project
     const token = authHeader.replace('Bearer ', '');
+    let userId: string | null = null;
     const { data: { user } } = await supabase.auth.getUser(token);
+    if (user) {
+      userId = user.id;
+    } else {
+      const payload = decodeJwtPayload(token);
+      if (payload?.sub) userId = payload.sub;
+    }
 
-    if (!user) {
+    if (!userId) {
       return new Response(
         JSON.stringify({ error: '유효하지 않은 토큰' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check admin role
-    const { data: isAdmin } = await supabase.rpc('has_role', {
-      _user_id: user.id,
-      _role: 'admin',
-    });
+    const isAdmin = await checkAdminOnMainProject(userId, token);
 
     if (!isAdmin) {
       return new Response(

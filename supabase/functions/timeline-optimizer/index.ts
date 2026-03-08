@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
+import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 
 const SYSTEM_PROMPT = `당신은 한국 결혼 준비 일정 최적화 전문 AI 플래너입니다.
 
@@ -125,29 +126,23 @@ serve(async (req: Request) => {
     ];
 
     // Call GPT
+    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored temperature
     const reply = await chatCompletion(messages, {
       temperature: 0.6,
       maxTokens: 3000,
     });
 
-    // Parse GPT response as JSON
-    let timeline;
-    try {
-      // Handle potential markdown code blocks in response
-      let jsonStr = reply.trim();
-      if (jsonStr.startsWith('```')) {
-        jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      }
-      const parsed = JSON.parse(jsonStr);
-      timeline = parsed.timeline;
-    } catch (parseError) {
-      console.error('GPT JSON 파싱 실패:', parseError, 'Raw reply:', reply);
+    // [EF-ADMIN-FIX-20260308-140000] Robust JSON extraction
+    const parsed = parseGptJson<{ timeline: unknown }>(reply);
+    if (!parsed?.timeline) {
+      console.error('GPT JSON 파싱 실패. Raw reply:', reply);
       await logFunctionCall(supabase, 'timeline-optimizer', startTime, 500, userId, 'GPT 응답 JSON 파싱 실패');
       return new Response(
         JSON.stringify({ error: 'AI 응답을 파싱할 수 없습니다. 다시 시도해주세요.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    const { timeline } = parsed;
 
     await logFunctionCall(supabase, 'timeline-optimizer', startTime, 200, userId);
 

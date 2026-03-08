@@ -5,6 +5,7 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
+import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
 serve(async (req) => {
   const startTime = Date.now();
@@ -46,11 +47,8 @@ serve(async (req) => {
     );
   }
 
-  // Check admin role
-  const { data: isAdmin } = await supabase.rpc('has_role', {
-    _user_id: userId,
-    _role: 'admin',
-  });
+  // [EF-ADMIN-FIX-20260308-110000] Check admin role on main project (cross-project fix)
+  const isAdmin = await checkAdminOnMainProject(userId, token);
 
   if (!isAdmin) {
     await logFunctionCall(supabase, 'data-quality-guardian', startTime, 403, userId, '관리자 권한 없음');
@@ -65,10 +63,21 @@ serve(async (req) => {
       .from('knowledge_embeddings')
       .select('id, content_hash, category, freshness_score, created_at, updated_at');
 
-    // Handle 42P01 (table does not exist) gracefully
+    // [EF-ADMIN-FIX-20260308-130000] Handle schema errors gracefully
+    // Catches: 42P01 (table missing), PostgREST schema cache, column/relation not found
     if (fetchError) {
-      if (fetchError.code === '42P01') {
-        const emptyResult = { scan_at: new Date().toISOString(), total_scanned: 0, issues: [], health_score: 100 };
+      const errMsg = fetchError.message || '';
+      const isSchemaError = fetchError.code === '42P01'
+        || errMsg.includes('schema cache')
+        || errMsg.includes('does not exist');
+      if (isSchemaError) {
+        const emptyResult = {
+          scan_at: new Date().toISOString(),
+          total_scanned: 0,
+          issues: [],
+          health_score: 100,
+          warning: `DB 스키마 불일치: ${errMsg}`,
+        };
         await logFunctionCall(supabase, 'data-quality-guardian', startTime, 200, userId);
         return new Response(JSON.stringify(emptyResult), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }

@@ -1,10 +1,15 @@
+// [EF-RESILIENCE-20260308-041500] AI Chat Hook — RAG→ai-chat 폴백 체인 보존
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { searchKnowledge } from '@/lib/wedding-knowledge-base';
 import type { Citation, FreshnessInfo } from '@/lib/rag-sources';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import {
+  edgeFunctionFetch,
+  getUserFriendlyError,
+  EdgeFunctionError,
+} from '@/lib/edge-function-fetch';
 
 // [ZERO-COST-PIPELINE-2026-03-07] freshnessInfo 필드 추가
 export interface ChatMessage {
@@ -21,6 +26,19 @@ export type AIFeature = 'honeymoon' | 'qa' | 'budget';
 interface UseAIChatOptions {
   feature: AIFeature;
   context?: Record<string, unknown>;
+}
+
+// ── RAG 응답 타입 ──
+interface RAGResponse {
+  reply: string;
+  citations?: Citation[];
+  rag_used?: boolean;
+  freshness_info?: FreshnessInfo;
+}
+
+// ── ai-chat 응답 타입 ──
+interface AIChatResponse {
+  reply: string;
 }
 
 export function useAIChat({ feature, context }: UseAIChatOptions) {
@@ -110,101 +128,50 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
           }
         }
 
-        // Get auth token
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-
-        if (!token) {
-          throw new Error('인증이 필요합니다');
-        }
-
-        const headers = {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          apikey: EDGE_FUNCTION_KEY,
-        };
-
         let reply: string;
         let citations: Citation[] | undefined;
         let ragUsed = false;
         // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보
         let freshnessInfo: FreshnessInfo | undefined;
 
+        const chatBody = {
+          feature,
+          messages: updatedMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          context: enrichedContext,
+        };
+
         // Phase 3: Try RAG query first for Q&A feature
         if (feature === 'qa') {
           try {
-            const ragResponse = await fetch(
-              `${EDGE_FUNCTION_URL}/functions/v1/rag-query`,
-              {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                  question: content,
-                  feature,
-                }),
-              }
-            );
-
-            if (ragResponse.ok) {
-              const ragData = await ragResponse.json();
-              reply = ragData.reply;
-              citations = ragData.citations;
-              ragUsed = ragData.rag_used || false;
-              // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 파싱
-              freshnessInfo = ragData.freshness_info || undefined;
-            } else {
-              throw new Error('RAG unavailable');
-            }
+            const ragData = await edgeFunctionFetch<RAGResponse>({
+              functionName: 'rag-query',
+              timeoutMs: 45000,
+              body: { question: content, feature },
+            });
+            reply = ragData.reply;
+            citations = ragData.citations;
+            ragUsed = ragData.rag_used || false;
+            // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 파싱
+            freshnessInfo = ragData.freshness_info || undefined;
           } catch {
             // RAG not deployed or failed — fall back to ai-chat
-            const response = await fetch(
-              `${EDGE_FUNCTION_URL}/functions/v1/ai-chat`,
-              {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                  feature,
-                  messages: updatedMessages.map((m) => ({
-                    role: m.role,
-                    content: m.content,
-                  })),
-                  context: enrichedContext,
-                }),
-              }
-            );
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(errorData.error || `API 오류 (${response.status})`);
-            }
-
-            const data = await response.json();
+            const data = await edgeFunctionFetch<AIChatResponse>({
+              functionName: 'ai-chat',
+              timeoutMs: 45000,
+              body: chatBody,
+            });
             reply = data.reply;
           }
         } else {
           // Non-Q&A features: use ai-chat directly
-          const response = await fetch(
-            `${EDGE_FUNCTION_URL}/functions/v1/ai-chat`,
-            {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                feature,
-                messages: updatedMessages.map((m) => ({
-                  role: m.role,
-                  content: m.content,
-                })),
-                context: enrichedContext,
-              }),
-            }
-          );
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || `API 오류 (${response.status})`);
-          }
-
-          const data = await response.json();
+          const data = await edgeFunctionFetch<AIChatResponse>({
+            functionName: 'ai-chat',
+            timeoutMs: 45000,
+            body: chatBody,
+          });
           reply = data.reply;
         }
 
@@ -249,20 +216,22 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
             // DB save failed — conversation still works in-memory
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('AI chat error:', error);
+
+        const friendlyMsg = getUserFriendlyError(error);
 
         // Add error message
         const errorMessage: ChatMessage = {
           role: 'assistant',
-          content: `죄송해요, 응답 생성 중 오류가 발생했어요. ${error.message || '잠시 후 다시 시도해 주세요.'}`,
+          content: `죄송해요, 응답 생성 중 오류가 발생했어요. ${friendlyMsg}`,
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMessage]);
 
         toast({
           title: 'AI 응답 오류',
-          description: error.message,
+          description: friendlyMsg,
           variant: 'destructive',
         });
       } finally {

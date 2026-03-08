@@ -4,6 +4,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
 serve(async (req) => {
   const corsRes = handleCors(req);
@@ -41,11 +42,8 @@ serve(async (req) => {
     );
   }
 
-  // Check admin role
-  const { data: isAdmin } = await supabase.rpc('has_role', {
-    _user_id: userId,
-    _role: 'admin',
-  });
+  // [EF-ADMIN-FIX-20260308-110000] Check admin role on main project (cross-project fix)
+  const isAdmin = await checkAdminOnMainProject(userId, token);
 
   if (!isAdmin) {
     return new Response(
@@ -64,10 +62,15 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1000);
 
-    // Handle table-not-exist (42P01) gracefully
+    // [EF-ADMIN-FIX-20260308-130000] Handle schema errors gracefully
+    // Catches: 42P01 (table missing), PostgREST schema cache, column/relation not found
     if (logsError) {
       const pgCode = (logsError as any)?.code;
-      if (pgCode === '42P01') {
+      const errMsg = logsError.message || '';
+      const isTableMissing = pgCode === '42P01'
+        || errMsg.includes('schema cache')
+        || errMsg.includes('does not exist');
+      if (isTableMissing) {
         return new Response(
           JSON.stringify({
             functions: [],

@@ -33,6 +33,8 @@ import { usePerformanceSentinel } from '@/hooks/usePerformanceSentinel';
 import { useDataQualityGuardian } from '@/hooks/useDataQualityGuardian';
 import { useEmbeddingTuner } from '@/hooks/useEmbeddingTuner';
 import { useSEOAmplifier } from '@/hooks/useSEOAmplifier';
+// [EF-RESILIENCE-20260308-041500] Edge Function 헬스 체크
+import { checkEdgeFunctionHealth } from '@/lib/edge-function-fetch';
 import { PerformancePanel } from '@/components/admin/PerformancePanel';
 import { DataQualityPanel } from '@/components/admin/DataQualityPanel';
 import { EmbeddingTunerPanel } from '@/components/admin/EmbeddingTunerPanel';
@@ -82,6 +84,8 @@ export default function Admin() {
 
   const [period, setPeriod] = useState('30');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  // [EF-RESILIENCE-20260308-041500] Edge Function 서비스 상태
+  const [efHealthy, setEfHealthy] = useState<boolean | null>(null);
 
   const { startDate, endDate } = useMemo(() => {
     const end = new Date();
@@ -106,7 +110,11 @@ export default function Admin() {
   }, [fetchData, startDate, endDate, fetchRAGStats, fetchMetrics]);
 
   useEffect(() => {
-    if (isAdmin) doFetch();
+    if (isAdmin) {
+      doFetch();
+      // [EF-RESILIENCE-20260308-041500] 초기 헬스 체크
+      checkEdgeFunctionHealth().then(setEfHealthy);
+    }
   }, [isAdmin, doFetch]);
 
   // 30-second auto-refresh, paused when tab is hidden
@@ -169,6 +177,23 @@ export default function Admin() {
         </header>
 
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
+          {/* [EF-RESILIENCE-20260308-041500] Edge Function 서비스 경고 배너 */}
+          {efHealthy === false && (
+            <Card className="p-3 border-amber-300 bg-amber-50 flex items-center gap-2">
+              <Info className="h-4 w-4 text-amber-600 shrink-0" />
+              <p className="text-sm text-amber-700">
+                AI 서비스(Edge Functions)에 연결할 수 없습니다. AI 기능이 제한될 수 있습니다.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
+                onClick={() => checkEdgeFunctionHealth().then(setEfHealthy)}
+              >
+                재확인
+              </Button>
+            </Card>
+          )}
           {/* ===== 필터 패널 ===== */}
           <div className="flex flex-wrap items-center gap-3">
             <Select value={period} onValueChange={setPeriod}>

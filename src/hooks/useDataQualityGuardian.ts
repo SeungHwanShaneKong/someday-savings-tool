@@ -1,10 +1,9 @@
-// [AGENT-TEAM-9-20260307]
+// [EF-RESILIENCE-20260308-041500]
 // E1 데이터 품질 감시 (Data Quality Guardian) Hook
 // Admin 페이지에서 Edge Function(data-quality-guardian)을 호출하여 품질 스캔 결과 반환
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
 
 // ── 품질 이슈 인터페이스 ──
 export interface DataQualityIssue {
@@ -38,36 +37,13 @@ export function useDataQualityGuardian(): UseDataQualityGuardianReturn {
     setError(null);
 
     try {
-      // Get auth token from main Supabase project
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (!token) {
-        throw new Error('인증 토큰이 없습니다');
-      }
-
-      const response = await fetch(
-        `${EDGE_FUNCTION_URL}/functions/v1/data-quality-guardian`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            apikey: EDGE_FUNCTION_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API 오류 (${response.status})`);
-      }
-
-      const data: DataQualityResult = await response.json();
+      const data = await edgeFunctionFetch<DataQualityResult>({
+        functionName: 'data-quality-guardian',
+      });
       setResult(data);
-    } catch (err: any) {
-      console.warn('[useDataQualityGuardian] Scan failed:', err.message);
-      setError(err.message);
+    } catch (err) {
+      console.warn('[useDataQualityGuardian] Scan failed:', err);
+      setError(getUserFriendlyError(err));
     } finally {
       setLoading(false);
     }

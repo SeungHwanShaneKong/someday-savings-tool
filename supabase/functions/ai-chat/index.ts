@@ -125,6 +125,7 @@ Deno.serve(async (req: Request) => {
     ];
 
     // Call OpenAI GPT
+    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored temperature
     const reply = await chatCompletion(fullMessages, {
       temperature: 0.7,
       maxTokens: 2048,

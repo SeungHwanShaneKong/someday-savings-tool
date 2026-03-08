@@ -1,9 +1,8 @@
-// [AGENT-TEAM-9-20260307]
+// [EF-RESILIENCE-20260308-041500]
 // P3 Honeymoon Planner — AI 기반 신혼여행 종합 기획 Hook
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
 
 // ── Response Types ──
 
@@ -76,39 +75,17 @@ export function useHoneymoonPlanner(): UseHoneymoonPlannerResult {
       setPlan(null);
 
       try {
-        // Get auth token
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-
-        if (!token) {
-          throw new Error('인증이 필요합니다. 로그인 후 이용해주세요.');
-        }
-
-        const response = await fetch(
-          `${EDGE_FUNCTION_URL}/functions/v1/honeymoon-planner`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              apikey: EDGE_FUNCTION_KEY,
-            },
-            body: JSON.stringify({
-              budget,
-              duration_days: durationDays,
-              preferred_regions: preferredRegions,
-              travel_style: travelStyle,
-              departure_date: departureDate,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `API 오류 (${response.status})`);
-        }
-
-        const data = await response.json();
+        const data = await edgeFunctionFetch<Record<string, unknown>>({
+          functionName: 'honeymoon-planner',
+          timeoutMs: 60000, // GPT 호출이므로 60초
+          body: {
+            budget,
+            duration_days: durationDays,
+            preferred_regions: preferredRegions,
+            travel_style: travelStyle,
+            departure_date: departureDate,
+          },
+        });
 
         // Handle raw_text fallback (server couldn't parse GPT JSON)
         if (data.raw_text && !data.recommended_destination) {
@@ -118,14 +95,14 @@ export function useHoneymoonPlanner(): UseHoneymoonPlannerResult {
             budget_breakdown: { flights: 0, accommodation: 0, meals: 0, activities: 0, buffer: 0 },
             alternatives: [],
             booking_tips: [],
-            raw_text: data.raw_text,
+            raw_text: data.raw_text as string,
           });
         } else {
-          setPlan(data as HoneymoonPlan);
+          setPlan(data as unknown as HoneymoonPlan);
         }
-      } catch (err: any) {
-        console.error('[useHoneymoonPlanner] planTrip failed:', err.message);
-        setError(err.message);
+      } catch (err) {
+        console.error('[useHoneymoonPlanner] planTrip failed:', err);
+        setError(getUserFriendlyError(err));
       } finally {
         setLoading(false);
       }

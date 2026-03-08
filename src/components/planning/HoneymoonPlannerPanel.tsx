@@ -1,4 +1,4 @@
-// [AGENT-TEAM-9-20260307]
+// [EF-RESILIENCE-20260308-041500]
 // P3 Honeymoon Planner Panel — AI 신혼여행 종합 플래너 Sheet UI
 
 import {
@@ -10,7 +10,9 @@ import {
 } from '@/components/ui/sheet';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RefreshCw } from 'lucide-react';
 import type { HoneymoonPlan } from '@/hooks/useHoneymoonPlanner';
 
 interface HoneymoonPlannerPanelProps {
@@ -19,6 +21,7 @@ interface HoneymoonPlannerPanelProps {
   error: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRetry?: () => void;
 }
 
 // ── 금액 포맷 ──
@@ -68,6 +71,7 @@ export function HoneymoonPlannerPanel({
   error,
   open,
   onOpenChange,
+  onRetry,
 }: HoneymoonPlannerPanelProps) {
   const budgetTotal = plan?.budget_breakdown
     ? Object.values(plan.budget_breakdown).reduce((sum, v) => sum + v, 0)
@@ -102,6 +106,17 @@ export function HoneymoonPlannerPanel({
             <Card className="p-4 border-red-200 bg-red-50">
               <p className="text-sm text-red-600 font-medium">오류 발생</p>
               <p className="text-sm text-red-500 mt-1">{error}</p>
+              {onRetry && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRetry}
+                  className="mt-3 border-red-300 text-red-600 hover:bg-red-100"
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  다시 시도
+                </Button>
+              )}
             </Card>
           )}
 

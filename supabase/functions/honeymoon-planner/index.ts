@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
+import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 
 interface HoneymoonRequest {
   budget: number;
@@ -117,19 +118,16 @@ serve(async (req) => {
     ];
 
     // Call GPT
+    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored temperature
     const reply = await chatCompletion(messages, {
       temperature: 0.7,
       maxTokens: 4096,
     });
 
-    // Parse GPT response as JSON (fallback to raw text)
-    let parsedPlan: Record<string, unknown>;
-    try {
-      // Strip potential markdown code fences
-      const cleaned = reply.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      parsedPlan = JSON.parse(cleaned);
-    } catch {
-      // If JSON parse fails, return raw text as fallback
+    // [EF-ADMIN-FIX-20260308-140000] Robust JSON extraction from GPT response
+    const parsedPlan = parseGptJson(reply);
+    if (!parsedPlan) {
+      // All parse strategies failed — return raw text as fallback
       await logFunctionCall(
         createClient(supabaseUrl, supabaseKey),
         'honeymoon-planner',

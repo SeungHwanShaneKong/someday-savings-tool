@@ -1,9 +1,8 @@
-// [ADMIN-RAG-MONITOR-2026-03-07] RAG 파이프라인 모니터링 통계 Hook
+// [EF-RESILIENCE-20260308-041500] RAG 파이프라인 모니터링 통계 Hook
 // Admin 페이지에서 Edge Function(admin-rag-stats)을 호출하여 MECE 통계 반환
 
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
+import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
 
 // ── 크롤링 파이프라인 ──
 export interface CrawlJob {
@@ -88,36 +87,13 @@ export function useAdminRAGStats(): UseAdminRAGStatsResult {
     setError(null);
 
     try {
-      // Get auth token from main Supabase project
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (!token) {
-        throw new Error('인증 토큰이 없습니다');
-      }
-
-      const response = await fetch(
-        `${EDGE_FUNCTION_URL}/functions/v1/admin-rag-stats`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            apikey: EDGE_FUNCTION_KEY,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `API 오류 (${response.status})`);
-      }
-
-      const data: RAGStats = await response.json();
+      const data = await edgeFunctionFetch<RAGStats>({
+        functionName: 'admin-rag-stats',
+      });
       setRagStats(data);
-    } catch (err: any) {
-      console.warn('[useAdminRAGStats] Fetch failed:', err.message);
-      setError(err.message);
+    } catch (err) {
+      console.warn('[useAdminRAGStats] Fetch failed:', err);
+      setError(getUserFriendlyError(err));
       // Keep previous stats on error to avoid UI flicker
     } finally {
       setLoading(false);

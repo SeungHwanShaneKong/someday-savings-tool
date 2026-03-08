@@ -5,6 +5,7 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
+import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 
 interface NegotiateRequest {
   category: string;
@@ -130,6 +131,7 @@ serve(async (req) => {
     ];
 
     // ── Call GPT ──
+    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored temperature
     const rawReply = await chatCompletion(messages, {
       temperature: 0.7,
       maxTokens: 2048,
@@ -138,15 +140,12 @@ serve(async (req) => {
     // ── Parse GPT response as JSON ──
     let result: NegotiateResponse;
 
-    try {
-      // GPT may wrap JSON in markdown code blocks — strip them
-      const cleaned = rawReply
-        .replace(/```json\s*/g, '')
-        .replace(/```\s*/g, '')
-        .trim();
-      result = JSON.parse(cleaned);
-    } catch (parseError) {
-      console.error('[negotiate-coach] JSON parse error:', parseError, 'raw:', rawReply);
+    // [EF-ADMIN-FIX-20260308-140000] Robust JSON extraction
+    const parsed = parseGptJson<NegotiateResponse>(rawReply);
+    if (parsed) {
+      result = parsed;
+    } else {
+      console.error('[negotiate-coach] JSON parse failed, raw:', rawReply);
       // Fallback: return a generic tip
       result = {
         tips: [

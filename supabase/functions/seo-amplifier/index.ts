@@ -7,6 +7,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
+import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
+import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 
 serve(async (req) => {
   const startTime = Date.now();
@@ -46,11 +48,8 @@ serve(async (req) => {
     );
   }
 
-  // Check admin role
-  const { data: isAdmin } = await supabase.rpc('has_role', {
-    _user_id: userId,
-    _role: 'admin',
-  });
+  // [EF-ADMIN-FIX-20260308-110000] Check admin role on main project (cross-project fix)
+  const isAdmin = await checkAdminOnMainProject(userId, token);
 
   if (!isAdmin) {
     return new Response(
@@ -139,22 +138,15 @@ ${contextSnippets}
     ];
 
     // ── Call GPT ──
+    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored temperature
     const rawResponse = await chatCompletion(messages, {
       temperature: 0.7,
       maxTokens: 4096,
     });
 
-    // ── Parse response ──
-    let parsed: any;
-    try {
-      // Strip markdown code fences if present
-      const cleaned = rawResponse
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
+    // [EF-ADMIN-FIX-20260308-140000] Robust JSON extraction
+    const parsed = parseGptJson(rawResponse);
+    if (!parsed) {
       console.error('[seo-amplifier] JSON parse failed. Raw:', rawResponse);
       return new Response(
         JSON.stringify({ error: 'GPT 응답 파싱 실패', raw: rawResponse }),

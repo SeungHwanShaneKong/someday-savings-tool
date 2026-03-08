@@ -6,6 +6,7 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { decodeJwtPayload } from '../_shared/jwt.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
+import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
 // ── 카테고리별 최소 임베딩 기준 ──
 const IDEAL_MIN_PER_CATEGORY = 10;
@@ -49,11 +50,8 @@ serve(async (req) => {
     );
   }
 
-  // Check admin role
-  const { data: isAdmin } = await supabase.rpc('has_role', {
-    _user_id: userId,
-    _role: 'admin',
-  });
+  // [EF-ADMIN-FIX-20260308-110000] Check admin role on main project (cross-project fix)
+  const isAdmin = await checkAdminOnMainProject(userId, token);
 
   if (!isAdmin) {
     await logFunctionCall(supabase, 'embedding-tuner', startTime, 403, userId, '관리자 아님');
@@ -71,10 +69,14 @@ serve(async (req) => {
       .from('knowledge_embeddings')
       .select('category, freshness_score, created_at');
 
-    // 42P01: 테이블 존재하지 않는 경우 graceful 처리
+    // [EF-ADMIN-FIX-20260308-130000] Handle schema errors gracefully
+    // Catches: 42P01 (table missing), PostgREST schema cache, column/relation not found
     if (fetchError) {
-      const is42P01 = fetchError.code === '42P01' || fetchError.message?.includes('relation');
-      if (is42P01) {
+      const errMsg = fetchError.message || '';
+      const isSchemaError = fetchError.code === '42P01'
+        || errMsg.includes('schema cache')
+        || errMsg.includes('does not exist');
+      if (isSchemaError) {
         const emptyResult = {
           coverage: [],
           recommendations: [],

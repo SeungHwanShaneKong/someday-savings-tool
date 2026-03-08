@@ -1,4 +1,4 @@
-// [CACHE-BUST-20260307-172400]
+// [CL-AI-HIERARCHY-20260308-163000]
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,7 @@ export function ChecklistPeriodSection({
 
   // Visual differentiation based on period status
   const sectionStyle = cn(
-    'rounded-2xl border bg-card overflow-hidden transition-all duration-200',
+    'rounded-2xl border bg-card overflow-hidden transition-all duration-200 shadow-sm hover:shadow-toss-sm',
     allDone && 'border-l-4 border-l-green-500 border-green-200 bg-green-50/30',
     isActive && !allDone && 'border-l-4 border-l-primary ring-1 ring-primary/20 shadow-toss-sm',
     hasProgress && !isActive && 'border-l-4 border-l-amber-500 border-border',
@@ -62,7 +62,7 @@ export function ChecklistPeriodSection({
         {/* Header */}
         <CollapsibleTrigger asChild>
           <button
-            className="w-full flex items-center gap-3 p-4 hover:bg-muted/30 transition-colors"
+            className="w-full flex items-center gap-3 p-4 sm:p-5 hover:bg-muted/30 transition-colors"
             aria-expanded={isOpen}
             aria-label={`${PERIOD_LABELS[period]} 체크리스트, ${items.length}개 항목 중 ${completed}개 완료`}
           >
@@ -72,7 +72,7 @@ export function ChecklistPeriodSection({
 
             <div className="flex-1 text-left min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-foreground">
+                <h3 className="text-sm sm:text-base font-semibold text-foreground">
                   {PERIOD_LABELS[period]}
                 </h3>
                 {isActive && (
@@ -89,7 +89,7 @@ export function ChecklistPeriodSection({
               <div className="flex items-center gap-2 mt-1">
                 <Progress
                   value={percentage}
-                  className="flex-1 h-1.5"
+                  className="flex-1 h-1.5 sm:h-2"
                   indicatorClassName={progressIndicatorClass}
                 />
                 <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -110,7 +110,7 @@ export function ChecklistPeriodSection({
 
         {/* Items — animated expand/collapse */}
         <CollapsibleContent className="collapsible-content">
-          <div className="px-4 pb-4 space-y-2">
+          <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2 sm:space-y-2.5">
             {/* Progress message */}
             <p className="text-xs text-muted-foreground px-1 pb-1">
               {getProgressMessage(completed, items.length)}

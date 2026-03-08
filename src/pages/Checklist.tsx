@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+// [CL-AI-HIERARCHY-20260308-163000]
 import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
@@ -29,7 +30,7 @@ export default function Checklist() {
   const { user, loading: authLoading } = useAuth();
 
   useSEO({
-    title: '체크리스트 - 웨딩셈',
+    title: 'D-day 체크리스트 AI - 웨딩셈',
     description: '결혼 준비 체크리스트로 일정별 할 일을 관리하세요. D-365부터 D-Day까지 시기별 준비 사항 안내.',
     path: '/checklist',
   });
@@ -100,7 +101,7 @@ export default function Checklist() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
-        <div className="flex items-center justify-between px-4 h-14 max-w-lg mx-auto">
+        <div className="flex items-center justify-between px-4 h-14 max-w-lg sm:max-w-2xl lg:max-w-4xl mx-auto">
           <button
             onClick={() => navigate('/budget')}
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -108,9 +109,12 @@ export default function Checklist() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-base font-semibold text-foreground">
-            D-day 체크리스트
-          </h1>
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h1 className="text-base sm:text-lg font-semibold text-foreground">
+              D-day 체크리스트 AI
+            </h1>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -124,7 +128,7 @@ export default function Checklist() {
         </div>
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-5 pb-24 space-y-5">
+      <main className="max-w-lg sm:max-w-2xl lg:max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 pb-24 space-y-5 sm:space-y-6">
         {/* Loading state — Skeleton UI */}
         {loading && (
           <div className="space-y-4">
@@ -162,7 +166,7 @@ export default function Checklist() {
                 setTimelineOpen(true);
               }
             }}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-sm font-medium hover:from-blue-100 hover:to-indigo-100 transition-all active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 px-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-sm sm:text-base font-medium hover:from-blue-100 hover:to-indigo-100 transition-all active:scale-[0.98]"
           >
             <Sparkles className="w-4 h-4" />
             AI 일정 최적화
@@ -171,7 +175,7 @@ export default function Checklist() {
 
         {/* Add custom item form */}
         {showAddForm && (
-          <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+          <div className="bg-card rounded-2xl border border-border p-4 sm:p-5 space-y-3">
             <h3 className="text-sm font-semibold">새 항목 추가</h3>
             <Input
               value={newItemTitle}
@@ -234,35 +238,37 @@ export default function Checklist() {
           <NudgeBanner type="incomplete" />
         )}
 
-        {/* Period sections — staggered animation */}
-        {!loading &&
-          items.length > 0 &&
-          (() => {
-            let visibleIndex = 0;
-            return PERIOD_ORDER.map((period) => {
-              const periodItems = items.filter((i) => i.period === period);
-              if (periodItems.length === 0) return null;
+        {/* Period sections — staggered animation, 2-col grid on desktop */}
+        {!loading && items.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+            {(() => {
+              let visibleIndex = 0;
+              return PERIOD_ORDER.map((period) => {
+                const periodItems = items.filter((i) => i.period === period);
+                if (periodItems.length === 0) return null;
 
-              const idx = visibleIndex++;
-              return (
-                <div
-                  key={period}
-                  className="animate-fade-up"
-                  style={{ animationDelay: `${idx * 0.08}s` }}
-                >
-                  <ChecklistPeriodSection
-                    period={period}
-                    items={periodItems}
-                    isActive={period === activePeriod}
-                    onToggle={toggleItem}
-                    onDelete={deleteItem}
-                    onUpdateNotes={updateNotes}
-                    onBudgetLink={handleBudgetLink}
-                  />
-                </div>
-              );
-            });
-          })()}
+                const idx = visibleIndex++;
+                return (
+                  <div
+                    key={period}
+                    className="animate-fade-up"
+                    style={{ animationDelay: `${idx * 0.08}s` }}
+                  >
+                    <ChecklistPeriodSection
+                      period={period}
+                      items={periodItems}
+                      isActive={period === activePeriod}
+                      onToggle={toggleItem}
+                      onDelete={deleteItem}
+                      onUpdateNotes={updateNotes}
+                      onBudgetLink={handleBudgetLink}
+                    />
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
       </main>
 
       {/* Praise Modal */}

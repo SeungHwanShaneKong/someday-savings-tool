@@ -25,7 +25,7 @@ export default function Footer() {
                     to="/checklist"
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
-                    D-day 체크리스트
+                    D-day 체크리스트 AI
                   </Link>
                 </li>
                 <li>

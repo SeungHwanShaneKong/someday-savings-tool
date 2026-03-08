@@ -28,6 +28,7 @@ import {
   History,
   Shield,
   ClipboardList,
+  Sparkles,
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -425,16 +426,22 @@ export default function BudgetFlow() {
         {/* Checklist shortcut + Insight Panel */}
         {viewMode === 'table' && items.length > 0 && (
           <div className="space-y-3 mb-4">
+            {/* [CL-AI-BTN-GLOW-20260308-175200] 눈에 띄는 AI 체크리스트 버튼 */}
             <button
               onClick={() => navigate('/checklist')}
-              className="w-full flex items-center gap-3 bg-card rounded-xl border border-border p-3.5 hover:bg-muted/30 transition-colors shadow-toss-sm"
+              className="w-full flex items-center gap-3 bg-gradient-to-r from-primary/10 via-blue-50 to-emerald-50/80 rounded-xl border-2 border-primary/40 p-3.5 sm:p-4 hover:from-primary/15 hover:via-blue-100 hover:to-emerald-100 hover:border-primary/60 hover:shadow-primary-glow hover:scale-[1.02] transition-all duration-200 ai-glow-strong"
             >
-              <ClipboardList className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/25 to-emerald-500/20 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Sparkles className="w-5 h-5 text-primary animate-[glow-pulse_2s_ease-in-out_infinite]" />
+              </div>
               <div className="flex-1 text-left">
-                <p className="text-sm font-medium text-foreground">D-day 체크리스트</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-bold text-foreground">D-day 체크리스트 AI</p>
+                  <span className="ai-badge-shimmer bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 text-primary text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-primary/30">AI</span>
+                </div>
                 <p className="text-xs text-muted-foreground">결혼 준비 진행 상황을 확인하세요</p>
               </div>
-              <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90" />
+              <ChevronDown className="w-4 h-4 text-primary -rotate-90" />
             </button>
             <InsightPanel items={items} />
           </div>

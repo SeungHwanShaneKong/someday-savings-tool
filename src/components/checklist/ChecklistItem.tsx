@@ -1,4 +1,4 @@
-// [CACHE-BUST-20260307-172400]
+// [CL-AI-HIERARCHY-20260308-163000]
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -95,12 +95,12 @@ export function ChecklistItem({
   return (
     <div
       className={cn(
-        'rounded-xl bg-card border border-border transition-all duration-200 hover:shadow-toss',
+        'rounded-xl sm:rounded-2xl bg-card border border-border transition-all duration-200 hover:shadow-toss',
         URGENCY_STYLES[urgency],
         item.is_completed && 'opacity-60'
       )}
     >
-      <div className="flex items-start gap-3 p-3.5">
+      <div className="flex items-start gap-3 p-3.5 sm:p-4">
         {/* Checkbox with check-pop animation */}
         <div className={cn(checkPop && 'animate-check-pop')}>
           <Checkbox
@@ -118,7 +118,7 @@ export function ChecklistItem({
           <div className="flex items-start justify-between gap-2">
             <span
               className={cn(
-                'text-sm font-medium leading-tight',
+                'text-sm sm:text-base font-medium leading-tight',
                 item.is_completed && 'line-through text-muted-foreground'
               )}
             >
@@ -175,7 +175,7 @@ export function ChecklistItem({
 
       {/* Expanded section */}
       {expanded && (
-        <div className="px-3.5 pb-3.5 pt-0 space-y-2.5 border-t border-border/50 mt-0">
+        <div className="px-3.5 sm:px-4 pb-3.5 sm:pb-4 pt-0 space-y-2.5 border-t border-border/50 mt-0">
           <div className="pt-2.5">
             {/* Notes — debounced */}
             <textarea

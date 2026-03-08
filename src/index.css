@@ -251,6 +251,23 @@
                 0 0 20px 0 hsl(213 100% 50% / 0.08);
   }
 
+  /* [CL-AI-BTN-GLOW-20260308-175200] AI button — strong glow for primary CTA-level AI actions */
+  .ai-glow-strong {
+    box-shadow: 0 0 0 1.5px hsl(213 100% 50% / 0.35),
+                0 0 16px 0 hsl(213 100% 50% / 0.15),
+                0 4px 12px 0 hsl(213 100% 50% / 0.10);
+  }
+
+  /* [CL-AI-BTN-GLOW-20260308-175200] AI badge — shimmer effect for inline AI tags */
+  .ai-badge-shimmer {
+    background-size: 200% 100%;
+    animation: badgeShimmer 2.5s ease-in-out infinite;
+  }
+  @keyframes badgeShimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
   /* Landing — hero icon float */
   .animate-float {
     animation: softFloat 3s ease-in-out infinite;
@@ -309,6 +326,7 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up,
     .animate-shimmer,
+    .ai-badge-shimmer,
     .animate-float,
     .animate-pulse-subtle,
     .animate-bounce,

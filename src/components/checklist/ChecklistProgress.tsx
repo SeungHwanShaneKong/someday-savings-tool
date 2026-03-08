@@ -1,4 +1,4 @@
-// [CACHE-BUST-20260307-172400]
+// [CL-AI-HIERARCHY-20260308-163000]
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import type { ChecklistStats } from '@/hooks/useChecklist';
@@ -15,18 +15,18 @@ function getBarColor(percentage: number): string {
 
 export function ChecklistProgress({ stats }: ChecklistProgressProps) {
   return (
-    <div className="bg-card rounded-2xl border border-border p-5 shadow-toss-sm animate-fade-up">
+    <div className="bg-card rounded-2xl border border-border p-5 sm:p-6 lg:p-8 shadow-toss-sm animate-fade-up">
       {/* Overall progress ring */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-5 sm:gap-6 lg:gap-8">
         <div
-          className="relative w-20 h-20 flex-shrink-0"
+          className="relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 flex-shrink-0"
           role="progressbar"
           aria-valuenow={stats.percentage}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={`전체 진행률 ${stats.percentage}퍼센트`}
         >
-          <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
+          <svg className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
             <circle
               cx="40"
               cy="40"
@@ -49,14 +49,14 @@ export function ChecklistProgress({ stats }: ChecklistProgressProps) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-lg font-bold text-foreground">
+            <span className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">
               {stats.percentage}%
             </span>
           </div>
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-foreground">
+          <h3 className="text-lg sm:text-xl font-semibold text-foreground">
             전체 진행률
           </h3>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -70,11 +70,11 @@ export function ChecklistProgress({ stats }: ChecklistProgressProps) {
         </div>
       </div>
 
-      {/* Period breakdown — color-coded bars */}
-      <div className="mt-4 space-y-2.5">
+      {/* Period breakdown — responsive grid with mini-cards */}
+      <div className="mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         {Object.entries(stats.byPeriod).map(([period, data]) => (
-          <div key={period} className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground w-24 flex-shrink-0 truncate">
+          <div key={period} className="flex items-center gap-3 bg-muted/30 rounded-lg px-3 py-2">
+            <span className="text-xs text-muted-foreground w-24 sm:w-28 flex-shrink-0 truncate">
               {period}
             </span>
             <Progress

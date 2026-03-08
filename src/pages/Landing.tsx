@@ -50,8 +50,8 @@ const FEATURES: Feature[] = [
   },
   {
     icon: CalendarCheck,
-    title: 'D-day 체크리스트',
-    description: '결혼일 기준으로 자동 생성되는 시기별 준비 리스트',
+    title: 'D-day 체크리스트 AI',
+    description: '✨ 결혼일 기준으로 AI가 자동 생성하는 시기별 준비 리스트',
     isAI: true,
     gradient: 'from-emerald-500/10 to-emerald-600/5',
     iconColor: 'text-emerald-500',

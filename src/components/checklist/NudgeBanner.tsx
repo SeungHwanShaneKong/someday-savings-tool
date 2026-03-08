@@ -1,4 +1,4 @@
-// [CACHE-BUST-20260307-172400]
+// [CL-AI-HIERARCHY-20260308-163000]
 // [DDAY-INLINE-PICKER-2026-03-07] 인라인 날짜 선택기 Popover 통합
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -52,7 +52,7 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave }: NudgeBanner
   const useInlinePicker = type === 'no-dday' && !!onSave;
 
   return (
-    <div className="relative bg-gradient-to-r from-primary/10 via-blue-50 to-primary/5 rounded-2xl p-4 border border-primary/20">
+    <div className="relative bg-gradient-to-r from-primary/10 via-blue-50 to-primary/5 rounded-2xl p-4 sm:p-5 border border-primary/20">
       <button
         onClick={() => setDismissed(true)}
         className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground rounded-full"

@@ -322,6 +322,30 @@
     animation: bounce 0.5s ease-in-out 2;
   }
 
+  /* [CL-INSIGHT-CHECK-20260315-160000] 인사이트 체크 파티클 & 카드 퇴장 */
+  .insight-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .insight-particle.is-active {
+    animation: insightParticleBurst 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes insightParticleBurst {
+    0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3); }
+  }
+  .insight-card-dismissing {
+    animation: insight-dismiss 0.35s ease-out forwards;
+  }
+  .insight-card-collapsing {
+    overflow: hidden;
+    animation: insight-collapse 0.3s ease-out 0.35s forwards;
+  }
+
   /* Accessibility — reduced motion */
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up,
@@ -333,8 +357,14 @@
     .collapsible-content[data-state="open"],
     .collapsible-content[data-state="closed"],
     .animate-check-pop,
-    .animate-bounce-limited {
+    .animate-bounce-limited,
+    .insight-particle.is-active,
+    .insight-card-dismissing,
+    .insight-card-collapsing {
       animation: none !important;
+    }
+    .insight-card-dismissing {
+      opacity: 0;
     }
   }
 }

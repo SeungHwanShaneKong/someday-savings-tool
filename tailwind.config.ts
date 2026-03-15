@@ -109,12 +109,32 @@ export default {
           "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--primary) / 0.4)" },
           "50%": { boxShadow: "0 0 12px 4px hsl(var(--primary) / 0.2)" },
         },
+        /* [CL-INSIGHT-CHECK-20260315-160000] 인사이트 체크 애니메이션 */
+        "insight-check-pop": {
+          "0%": { transform: "scale(1)" },
+          "30%": { transform: "scale(1.3)" },
+          "50%": { transform: "scale(0.95)" },
+          "70%": { transform: "scale(1.05)" },
+          "100%": { transform: "scale(1)" },
+        },
+        "insight-dismiss": {
+          "0%": { opacity: "1", transform: "translateX(0) scale(1)" },
+          "100%": { opacity: "0", transform: "translateX(20px) scale(0.95)" },
+        },
+        "insight-collapse": {
+          "0%": { maxHeight: "200px", marginBottom: "8px", opacity: "1" },
+          "100%": { maxHeight: "0px", marginBottom: "0px", opacity: "0", padding: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "coffee-wiggle": "coffee-wiggle 10s ease-in-out infinite",
         "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        /* [CL-INSIGHT-CHECK-20260315-160000] */
+        "insight-check-pop": "insight-check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "insight-dismiss": "insight-dismiss 0.35s ease-out forwards",
+        "insight-collapse": "insight-collapse 0.3s ease-out forwards",
       },
     },
   },

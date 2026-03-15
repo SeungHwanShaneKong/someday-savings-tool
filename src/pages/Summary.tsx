@@ -88,6 +88,12 @@ export default function Summary() {
     return budgetItems.reduce((sum, item) => sum + item.amount, 0);
   };
 
+  // [CL-FULL-QA-20260315-170000] 동일 이름 옵션 충돌 방지
+  const budgetLabels = budgetsForComparison.map((budget, i) => {
+    const sameNameCount = budgetsForComparison.slice(0, i).filter(b => b.name === budget.name).length;
+    return sameNameCount > 0 ? `${budget.name} (${sameNameCount + 1})` : budget.name;
+  });
+
   // Find min and max budgets
   const budgetTotals = budgetsForComparison.map(b => ({
     ...b,
@@ -253,21 +259,21 @@ export default function Summary() {
 
   // Chart data for comparison
   const comparisonChartData = budgetsForComparison.map((budget, index) => ({
-    name: budget.name,
+    name: budgetLabels[index],
     total: getBudgetTotal(budget.items),
     fill: CHART_COLORS[index % CHART_COLORS.length],
   }));
 
-  // Category comparison data
+  // Category comparison data — [CL-FULL-QA-20260315-170000] budgetLabels 사용
   const categoryComparisonData = BUDGET_CATEGORIES.map(category => {
     const result: Record<string, any> = { category: category.name, icon: category.icon };
-    budgetsForComparison.forEach(budget => {
-      result[budget.name] = getCategoryTotal(category.id, budget.items);
+    budgetsForComparison.forEach((budget, i) => {
+      result[budgetLabels[i]] = getCategoryTotal(category.id, budget.items);
     });
     return result;
   }).filter(data => {
     // Filter out categories with all zeros
-    return budgetsForComparison.some(b => data[b.name] > 0);
+    return budgetLabels.some(label => data[label] > 0);
   });
 
   return (
@@ -397,60 +403,62 @@ export default function Summary() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">카테고리</th>
-                      {budgetsForComparison.map((budget, index) => (
-                        <th 
-                          key={budget.id} 
+                    <tr className="border-b">{[
+                      <th key="cat-h" className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">카테고리</th>,
+                      ...budgetsForComparison.map((budget, index) => (
+                        <th
+                          key={budget.id}
                           className="text-right py-2 px-2 text-sm font-medium"
                           style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
                         >
-                          {budget.name}
+                          {budgetLabels[index]}
                         </th>
-                      ))}
-                    </tr>
+                      )),
+                    ]}</tr>
                   </thead>
                   <tbody>
-                    {categoryComparisonData.map((row, idx) => (
-                      <tr key={idx} className="border-b last:border-0">
-                        <td className="py-3 px-2">
+                    {/* [CL-FULL-QA-20260315-170000] index key → category key */}
+                    {categoryComparisonData.map((row) => (
+                      <tr key={row.category} className="border-b last:border-0">{[
+                        <td key="cat-label" className="py-3 px-2">
                           <span className="mr-2">{row.icon}</span>
                           <span className="text-sm">{row.category}</span>
-                        </td>
-                        {budgetsForComparison.map((budget, budgetIdx) => {
-                          const value = row[budget.name] as number;
-                          const maxInRow = Math.max(...budgetsForComparison.map(b => row[b.name] as number));
-                          const minInRow = Math.min(...budgetsForComparison.filter(b => row[b.name] > 0).map(b => row[b.name] as number));
+                        </td>,
+                        ...budgetsForComparison.map((budget, budgetIdx) => {
+                          const label = budgetLabels[budgetIdx];
+                          const value = row[label] as number;
+                          const maxInRow = Math.max(...budgetLabels.map(l => row[l] as number));
+                          const minInRow = Math.min(...budgetLabels.filter(l => row[l] > 0).map(l => row[l] as number));
                           const isMax = value === maxInRow && budgets.length > 1;
                           const isMin = value === minInRow && value > 0 && budgets.length > 1 && maxInRow !== minInRow;
-                          
+
                           return (
-                            <td 
-                              key={budget.id} 
+                            <td
+                              key={budget.id}
                               className={`text-right py-3 px-2 text-sm ${
-                                isMin ? 'text-green-600 font-medium' : 
+                                isMin ? 'text-green-600 font-medium' :
                                 isMax ? 'text-orange-600 font-medium' : ''
                               }`}
                             >
                               {value > 0 ? formatKoreanWon(value) : '-'}
                             </td>
                           );
-                        })}
-                      </tr>
+                        }),
+                      ]}</tr>
                     ))}
                     {/* Total row */}
-                    <tr className="bg-muted/50 font-semibold">
-                      <td className="py-3 px-2 text-sm">💰 총합</td>
-                      {budgetsForComparison.map((budget, index) => (
-                        <td 
-                          key={budget.id} 
+                    <tr className="bg-muted/50 font-semibold">{[
+                      <td key="total-label" className="py-3 px-2 text-sm">💰 총합</td>,
+                      ...budgetsForComparison.map((budget, index) => (
+                        <td
+                          key={budget.id}
                           className="text-right py-3 px-2 text-sm"
                           style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
                         >
                           {formatKoreanWon(getBudgetTotal(budget.items))}
                         </td>
-                      ))}
-                    </tr>
+                      )),
+                    ]}</tr>
                   </tbody>
                 </table>
               </div>
@@ -462,45 +470,47 @@ export default function Summary() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">분담</th>
-                      {budgetsForComparison.map((budget, index) => (
-                        <th 
-                          key={budget.id} 
+                    <tr className="border-b">{[
+                      <th key="split-h" className="text-left py-2 px-2 text-sm font-medium text-muted-foreground">분담</th>,
+                      ...budgetsForComparison.map((budget, index) => (
+                        <th
+                          key={budget.id}
                           className="text-right py-2 px-2 text-sm font-medium"
                           style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
                         >
-                          {budget.name}
+                          {budgetLabels[index]}
                         </th>
-                      ))}
-                    </tr>
+                      )),
+                    ]}</tr>
                   </thead>
-                  <tbody>
-                    {COST_SPLIT_OPTIONS.map((splitOpt) => {
+                  <tbody>{/* [CL-FULL-QA-20260315-170000] validateDOMNesting 경고 수정 */}
+                    {COST_SPLIT_OPTIONS.filter((splitOpt) => {
+                      if (splitOpt.value !== '-') return true;
+                      return budgetsForComparison.some(budget =>
+                        budget.items.filter(item => (item.cost_split || '-') === '-').reduce((s, i) => s + i.amount, 0) > 0
+                      );
+                    }).map((splitOpt) => {
                       const splitTotals = budgetsForComparison.map(budget => ({
                         budgetId: budget.id,
                         total: budget.items
                           .filter(item => (item.cost_split || '-') === splitOpt.value)
                           .reduce((sum, item) => sum + item.amount, 0)
                       }));
-                      const hasAnyValue = splitTotals.some(t => t.total > 0);
-                      if (!hasAnyValue && splitOpt.value === '-') return null;
-                      
                       return (
-                        <tr key={splitOpt.value} className="border-b last:border-0">
-                          <td className="py-3 px-2">
-                            <span 
+                        <tr key={splitOpt.value} className="border-b last:border-0">{[
+                          <td key="split-label" className="py-3 px-2">
+                            <span
                               className="inline-block w-3 h-3 rounded-full mr-2"
                               style={{ backgroundColor: COST_SPLIT_COLORS[splitOpt.value] }}
                             />
                             <span className="text-sm">{splitOpt.label}</span>
-                          </td>
-                          {splitTotals.map((st) => (
+                          </td>,
+                          ...splitTotals.map((st) => (
                             <td key={st.budgetId} className="text-right py-3 px-2 text-sm font-medium">
                               {st.total > 0 ? formatKoreanWon(st.total) : '-'}
                             </td>
-                          ))}
-                        </tr>
+                          )),
+                        ]}</tr>
                       );
                     })}
                   </tbody>

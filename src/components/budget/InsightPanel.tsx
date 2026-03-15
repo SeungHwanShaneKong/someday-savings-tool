@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+// [CL-INSIGHT-CHECK-20260315-160000] dismissing 중간 상태 + collapsing 래퍼
+import { useState, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InsightCard } from './InsightCard';
-import { generateBudgetInsights, type BudgetInsight } from '@/lib/budget-optimizer';
+import { generateBudgetInsights } from '@/lib/budget-optimizer';
 import type { ExtendedBudgetItem } from '@/components/BudgetTable';
 
 interface InsightPanelProps {
@@ -13,6 +14,7 @@ interface InsightPanelProps {
 export function InsightPanel({ items, className }: InsightPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissing, setDismissing] = useState<Set<string>>(new Set());
 
   // Convert ExtendedBudgetItem to BudgetItem format
   const insights = useMemo(() => {
@@ -28,8 +30,24 @@ export function InsightPanel({ items, className }: InsightPanelProps) {
   }, [items]);
 
   const visibleInsights = insights.filter((i) => !dismissed.has(i.id));
+  const activeCount = visibleInsights.filter((i) => !dismissing.has(i.id)).length;
 
-  if (visibleInsights.length === 0) return null;
+  const handleDismiss = useCallback((id: string) => {
+    // Phase 1: 카드 퇴장 애니메이션 시작
+    setDismissing((prev) => new Set([...prev, id]));
+
+    // Phase 2: 애니메이션 완료 후 DOM에서 제거
+    setTimeout(() => {
+      setDismissed((prev) => new Set([...prev, id]));
+      setDismissing((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 650);
+  }, []);
+
+  if (activeCount === 0 && visibleInsights.length === 0) return null;
 
   return (
     <div
@@ -49,7 +67,7 @@ export function InsightPanel({ items, className }: InsightPanelProps) {
             AI 인사이트
           </span>
           <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
-            {visibleInsights.length}
+            {activeCount}
           </span>
         </div>
         {isOpen ? (
@@ -63,13 +81,19 @@ export function InsightPanel({ items, className }: InsightPanelProps) {
       {isOpen && (
         <div className="px-4 pb-4 space-y-2">
           {visibleInsights.map((insight) => (
-            <InsightCard
+            <div
               key={insight.id}
-              insight={insight}
-              onDismiss={(id) =>
-                setDismissed((prev) => new Set([...prev, id]))
-              }
-            />
+              className={cn(
+                'transition-all duration-300',
+                dismissing.has(insight.id) && 'insight-card-collapsing'
+              )}
+            >
+              <InsightCard
+                insight={insight}
+                isDismissing={dismissing.has(insight.id)}
+                onDismiss={handleDismiss}
+              />
+            </div>
           ))}
         </div>
       )}

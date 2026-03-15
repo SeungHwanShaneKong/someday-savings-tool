@@ -32,20 +32,27 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
     );
   }
 
+  // [CL-FULL-QA-20260315-170000] 동일 이름 옵션 충돌 방지: id 기반 고유 라벨 생성
+  const budgetLabels = budgets.map((budget, i) => {
+    const sameNameCount = budgets.slice(0, i).filter(b => b.name === budget.name).length;
+    return sameNameCount > 0 ? `${budget.name} (${sameNameCount + 1})` : budget.name;
+  });
+
   // Calculate totals for each budget
-  const budgetTotals = budgets.map(budget => ({
-    name: budget.name,
+  const budgetTotals = budgets.map((budget, i) => ({
+    id: budget.id,
+    name: budgetLabels[i],
     total: budget.items.reduce((sum, item) => sum + item.amount, 0),
   }));
 
   // Calculate category breakdown for each budget
   const categoryComparison = BUDGET_CATEGORIES.map(category => {
     const row: Record<string, any> = { category: category.name, icon: category.icon };
-    budgets.forEach(budget => {
+    budgets.forEach((budget, i) => {
       const categoryTotal = budget.items
         .filter(item => item.category === category.id)
         .reduce((sum, item) => sum + item.amount, 0);
-      row[budget.name] = categoryTotal;
+      row[budgetLabels[i]] = categoryTotal;
     });
     return row;
   });
@@ -191,9 +198,9 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
                 <Tooltip content={<CustomTooltip />} />
                 <Legend wrapperStyle={{ fontSize: '10px' }} />
                 {budgets.map((budget, index) => (
-                  <Bar 
+                  <Bar
                     key={budget.id}
-                    dataKey={budget.name} 
+                    dataKey={budgetLabels[index]}
                     fill={CHART_COLORS[index % CHART_COLORS.length]}
                     radius={[4, 4, 0, 0]}
                   />
@@ -213,42 +220,42 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <table className="w-full text-xs sm:text-sm min-w-[300px]">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2 sm:px-3">카테고리</th>
-                  {budgets.map((budget, index) => (
-                    <th 
-                      key={budget.id} 
+                <tr className="border-b">{[
+                  <th key="cat-h" className="text-left py-2 px-2 sm:px-3">카테고리</th>,
+                  ...budgets.map((budget, index) => (
+                    <th
+                      key={budget.id}
                       className="text-right py-2 px-2 sm:px-3 whitespace-nowrap"
                       style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
                     >
-                      {budget.name}
+                      {budgetLabels[index]}
                     </th>
-                  ))}
-                </tr>
+                  )),
+                ]}</tr>
               </thead>
               <tbody>
                 {categoryComparison.map((row) => (
-                  <tr key={row.category} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 sm:px-3 whitespace-nowrap">
+                  <tr key={row.category} className="border-b hover:bg-muted/50">{[
+                    <td key="cat-label" className="py-2 px-2 sm:px-3 whitespace-nowrap">
                       <span className="mr-1 sm:mr-2">{row.icon}</span>
                       <span className="hidden sm:inline">{row.category}</span>
                       <span className="sm:hidden text-[11px]">{row.category}</span>
-                    </td>
-                    {budgets.map((budget) => (
+                    </td>,
+                    ...budgets.map((budget, index) => (
                       <td key={budget.id} className="text-right py-2 px-2 sm:px-3 font-medium whitespace-nowrap text-[11px] sm:text-sm">
-                        {row[budget.name] > 0 ? formatKoreanWon(row[budget.name]) : '-'}
+                        {row[budgetLabels[index]] > 0 ? formatKoreanWon(row[budgetLabels[index]]) : '-'}
                       </td>
-                    ))}
-                  </tr>
+                    )),
+                  ]}</tr>
                 ))}
-                <tr className="bg-primary/10 font-bold">
-                  <td className="py-2 px-2 sm:px-3">총계</td>
-                  {budgets.map((budget) => (
+                <tr className="bg-primary/10 font-bold">{[
+                  <td key="total-label" className="py-2 px-2 sm:px-3">총계</td>,
+                  ...budgets.map((budget, index) => (
                     <td key={budget.id} className="text-right py-2 px-2 sm:px-3 text-primary text-[11px] sm:text-sm whitespace-nowrap">
-                      {formatKoreanWon(budgetTotals.find(b => b.name === budget.name)?.total || 0)}
+                      {formatKoreanWon(budgetTotals.find(b => b.id === budget.id)?.total || 0)}
                     </td>
-                  ))}
-                </tr>
+                  )),
+                ]}</tr>
               </tbody>
             </table>
           </div>
@@ -264,18 +271,18 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <table className="w-full text-xs sm:text-sm min-w-[300px]">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2 sm:px-3">분담</th>
-                  {budgets.map((budget, index) => (
-                    <th 
-                      key={budget.id} 
+                <tr className="border-b">{[
+                  <th key="split-h" className="text-left py-2 px-2 sm:px-3">분담</th>,
+                  ...budgets.map((budget, index) => (
+                    <th
+                      key={budget.id}
                       className="text-right py-2 px-2 sm:px-3 whitespace-nowrap"
                       style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
                     >
-                      {budget.name}
+                      {budgetLabels[index]}
                     </th>
-                  ))}
-                </tr>
+                  )),
+                ]}</tr>
               </thead>
               <tbody>
                 {COST_SPLIT_OPTIONS.map((splitOpt) => {
@@ -289,23 +296,23 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
                   if (!hasAnyValue && splitOpt.value === '-') return null;
                   
                   return (
-                    <tr key={splitOpt.value} className="border-b hover:bg-muted/50">
-                      <td className="py-2 px-2 sm:px-3 whitespace-nowrap">
-                        <span 
+                    <tr key={splitOpt.value} className="border-b hover:bg-muted/50">{[
+                      <td key="split-label" className="py-2 px-2 sm:px-3 whitespace-nowrap">
+                        <span
                           className="inline-block w-2 h-2 sm:w-3 sm:h-3 rounded-full mr-1 sm:mr-2"
                           style={{ backgroundColor: COST_SPLIT_COLORS[splitOpt.value] }}
                         />
                         {splitOpt.label}
-                      </td>
-                      {splitTotals.map((st, idx) => (
-                        <td 
-                          key={st.budgetId} 
+                      </td>,
+                      ...splitTotals.map((st, idx) => (
+                        <td
+                          key={st.budgetId}
                           className="text-right py-2 px-2 sm:px-3 font-medium whitespace-nowrap text-[11px] sm:text-sm"
                         >
                           {st.total > 0 ? formatKoreanWon(st.total) : '-'}
                         </td>
-                      ))}
-                    </tr>
+                      )),
+                    ]}</tr>
                   );
                 })}
               </tbody>

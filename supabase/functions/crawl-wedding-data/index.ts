@@ -39,14 +39,8 @@ serve(async (req) => {
 
     // [EF-ADMIN-FIX-20260308-110000] Cross-project auth + admin check on main project
     const token = authHeader.replace('Bearer ', '');
-    let userId: string | null = null;
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (user) {
-      userId = user.id;
-    } else {
-      const payload = decodeJwtPayload(token);
-      if (payload?.sub) userId = payload.sub;
-    }
+    // [SEC-FIX-20260315] Secure JWT verification
+    const userId = await verifyUserToken(supabase, token);
 
     if (!userId) {
       return new Response(

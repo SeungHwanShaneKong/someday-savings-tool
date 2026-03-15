@@ -3,7 +3,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { verifyUserToken } from '../_shared/jwt.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
@@ -30,14 +30,8 @@ serve(async (req) => {
 
   const token = authHeader.replace('Bearer ', '');
 
-  // Cross-project auth: try getUser first, fall back to JWT decode
-  const { data: { user } } = await supabase.auth.getUser(token);
-  if (user) {
-    userId = user.id;
-  } else {
-    const payload = decodeJwtPayload(token);
-    if (payload?.sub) userId = payload.sub;
-  }
+  // [SEC-FIX-20260315] Secure JWT verification
+  userId = await verifyUserToken(supabase, token);
 
   if (!userId) {
     await logFunctionCall(supabase, 'data-quality-guardian', startTime, 401, null, '유효하지 않은 토큰');

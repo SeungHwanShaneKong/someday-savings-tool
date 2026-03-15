@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
-import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { verifyUserToken } from '../_shared/jwt.ts';
 
 // Feature-specific system prompts
 const SYSTEM_PROMPTS: Record<string, string> = {
@@ -63,24 +63,15 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify JWT — try native verification first, then decode for cross-project tokens
-    // (Live site issues JWTs from Lovable's project; Edge Functions live on a different project)
+    // [SEC-FIX-20260315] Secure JWT verification (replaces decodeJwtPayload)
     const token = authHeader.replace('Bearer ', '');
-    let userId: string;
+    const userId = await verifyUserToken(supabase, token);
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (!authError && user) {
-      userId = user.id;
-    } else {
-      // Cross-project token: decode payload to extract user ID
-      const payload = decodeJwtPayload(token);
-      if (!payload) {
-        return new Response(
-          JSON.stringify({ error: '유효하지 않은 인증입니다' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      userId = payload.sub;
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 인증입니다' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Parse body
@@ -125,13 +116,12 @@ Deno.serve(async (req: Request) => {
     ];
 
     // Call OpenAI GPT
-    // [EF-RESILIENCE-20260308-051500] gpt-4o-mini: restored temperature
     const reply = await chatCompletion(fullMessages, {
       temperature: 0.7,
       maxTokens: 2048,
     });
 
-    // Save conversation (wrapped in try-catch: cross-project user_id may fail FK constraint)
+    // Save conversation
     try {
       await supabase.from('ai_conversations').insert({
         user_id: userId,
@@ -140,7 +130,6 @@ Deno.serve(async (req: Request) => {
         metadata: context ? { context } : null,
       });
     } catch (saveError) {
-      // Conversation save failure should not block the AI response
       console.warn('Failed to save conversation:', saveError);
     }
 

@@ -25,15 +25,8 @@ serve(async (req) => {
 
   const token = authHeader.replace('Bearer ', '');
 
-  // Cross-project auth: try getUser first, fall back to JWT decode
-  let userId: string | null = null;
-  const { data: { user } } = await supabase.auth.getUser(token);
-  if (user) {
-    userId = user.id;
-  } else {
-    const payload = decodeJwtPayload(token);
-    if (payload?.sub) userId = payload.sub;
-  }
+  // [SEC-FIX-20260315] Secure JWT verification
+  const userId = await verifyUserToken(supabase, token);
 
   if (!userId) {
     return new Response(

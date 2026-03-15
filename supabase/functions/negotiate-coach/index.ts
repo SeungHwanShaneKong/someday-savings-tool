@@ -92,17 +92,9 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify JWT — try native verification first, then decode for cross-project tokens
+    // [SEC-FIX-20260315] Secure JWT verification
     const token = authHeader.replace('Bearer ', '');
-    let userId: string | null = null;
-
-    const { data: { user } } = await supabase.auth.getUser(token);
-    if (user) {
-      userId = user.id;
-    } else {
-      const payload = decodeJwtPayload(token);
-      if (payload?.sub) userId = payload.sub;
-    }
+    const userId = await verifyUserToken(supabase, token);
 
     if (!userId) {
       return new Response(

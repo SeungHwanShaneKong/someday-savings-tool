@@ -64,13 +64,8 @@ serve(async (req: Request) => {
 
     const token = authHeader.replace('Bearer ', '');
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (!authError && user) {
-      userId = user.id;
-    } else {
-      const payload = decodeJwtPayload(token);
-      if (payload?.sub) userId = payload.sub;
-    }
+    // [SEC-FIX-20260315] Secure JWT verification
+    userId = await verifyUserToken(supabase, token);
 
     if (!userId) {
       await logFunctionCall(supabase, 'timeline-optimizer', startTime, 401, null, '유효하지 않은 토큰');

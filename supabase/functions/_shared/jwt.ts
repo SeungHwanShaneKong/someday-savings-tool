@@ -21,8 +21,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
  * @param token - Raw JWT token (without "Bearer " prefix)
  * @returns userId string if valid, null if invalid
  */
+// [SEC-FIX-20260315-104500] Use 'any' to avoid SupabaseClient generic mismatch
+// deno-lint-ignore no-explicit-any
 export async function verifyUserToken(
-  localSupabase: ReturnType<typeof createClient>,
+  localSupabase: any,
   token: string,
 ): Promise<string | null> {
   // 1. Try local project verification

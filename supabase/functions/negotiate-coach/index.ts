@@ -3,7 +3,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { verifyUserToken } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 

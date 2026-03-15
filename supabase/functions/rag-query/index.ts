@@ -1,11 +1,11 @@
 // rag-query: Vector search → top-5 → GPT-4.1-mini response with citations
-// [ZERO-COST-PIPELINE-2026-03-07] freshness_info 응답 추가
+// [SEC-FIX-20260315] Replaced decodeJwtPayload with verifyUserToken
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
 import { DEFAULT_MODEL } from '../_shared/openai.ts';
-import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { verifyUserToken } from '../_shared/jwt.ts';
 
 const openai = new OpenAI({
   apiKey: Deno.env.get('OPENAI_API_KEY')!,
@@ -51,20 +51,15 @@ serve(async (req) => {
       );
     }
 
-    // Verify JWT — native first, then decode for cross-project tokens
+    // [SEC-FIX-20260315] Secure JWT verification
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const userId = await verifyUserToken(supabase, token);
 
-    if (authError || !user) {
-      // Cross-project token: decode payload to validate
-      const payload = decodeJwtPayload(token);
-      if (!payload) {
-        return new Response(
-          JSON.stringify({ error: '유효하지 않은 토큰입니다' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      // Token is valid (cross-project); continue with request
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 토큰입니다' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const body: RagRequest = await req.json();
@@ -102,7 +97,6 @@ serve(async (req) => {
 
     if (searchError) {
       console.error('Vector search error:', searchError);
-      // Fall back to non-RAG response if vector search fails
     }
 
     // Step 3: Build context from matches

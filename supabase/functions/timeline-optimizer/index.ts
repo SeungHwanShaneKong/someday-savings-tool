@@ -2,7 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-import { decodeJwtPayload } from '../_shared/jwt.ts';
+import { verifyUserToken } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
@@ -64,13 +64,8 @@ serve(async (req: Request) => {
 
     const token = authHeader.replace('Bearer ', '');
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (!authError && user) {
-      userId = user.id;
-    } else {
-      const payload = decodeJwtPayload(token);
-      if (payload?.sub) userId = payload.sub;
-    }
+    // [SEC-FIX-20260315] Secure JWT verification
+    userId = await verifyUserToken(supabase, token);
 
     if (!userId) {
       await logFunctionCall(supabase, 'timeline-optimizer', startTime, 401, null, '유효하지 않은 토큰');

@@ -86,7 +86,7 @@ const FEATURES: Feature[] = [
   },
   {
     icon: Share2,
-    title: '이미지 저장 & 공유',
+    title: '예산요약 저장 & 공유',
     description: '예산표를 이미지로 저장하고 링크로 간편하게 공유',
     isAI: false,
     gradient: 'from-slate-500/10 to-slate-600/5',
@@ -263,7 +263,7 @@ export default function Landing() {
               꼼꼼한 셈 법
             </p>
             <h1 className="text-5xl sm:text-6xl font-black bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent tracking-tighter">
-              결혼셈
+              웨딩셈
             </h1>
           </div>
 

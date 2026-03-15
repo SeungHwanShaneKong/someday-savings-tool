@@ -24,7 +24,8 @@ import {
   Link as LinkIcon,
   TrendingDown,
   TrendingUp,
-  Minus
+  Minus,
+  Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -37,10 +38,7 @@ import { CHART_COLORS, COST_SPLIT_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/char
 // [AGENT-TEAM-9-20260307] P1 협상 코치 에이전트
 import { useNegotiateCoach } from '@/hooks/useNegotiateCoach';
 import { NegotiationTips } from '@/components/planning/NegotiationTips';
-// [AGENT-TEAM-9-20260307] M1 공유 이미지 생성 에이전트
-import { useShareImageGen } from '@/hooks/useShareImageGen';
-import ShareCardPreview from '@/components/marketing/ShareCardPreview';
-import { Sparkles, Image as ImageIcon } from 'lucide-react';
+// [CL-REMOVE-SHARECARD-20260315-120000] 공유 카드 기능 제거
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -67,8 +65,7 @@ export default function Summary() {
   const { result: negotiateResult, loading: negotiateLoading, error: negotiateError, askCoach } = useNegotiateCoach();
   const [negotiateOpen, setNegotiateOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
-  // [AGENT-TEAM-9-20260307] M1 공유 이미지 생성 에이전트
-  const { result: shareCardResult, loading: shareCardLoading, error: shareCardError, generate: generateShareCard } = useShareImageGen();
+  // [CL-REMOVE-SHARECARD-20260315-120000] 공유 카드 state 제거
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -281,7 +278,7 @@ export default function Summary() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate('/budget')}
+            onClick={() => navigate('/')} /* [CL-HOME-BTN-20260315-140000] */
             className="rounded-full"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -615,28 +612,7 @@ export default function Summary() {
           </Button>
         </div>
 
-        {/* [AGENT-TEAM-9-20260307] M1 공유 카드 만들기 버튼 + 프리뷰 */}
-        <div className="mt-4 space-y-4">
-          <Button
-            onClick={() => {
-              const cats = BUDGET_CATEGORIES
-                .map(c => ({ name: c.name, amount: getCategoryTotal(c.id, items) }))
-                .filter(c => c.amount > 0);
-              generateShareCard(total, cats);
-            }}
-            variant="outline"
-            className="w-full h-12 text-body font-medium rounded-xl gap-2 border-pink-200 text-pink-700 hover:bg-pink-50"
-            disabled={shareCardLoading}
-          >
-            <ImageIcon className="h-5 w-5" />
-            {shareCardLoading ? '카드 생성 중...' : '공유 카드 만들기'}
-          </Button>
-          <ShareCardPreview
-            result={shareCardResult}
-            loading={shareCardLoading}
-            error={shareCardError}
-          />
-        </div>
+        {/* [CL-REMOVE-SHARECARD-20260315-120000] 공유 카드 기능 제거됨 */}
       </main>
 
       {/* [AGENT-TEAM-9-20260307] P1 협상 코치 Sheet */}

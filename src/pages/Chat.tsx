@@ -34,7 +34,7 @@ export default function Chat() {
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
         <div className="flex items-center justify-between px-4 h-14 max-w-lg mx-auto">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/')} /* [CL-HOME-BTN-20260315-140000] */
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />

@@ -82,7 +82,7 @@ export function BudgetComparisonDashboard({ budgets }: BudgetComparisonDashboard
       {/* Total Comparison Cards - Mobile: 2 cols, Tablet+: 4 cols */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         {budgetTotals.map((budget, index) => (
-          <Card key={budget.name} className={index === 0 ? 'ring-2 ring-primary' : ''}>
+          <Card key={`total-${index}`} className={index === 0 ? 'ring-2 ring-primary' : ''}> {/* [CL-HOME-FIX-20260315-120000] */}
             <CardHeader className="pb-1 sm:pb-2 p-3 sm:p-6">
               <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
                 {budget.name}

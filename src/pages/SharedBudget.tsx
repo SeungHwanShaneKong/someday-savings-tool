@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BudgetDonutChart } from '@/components/BudgetDonutChart';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
-import { Home, Lock, Sparkles } from 'lucide-react';
+import { Home, Lock, Sparkles, ArrowLeft } from 'lucide-react'; // [CL-HOME-BTN-20260315-140000]
 import { useAuth } from '@/hooks/useAuth';
 
 interface BudgetItem {
@@ -131,10 +131,15 @@ export default function SharedBudget() {
           </div>
         </div>
 
-        {/* Header */}
-        <header className="px-4 py-5 text-center">
-          <h1 className="text-lg font-semibold text-foreground">공유된 결혼 예산</h1>
-          <p className="text-xs text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
+        {/* Header — [CL-HOME-BTN-20260315-140000] */}
+        <header className="px-4 py-5">
+          <button onClick={() => navigate('/')} className="p-2 -ml-2 mb-2 text-muted-foreground hover:text-foreground transition-colors" aria-label="홈으로">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="text-center">
+            <h1 className="text-lg font-semibold text-foreground">공유된 결혼 예산</h1>
+            <p className="text-xs text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
+          </div>
         </header>
 
         {/* Main content - Slim vertical card */}
@@ -213,10 +218,15 @@ export default function SharedBudget() {
   // Owner view: Full interactive page (existing design but slimmer)
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="px-4 py-5 text-center">
-        <h1 className="text-lg font-semibold text-foreground">공유된 결혼 예산</h1>
-        <p className="text-xs text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
+      {/* Header — [CL-HOME-BTN-20260315-140000] */}
+      <header className="px-4 py-5">
+        <button onClick={() => navigate('/')} className="p-2 -ml-2 mb-2 text-muted-foreground hover:text-foreground transition-colors" aria-label="홈으로">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <div className="text-center">
+          <h1 className="text-lg font-semibold text-foreground">공유된 결혼 예산</h1>
+          <p className="text-xs text-muted-foreground mt-1">웨딩셈으로 작성되었어요</p>
+        </div>
       </header>
 
       {/* Main content - Slim vertical card */}

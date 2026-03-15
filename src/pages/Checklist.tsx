@@ -106,9 +106,9 @@ export default function Checklist() {
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
         <div className="flex items-center justify-between px-4 h-14 max-w-lg sm:max-w-2xl lg:max-w-4xl mx-auto">
           <button
-            onClick={() => navigate('/budget')}
+            onClick={() => navigate('/')} /* [CL-HOME-BTN-20260315-140000] */
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="체크리스트 나가기"
+            aria-label="홈으로"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>

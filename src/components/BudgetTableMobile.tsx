@@ -341,14 +341,18 @@ export function BudgetTableMobile({
                           <span className="text-xs text-muted-foreground">
                             ({categoryItems.length}개)
                           </span>
+                          {/* [CL-HOME-FIX-20260315-120000] button 중첩 해소 — span + role=link */}
                           {category.id === 'honeymoon' && (
-                            <button
+                            <span
+                              role="link"
+                              tabIndex={0}
                               onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/honeymoon'); }}
-                              className="flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors animate-pulse-subtle"
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); navigate('/honeymoon'); } }}
+                              className="flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors animate-pulse-subtle cursor-pointer"
                             >
                               <Sparkles className="w-3 h-3" />
                               추천
-                            </button>
+                            </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">

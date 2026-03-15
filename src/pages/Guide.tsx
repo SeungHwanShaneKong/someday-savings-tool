@@ -12,6 +12,7 @@ import {
   TrendingDown,
   Sparkles,
   CheckCircle2,
+  ArrowLeft, // [CL-HOME-BTN-20260315-140000]
 } from 'lucide-react';
 
 /* ─── Budget Category Data ─── */
@@ -161,6 +162,12 @@ export default function Guide() {
     <div className="min-h-screen bg-background flex flex-col">
       <main className="flex-1 px-6 pt-10 pb-12">
         <div className="max-w-lg mx-auto">
+          {/* [CL-HOME-BTN-20260315-140000] Home button */}
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4" aria-label="홈으로">
+            <ArrowLeft className="w-4 h-4" />
+            <span>홈</span>
+          </Link>
+
           <Breadcrumb items={breadcrumbItems} />
 
           {/* Header */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react'; // [CL-HOME-FIX-20260315-120000]
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
@@ -23,20 +23,39 @@ export interface BudgetSnapshot {
   created_at: string;
 }
 
+// [CL-HOME-FIX-20260315-120000] sessionStorage 키 — 네비게이션 간 activeBudgetId 유지
+const ACTIVE_BUDGET_KEY = 'wedding_active_budget_id';
+
 export function useMultipleBudgets() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [activeBudgetId, setActiveBudgetId] = useState<string | null>(null);
+  // [CL-HOME-FIX-20260315-120000] sessionStorage에서 복원하여 네비게이션 간 유지
+  const [activeBudgetId, setActiveBudgetIdRaw] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(ACTIVE_BUDGET_KEY); } catch { return null; }
+  });
   const [items, setItems] = useState<ExtendedBudgetItem[]>([]);
   const [allBudgetsItems, setAllBudgetsItems] = useState<Record<string, ExtendedBudgetItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<BudgetSnapshot[]>([]);
 
+  // [CL-HOME-FIX-20260315-120000] 가드 ref — 중복 fetch/생성 방지
+  const isCreatingRef = useRef(false);
+  const hasFetchedRef = useRef(false);
+
+  // [CL-HOME-FIX-20260315-120000] setter 래핑 — sessionStorage 동기화
+  const setActiveBudgetId = useCallback((id: string | null) => {
+    setActiveBudgetIdRaw(id);
+    try {
+      if (id) sessionStorage.setItem(ACTIVE_BUDGET_KEY, id);
+      else sessionStorage.removeItem(ACTIVE_BUDGET_KEY);
+    } catch { /* SSR/private browsing fallback */ }
+  }, []);
+
   // Use the optimized version recovery hook
   const versionRecovery = useVersionRecovery();
 
-  // Fetch all budgets for the user
+  // [CL-HOME-FIX-20260315-120000] Fetch all budgets for the user — updated_at DESC + 가드
   const fetchBudgets = useCallback(async () => {
     if (!user) return;
 
@@ -45,17 +64,20 @@ export function useMultipleBudgets() {
         .from('budgets')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .order('updated_at', { ascending: false }); // 최근 편집순
 
       if (fetchError) throw fetchError;
 
       if (existingBudgets && existingBudgets.length > 0) {
         setBudgets(existingBudgets);
-        
-        // Set first budget as active if none selected
-        if (!activeBudgetId || !existingBudgets.find(b => b.id === activeBudgetId)) {
-          setActiveBudgetId(existingBudgets[0].id);
-        }
+
+        // [CL-HOME-FIX-20260315-120000] sessionStorage 저장값이 유효하면 유지, 아니면 첫 번째(최근 편집)
+        setActiveBudgetIdRaw(prev => {
+          const valid = prev && existingBudgets.find(b => b.id === prev);
+          const nextId = valid ? prev : existingBudgets[0].id;
+          try { if (nextId) sessionStorage.setItem(ACTIVE_BUDGET_KEY, nextId); } catch {}
+          return nextId;
+        });
 
         // Fetch all items for all budgets (for comparison dashboard)
         const { data: allItems, error: allItemsError } = await supabase
@@ -72,8 +94,12 @@ export function useMultipleBudgets() {
           setAllBudgetsItems(grouped);
         }
       } else {
-        // Create first budget
-        await createNewBudget('옵션 1');
+        // [CL-HOME-FIX-20260315-120000] 중복 생성 가드 — 레이스 컨디션 방지
+        if (!isCreatingRef.current) {
+          isCreatingRef.current = true;
+          await createNewBudget('옵션 1');
+          isCreatingRef.current = false;
+        }
       }
     } catch (error: any) {
       toast({
@@ -84,7 +110,7 @@ export function useMultipleBudgets() {
     } finally {
       setLoading(false);
     }
-  }, [user, activeBudgetId, toast]);
+  }, [user, toast]); // [CL-HOME-FIX-20260315-120000] activeBudgetId 의존성 제거
 
   // Fetch items for active budget
   const fetchItems = useCallback(async () => {
@@ -324,6 +350,11 @@ export function useMultipleBudgets() {
             item.id === itemId ? { ...item, ...updates } : item
           )
         }));
+        // [CL-HOME-FIX-20260315-120000] budget updated_at 갱신 → 최근 편집 옵션 우선 표시
+        supabase.from('budgets')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', activeBudgetId)
+          .then();
       }
     } catch (error: any) {
       toast({
@@ -801,16 +832,20 @@ export function useMultipleBudgets() {
     }
   };
 
+  // [CL-HOME-FIX-20260315-120000] user.id 기반으로 안정화 — 객체 참조 변경에 의한 중복 호출 방지
   useEffect(() => {
-    if (user) {
+    if (user && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       fetchBudgets();
-    } else {
+    } else if (!user) {
+      hasFetchedRef.current = false;
+      isCreatingRef.current = false;
       setBudgets([]);
       setItems([]);
       setActiveBudgetId(null);
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   useEffect(() => {
     if (activeBudgetId) {

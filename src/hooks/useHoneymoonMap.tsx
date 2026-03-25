@@ -6,6 +6,7 @@ import {
   type HoneymoonConcept,
   type AccommodationType,
 } from '@/lib/honeymoon-destinations';
+import { STYLE_TO_CONCEPTS, STYLE_TO_ACCOMMODATION, type TravelProfile } from '@/lib/honeymoon-profile';
 
 export interface MapViewState {
   longitude: number;
@@ -73,8 +74,8 @@ export function useHoneymoonMap() {
         if (prev.includes(destinationId)) {
           return prev.filter((id) => id !== destinationId);
         }
-        if (prev.length >= 3) {
-          // Max 3 for comparison
+        if (prev.length >= 5) {
+          // [CL-TOP100-DESTINATIONS-20260325] Max 5 for comparison (3→5)
           return [...prev.slice(1), destinationId];
         }
         return [...prev, destinationId];
@@ -115,6 +116,17 @@ export function useHoneymoonMap() {
     setSelectedIds(newOrder);
   }, []);
 
+  // [CL-HONEYMOON-REDESIGN-20260316] 온보딩 프로필 → 필터 적용
+  const applyProfile = useCallback((profile: TravelProfile) => {
+    setFilters({
+      maxBudget: profile.budgetRange.max,
+      minNights: profile.nights.min,
+      maxNights: profile.nights.max,
+      concepts: STYLE_TO_CONCEPTS[profile.dominantStyle] ?? [],
+      accommodationTypes: STYLE_TO_ACCOMMODATION[profile.dominantStyle] ?? [],
+    });
+  }, []);
+
   return {
     viewState,
     setViewState,
@@ -132,5 +144,6 @@ export function useHoneymoonMap() {
     setPopupDestination,
     flyTo,
     resetView,
+    applyProfile,
   };
 }

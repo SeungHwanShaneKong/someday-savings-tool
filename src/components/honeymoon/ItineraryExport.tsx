@@ -1,6 +1,7 @@
 // [HONEYMOON-UPGRADE-2026-03-07] 여행 일정 내보내기 & 공유
+// [CL-HONEYMOON-REDESIGN-20260316] PDF 저장 버튼 추가
 import { useState, useCallback } from 'react';
-import { Copy, Download, CheckCircle2 } from 'lucide-react';
+import { Copy, Download, CheckCircle2, FileText } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import type { Destination } from '@/lib/honeymoon-destinations';
 
@@ -118,6 +119,15 @@ export function ItineraryExport({ destinations, captureRef }: ItineraryExportPro
           {exporting ? '저장 중...' : '이미지 저장'}
         </button>
       )}
+
+      {/* [CL-HONEYMOON-REDESIGN-20260316] PDF/인쇄 저장 버튼 */}
+      <button
+        onClick={() => window.print()}
+        className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-medium bg-muted/50 hover:bg-muted text-foreground rounded-lg py-2 transition-colors"
+      >
+        <FileText className="w-3.5 h-3.5" />
+        PDF 저장
+      </button>
     </div>
   );
 }

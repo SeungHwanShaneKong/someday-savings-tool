@@ -1,8 +1,11 @@
+/**
+ * [CL-HONEYMOON-REDESIGN-20260316] profileApplied 배너 추가
+ */
 import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Sparkles } from 'lucide-react';
 import type { HoneymoonFilters } from '@/hooks/useHoneymoonMap';
 import type { HoneymoonConcept, AccommodationType } from '@/lib/honeymoon-destinations';
 
@@ -13,6 +16,8 @@ interface FilterSlidersProps {
     value: HoneymoonFilters[K]
   ) => void;
   onReset: () => void;
+  /** [CL-HONEYMOON-REDESIGN-20260316] AI 프로필 적용 여부 */
+  profileApplied?: boolean;
 }
 
 const CONCEPT_OPTIONS: { value: HoneymoonConcept; label: string; emoji: string }[] = [
@@ -30,9 +35,19 @@ const ACCOMMODATION_OPTIONS: { value: AccommodationType; label: string; emoji: s
   { value: '에어비앤비', label: '에어비앤비', emoji: '🏠' },
 ];
 
-export function FilterSliders({ filters, onUpdate, onReset }: FilterSlidersProps) {
+export function FilterSliders({ filters, onUpdate, onReset, profileApplied }: FilterSlidersProps) {
   return (
     <div className="space-y-4 bg-card rounded-xl border border-border p-4 hover:shadow-toss transition-all duration-200">
+      {/* [CL-HONEYMOON-REDESIGN-20260316] AI 프로필 적용 배너 */}
+      {profileApplied && (
+        <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 animate-fade-up">
+          <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
+          <p className="text-xs text-primary font-medium">
+            AI 추천 기반으로 필터가 자동 설정되었어요
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">필터</h3>
         <Button

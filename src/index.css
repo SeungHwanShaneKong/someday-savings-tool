@@ -360,11 +360,24 @@
     .animate-bounce-limited,
     .insight-particle.is-active,
     .insight-card-dismissing,
-    .insight-card-collapsing {
+    .insight-card-collapsing,
+    .animate-wc-slide-out-left,
+    .animate-wc-slide-out-right,
+    .animate-wc-winner-pulse,
+    .animate-wc-step-enter {
       animation: none !important;
     }
-    .insight-card-dismissing {
+    .insight-card-dismissing,
+    .animate-wc-slide-out-left,
+    .animate-wc-slide-out-right {
       opacity: 0;
     }
+  }
+
+  /* [CL-HONEYMOON-REDESIGN-20260316] Print-friendly styles for itinerary export */
+  @media print {
+    body > *:not(.print-area) { display: none !important; }
+    .print-area { display: block !important; }
+    .no-print { display: none !important; }
   }
 }

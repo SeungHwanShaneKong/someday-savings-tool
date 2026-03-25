@@ -1,9 +1,10 @@
 // [HONEYMOON-UPGRADE-2026-03-07] 배지 + 퀵스탯 미니바 + 애니메이션 스코어
-import { useMemo } from 'react';
+// [CL-TOP100-DESTINATIONS-20260325] 지역별 그룹핑 + Top 5 + 점수 필터링
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatKoreanWon } from '@/lib/budget-categories';
-import { MapPin, Plus, Check } from 'lucide-react';
-import { computeBadges, type Destination } from '@/lib/honeymoon-destinations';
+import { MapPin, Plus, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { computeBadges, type Destination, type DestinationRegion } from '@/lib/honeymoon-destinations';
 
 interface ScoredDestination {
   destination: Destination;
@@ -75,11 +76,39 @@ export function RecommendationPanel({
   onFlyTo,
   onToggleSelection,
 }: RecommendationPanelProps) {
-  // 점수순 정렬
+  // [CL-TOP100-DESTINATIONS-20260325] 점수순 정렬 + Top 5 + 지역 그룹핑
   const ranked = useMemo(
     () => [...scoredDestinations].sort((a, b) => b.score - a.score),
     [scoredDestinations]
   );
+
+  const top5 = ranked.slice(0, 5);
+  const rest = ranked.slice(5).filter(({ score }) => score >= 0.3);
+
+  // 지역별 그룹핑
+  const regionGroups = useMemo(() => {
+    const groups = new Map<DestinationRegion, ScoredDestination[]>();
+    rest.forEach(item => {
+      const region = item.destination.region;
+      if (!groups.has(region)) groups.set(region, []);
+      groups.get(region)!.push(item);
+    });
+    return Array.from(groups.entries()).sort((a, b) => {
+      const aMax = Math.max(...a[1].map(d => d.score));
+      const bMax = Math.max(...b[1].map(d => d.score));
+      return bMax - aMax;
+    });
+  }, [rest]);
+
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const toggleRegion = (region: string) => {
+    setExpandedRegions(prev => {
+      const next = new Set(prev);
+      if (next.has(region)) next.delete(region);
+      else next.add(region);
+      return next;
+    });
+  };
 
   const activeCount = ranked.filter(({ score }) => score > 0.5).length;
 
@@ -99,7 +128,8 @@ export function RecommendationPanel({
 
       {/* Cards */}
       <div className="divide-y divide-border max-h-[calc(100vh-300px)] overflow-y-auto">
-        {ranked.map(({ destination, score }, index) => {
+        {/* Top 5 section */}
+        {top5.map(({ destination, score }, index) => {
           const isSelected = selectedIds.includes(destination.id);
           const isActive = score > 0.5;
           // [HONEYMOON-UPGRADE-2026-03-07] 배지 계산
@@ -208,6 +238,51 @@ export function RecommendationPanel({
             </div>
           );
         })}
+
+        {/* [CL-TOP100-DESTINATIONS-20260325] 지역별 그룹핑 */}
+        {regionGroups.map(([region, items]) => (
+          <div key={region}>
+            <button
+              onClick={() => toggleRegion(region)}
+              className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/20 hover:bg-muted/40 transition-colors border-t border-border"
+            >
+              <span className="text-xs font-semibold text-foreground">
+                📍 {region} ({items.length}개)
+              </span>
+              {expandedRegions.has(region) ? (
+                <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+              )}
+            </button>
+            {expandedRegions.has(region) && items.map(({ destination, score }) => {
+              const isSelected = selectedIds.includes(destination.id);
+              return (
+                <div key={destination.id} className="px-3 py-2 flex items-center gap-2 hover:bg-muted/30 transition-colors border-t border-border/50">
+                  <span className="text-lg">{destination.markerEmoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-foreground">{destination.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{Math.round(score * 100)}%</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground truncate">{destination.description}</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => onFlyTo(destination)} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600">
+                      <MapPin className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => onToggleSelection(destination.id)}
+                      className={cn('p-1.5 rounded-md', isSelected ? 'bg-primary text-white' : 'bg-muted/50 hover:bg-muted')}
+                    >
+                      {isSelected ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );

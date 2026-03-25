@@ -1,114 +1,102 @@
-// [EF-RESILIENCE-20260308-041500]
-// P3 Honeymoon Planner — AI 기반 신혼여행 종합 기획 Hook
+// [CL-REMOVE-OLD-PLANNER-20260325] AI 큐레이션 전용 Hook
+// [CL-TOP100-DESTINATIONS-20260325] 프리필터링 + candidates 전송
 
 import { useState, useCallback } from 'react';
 import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
+import type { AICurationResult, TravelProfile } from '@/lib/honeymoon-profile';
+import { preFilterCandidates } from '@/lib/honeymoon-profile';
 
-// ── Response Types ──
+// ── 타입 재수출 (기존 import 경로 호환) ──
 
-export interface ItineraryDay {
-  day: number;
-  activities: string;
-  estimated_cost: number;
-  tips: string;
+export type { AICurationResult, AICurationRecommendation } from '@/lib/honeymoon-profile';
+
+// ── Hook 전용 타입 ──
+
+export interface CurateProfile {
+  dominantStyle: string;
+  styleScores: Record<string, number>;
+  budgetMin: number;
+  budgetMax: number;
+  nightsMin: number;
+  nightsMax: number;
+  departureMonth?: number;
 }
 
-export interface BudgetBreakdown {
-  flights: number;
-  accommodation: number;
-  meals: number;
-  activities: number;
-  buffer: number;
-}
-
-export interface Alternative {
-  destination: string;
-  reason: string;
-  cost_diff: number;
-}
-
-export interface BookingTip {
-  item: string;
-  optimal_timing: string;
-  savings_estimate: string;
-}
-
-export interface HoneymoonPlan {
-  recommended_destination: string;
-  itinerary: ItineraryDay[];
-  budget_breakdown: BudgetBreakdown;
-  alternatives: Alternative[];
-  booking_tips: BookingTip[];
-  raw_text?: string; // fallback when JSON parse fails on server
+// [CL-TOP100-DESTINATIONS-20260325] AI에 전송할 후보 정보
+interface CandidateInfo {
+  id: string;
+  name: string;
+  region: string;
+  description: string;
+  highlights: string[];
+  budgetRange: { min: number; max: number };
+  nights: number;
+  localScore: number;
 }
 
 // ── Hook ──
 
 interface UseHoneymoonPlannerResult {
-  plan: HoneymoonPlan | null;
-  loading: boolean;
-  error: string | null;
-  planTrip: (
-    budget: number,
-    durationDays: number,
-    preferredRegions: string[],
-    travelStyle: string,
-    departureDate?: string
-  ) => Promise<void>;
+  curationResult: AICurationResult | null;
+  curateLoading: boolean;
+  curateError: string | null;
+  curateDestinations: (profile: CurateProfile, travelProfile?: TravelProfile) => Promise<void>;
 }
 
 export function useHoneymoonPlanner(): UseHoneymoonPlannerResult {
-  const [plan, setPlan] = useState<HoneymoonPlan | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [curationResult, setCurationResult] = useState<AICurationResult | null>(null);
+  const [curateLoading, setCurateLoading] = useState(false);
+  const [curateError, setCurateError] = useState<string | null>(null);
 
-  const planTrip = useCallback(
-    async (
-      budget: number,
-      durationDays: number,
-      preferredRegions: string[],
-      travelStyle: string,
-      departureDate?: string
-    ) => {
-      setLoading(true);
-      setError(null);
-      setPlan(null);
+  const curateDestinations = useCallback(
+    async (profile: CurateProfile, travelProfile?: TravelProfile) => {
+      setCurateLoading(true);
+      setCurateError(null);
+      setCurationResult(null);
+
+      // [CL-TOP100-DESTINATIONS-20260325] 100개 중 상위 20개만 AI에 전송
+      let candidates: CandidateInfo[] = [];
+      if (travelProfile) {
+        candidates = preFilterCandidates(travelProfile, 20).map(({ destination, score }) => ({
+          id: destination.id,
+          name: destination.name,
+          region: destination.region,
+          description: destination.description,
+          highlights: destination.highlights.slice(0, 3),
+          budgetRange: destination.budgetRange,
+          nights: destination.nights,
+          localScore: Math.round(score * 100) / 100,
+        }));
+      }
 
       try {
         const data = await edgeFunctionFetch<Record<string, unknown>>({
           functionName: 'honeymoon-planner',
-          timeoutMs: 60000, // GPT 호출이므로 60초
+          timeoutMs: 60000,
           body: {
-            budget,
-            duration_days: durationDays,
-            preferred_regions: preferredRegions,
-            travel_style: travelStyle,
-            departure_date: departureDate,
+            action: 'curate',
+            ...profile,
+            ...(candidates.length > 0 ? { candidates } : {}),
           },
         });
 
-        // Handle raw_text fallback (server couldn't parse GPT JSON)
-        if (data.raw_text && !data.recommended_destination) {
-          setPlan({
-            recommended_destination: '',
-            itinerary: [],
-            budget_breakdown: { flights: 0, accommodation: 0, meals: 0, activities: 0, buffer: 0 },
-            alternatives: [],
-            booking_tips: [],
-            raw_text: data.raw_text as string,
-          });
+        // 응답 구조 검증
+        if (data.recommendations && Array.isArray(data.recommendations)) {
+          setCurationResult(data as unknown as AICurationResult);
+        } else if (data.raw_text) {
+          setCurateError('AI 응답을 분석할 수 없어요. 대신 추천 결과를 보여드릴게요.');
         } else {
-          setPlan(data as unknown as HoneymoonPlan);
+          setCurateError('추천 결과를 받지 못했어요.');
         }
       } catch (err) {
-        console.error('[useHoneymoonPlanner] planTrip failed:', err);
-        setError(getUserFriendlyError(err));
+        console.error('[useHoneymoonPlanner] curateDestinations failed:', err);
+        setCurateError(getUserFriendlyError(err));
       } finally {
-        setLoading(false);
+        setCurateLoading(false);
       }
     },
     []
   );
 
-  return { plan, loading, error, planTrip };
+  return { curationResult, curateLoading, curateError, curateDestinations };
 }

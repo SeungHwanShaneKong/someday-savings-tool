@@ -125,6 +125,25 @@ export default {
           "0%": { maxHeight: "200px", marginBottom: "8px", opacity: "1" },
           "100%": { maxHeight: "0px", marginBottom: "0px", opacity: "0", padding: "0" },
         },
+        /* [CL-HONEYMOON-REDESIGN-20260316] 이미지 월드컵 애니메이션 */
+        "wc-slide-out-left": {
+          "0%": { opacity: "1", transform: "translateX(0) scale(1)" },
+          "100%": { opacity: "0", transform: "translateX(-100%) scale(0.8)" },
+        },
+        "wc-slide-out-right": {
+          "0%": { opacity: "1", transform: "translateX(0) scale(1)" },
+          "100%": { opacity: "0", transform: "translateX(100%) scale(0.8)" },
+        },
+        // [CL-REMOVE-OLD-PLANNER-20260325] CSS 변수로 다크모드 호환
+        "wc-winner-pulse": {
+          "0%": { transform: "scale(1)", boxShadow: "0 0 0 0 hsl(var(--primary) / 0.4)" },
+          "50%": { transform: "scale(1.05)", boxShadow: "0 0 20px 8px hsl(var(--primary) / 0.2)" },
+          "100%": { transform: "scale(1)", boxShadow: "0 0 0 0 hsl(var(--primary) / 0)" },
+        },
+        "wc-step-enter": {
+          "0%": { opacity: "0", transform: "translateY(20px) scale(0.98)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -135,6 +154,11 @@ export default {
         "insight-check-pop": "insight-check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
         "insight-dismiss": "insight-dismiss 0.35s ease-out forwards",
         "insight-collapse": "insight-collapse 0.3s ease-out forwards",
+        /* [CL-HONEYMOON-REDESIGN-20260316] */
+        "wc-slide-out-left": "wc-slide-out-left 0.4s ease-out forwards",
+        "wc-slide-out-right": "wc-slide-out-right 0.4s ease-out forwards",
+        "wc-winner-pulse": "wc-winner-pulse 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        "wc-step-enter": "wc-step-enter 0.4s ease-out",
       },
     },
   },

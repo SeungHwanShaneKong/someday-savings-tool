@@ -15,7 +15,8 @@ interface ComparisonCardsProps {
 }
 
 // [HONEYMOON-UPGRADE-2026-03-07] 레이더 차트 색상 팔레트
-const RADAR_COLORS = ['#3b82f6', '#f97316', '#22c55e'];
+// [CL-TOP100-DESTINATIONS-20260325] 5개 비교 지원 (3→5 색상)
+const RADAR_COLORS = ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#ec4899'];
 
 export function ComparisonCards({
   destinations,

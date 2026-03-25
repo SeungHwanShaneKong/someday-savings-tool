@@ -1,7 +1,8 @@
 // [HONEYMOON-UPGRADE-2026-03-07] 새 컴포넌트 통합
-import { useState, useRef, useMemo } from 'react';
+// [CL-HONEYMOON-REDESIGN-20260316] 온보딩 게이트 + AI 큐레이션
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { ArrowLeft, MapIcon, MapPin, Sparkles } from 'lucide-react';
+import { ArrowLeft, MapIcon, MapPin, Sparkles, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,9 +17,18 @@ import { ItineraryPanel } from '@/components/honeymoon/ItineraryPanel';
 import { ItineraryCostCalculator } from '@/components/honeymoon/ItineraryCostCalculator';
 import { ItineraryExport } from '@/components/honeymoon/ItineraryExport';
 import { useSEO } from '@/hooks/useSEO';
-// [AGENT-TEAM-9-20260307] P3 신혼여행 기획 에이전트
+// [CL-REMOVE-OLD-PLANNER-20260325] 큐레이션 전용 훅
 import { useHoneymoonPlanner } from '@/hooks/useHoneymoonPlanner';
-import { HoneymoonPlannerPanel } from '@/components/planning/HoneymoonPlannerPanel';
+// [CL-HONEYMOON-REDESIGN-20260316] 온보딩 컴포넌트
+import { useHoneymoonOnboarding } from '@/hooks/useHoneymoonOnboarding';
+import { OnboardingShell } from '@/components/honeymoon/onboarding/OnboardingShell';
+import { WelcomeStep } from '@/components/honeymoon/onboarding/WelcomeStep';
+import { WorldCupStep } from '@/components/honeymoon/onboarding/WorldCupStep';
+import { BudgetStep } from '@/components/honeymoon/onboarding/BudgetStep';
+import { ScheduleStep } from '@/components/honeymoon/onboarding/ScheduleStep';
+import { LoadingStep } from '@/components/honeymoon/onboarding/LoadingStep';
+import { ResultsStep } from '@/components/honeymoon/onboarding/ResultsStep';
+import { buildLocalFallbackResults } from '@/lib/honeymoon-profile';
 
 export default function Honeymoon() {
   const navigate = useNavigate();
@@ -30,6 +40,9 @@ export default function Honeymoon() {
     description: '예산과 일정에 맞는 신혼여행지를 추천해드려요. 인기 여행지 비교와 예약 타임라인 제공.',
     path: '/honeymoon',
   });
+
+  // [CL-HONEYMOON-REDESIGN-20260316] 온보딩 상태
+  const onboarding = useHoneymoonOnboarding(user?.id);
 
   const {
     viewState,
@@ -48,11 +61,15 @@ export default function Honeymoon() {
     setPopupDestination,
     flyTo,
     resetView,
+    applyProfile,
   } = useHoneymoonMap();
 
-  // [AGENT-TEAM-9-20260307] P3 신혼여행 기획 에이전트
-  const { plan: honeymoonPlan, loading: plannerLoading, error: plannerError, planTrip } = useHoneymoonPlanner();
-  const [plannerOpen, setPlannerOpen] = useState(false);
+  // [CL-REMOVE-OLD-PLANNER-20260325] 큐레이션 전용
+  const {
+    curationResult,
+    curateError,
+    curateDestinations,
+  } = useHoneymoonPlanner();
 
   // [HONEYMOON-UPGRADE-2026-03-07] 캡처용 ref + 스코어 맵
   const captureRef = useRef<HTMLDivElement>(null);
@@ -64,11 +81,82 @@ export default function Honeymoon() {
   // Check if any destinations match filters
   const hasFilterResults = scoredDestinations.some(({ score }) => score > 0.5);
 
+  // [CL-HONEYMOON-REDESIGN-20260316] 온보딩 완료 후 프로필 적용
+  const [profileApplied, setProfileApplied] = useState(false);
+  useEffect(() => {
+    if (onboarding.state.isComplete && onboarding.state.profile && !profileApplied) {
+      applyProfile(onboarding.state.profile);
+      setProfileApplied(true);
+    }
+  }, [onboarding.state.isComplete, onboarding.state.profile, profileApplied, applyProfile]);
+
   // Auth check
   if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
   }
 
+  // ── [CL-HONEYMOON-REDESIGN-20260316] 온보딩 플로우 ──
+  if (!onboarding.state.isComplete) {
+    return (
+      <OnboardingShell
+        step={onboarding.state.step}
+        progress={onboarding.progress}
+        onBack={onboarding.goBack}
+      >
+        {onboarding.state.step === 'welcome' && (
+          <WelcomeStep
+            onStart={() => onboarding.goToStep('worldcup')}
+            onSkip={onboarding.completeOnboarding}
+          />
+        )}
+        {onboarding.state.step === 'worldcup' && onboarding.currentMatch && (
+          <WorldCupStep
+            match={onboarding.currentMatch}
+            round={onboarding.state.worldCupRound}
+            onSelect={onboarding.selectWorldCupWinner}
+          />
+        )}
+        {onboarding.state.step === 'budget' && (
+          <BudgetStep
+            value={onboarding.state.budget}
+            onChange={onboarding.setBudget}
+            onNext={() => onboarding.goToStep('schedule')}
+          />
+        )}
+        {onboarding.state.step === 'schedule' && (
+          <ScheduleStep
+            nightsMin={onboarding.state.nightsMin}
+            nightsMax={onboarding.state.nightsMax}
+            onNightsChange={onboarding.setNightsRange}
+            departureMonth={onboarding.state.departureMonth}
+            onDepartureMonthChange={onboarding.setDepartureMonth}
+            onNext={() => onboarding.goToStep('loading')}
+          />
+        )}
+        {onboarding.state.step === 'loading' && onboarding.state.profile && (
+          <LoadingStep
+            profile={onboarding.state.profile}
+            onCurate={curateDestinations}
+            curationResult={curationResult}
+            curateError={curateError}
+            onResults={onboarding.setAiResults}
+            onFallback={onboarding.setAiResults}
+            buildLocalFallback={buildLocalFallbackResults}
+          />
+        )}
+        {onboarding.state.step === 'results' && onboarding.state.profile && onboarding.state.aiResults && (
+          <ResultsStep
+            profile={onboarding.state.profile}
+            results={onboarding.state.aiResults}
+            onComplete={onboarding.completeOnboarding}
+            onRetry={onboarding.resetOnboarding}
+          />
+        )}
+      </OnboardingShell>
+    );
+  }
+
+  // ── 기존 지도 페이지 (UNCHANGED except header additions) ──
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -81,28 +169,51 @@ export default function Honeymoon() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold text-foreground">
-              허니문 큐레이션
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h1 className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap">
+              허니문
             </h1>
             <Badge
               variant="outline"
-              className="animate-shimmer bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-primary/20 px-2 py-0.5"
+              className="animate-shimmer bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-primary/20 px-1.5 py-0.5 flex-shrink-0"
             >
-              <Sparkles className="w-3 h-3 mr-1 text-primary" aria-hidden="true" />
-              <span className="text-[11px] font-medium text-primary">AI</span>
+              <Sparkles className="w-3 h-3 mr-0.5 text-primary" aria-hidden="true" />
+              <span className="text-[10px] font-medium text-primary">AI</span>
             </Badge>
+            {/* [CL-HONEYMOON-REDESIGN-20260316] 프로필 배지 — 모바일: 이모지만, 데스크탑: 전체 */}
+            {onboarding.state.profile && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 flex-shrink-0">
+                <span>{onboarding.state.profile.profileEmoji}</span>
+                <span className="hidden sm:inline ml-1">{onboarding.state.profile.profileLabel}</span>
+              </Badge>
+            )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={resetView}
-            aria-label="지도 초기화"
-          >
-            <MapIcon className="w-4 h-4 mr-1" />
-            전체보기
-          </Button>
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            {/* [CL-HONEYMOON-REDESIGN-20260316] 다시 테스트 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-8 px-2"
+              onClick={() => {
+                onboarding.resetOnboarding();
+                setProfileApplied(false);
+              }}
+              aria-label="성향 테스트 다시하기"
+            >
+              <RotateCcw className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">다시 테스트</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs h-8 px-2"
+              onClick={resetView}
+              aria-label="지도 초기화"
+            >
+              <MapIcon className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">전체보기</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -128,23 +239,12 @@ export default function Honeymoon() {
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-24">
-            {/* [AGENT-TEAM-9-20260307] P3 AI 여행 플래너 버튼 */}
-            <button
-              onClick={() => {
-                planTrip(5000000, 7, ['동남아', '유럽'], '휴양');
-                setPlannerOpen(true);
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-sm font-medium hover:from-emerald-100 hover:to-teal-100 transition-all active:scale-[0.98]"
-            >
-              <Sparkles className="w-4 h-4" />
-              AI 여행 플래너
-            </button>
-
             <div className="animate-fade-up" style={{ animationDelay: '0.05s' }}>
               <FilterSliders
                 filters={filters}
                 onUpdate={updateFilter}
                 onReset={resetFilters}
+                profileApplied={profileApplied}
               />
             </div>
 
@@ -233,6 +333,7 @@ export default function Honeymoon() {
                 filters={filters}
                 onUpdate={updateFilter}
                 onReset={resetFilters}
+                profileApplied={profileApplied}
               />
             </div>
 
@@ -251,18 +352,6 @@ export default function Honeymoon() {
 
           {/* Right Panel: Recommendation + Itinerary + Comparison (40%) */}
           <div className="w-[40%] flex flex-col p-4 pl-0 gap-4 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
-            {/* [AGENT-TEAM-9-20260307] P3 AI 여행 플래너 버튼 (desktop) */}
-            <button
-              onClick={() => {
-                planTrip(5000000, 7, ['동남아', '유럽'], '휴양');
-                setPlannerOpen(true);
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 text-sm font-medium hover:from-emerald-100 hover:to-teal-100 transition-all active:scale-[0.98]"
-            >
-              <Sparkles className="w-4 h-4" />
-              AI 여행 플래너
-            </button>
-
             {/* Recommendation Panel */}
             <div className="animate-fade-up" style={{ animationDelay: '0.05s' }}>
               <RecommendationPanel
@@ -316,14 +405,6 @@ export default function Honeymoon() {
         </div>
       )}
 
-      {/* [AGENT-TEAM-9-20260307] P3 신혼여행 기획 패널 */}
-      <HoneymoonPlannerPanel
-        plan={honeymoonPlan}
-        loading={plannerLoading}
-        error={plannerError}
-        open={plannerOpen}
-        onOpenChange={setPlannerOpen}
-      />
     </div>
   );
 }

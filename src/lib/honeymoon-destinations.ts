@@ -6,10 +6,16 @@
 export type HoneymoonConcept = '휴양' | '관광' | '쇼핑' | '액티비티';
 export type AccommodationType = '풀빌라' | '올인클루시브' | '리조트' | '호텔' | '에어비앤비';
 
+// [CL-TOP100-DESTINATIONS-20260325] 지역 분류
+export type DestinationRegion =
+  | '동남아' | '동아시아' | '남아시아/인도양' | '중동/아프리카'
+  | '유럽' | '북미' | '중남미/카리브' | '오세아니아/태평양' | '국내';
+
 export interface Destination {
   id: string;
   name: string;
   nameEn: string;
+  region: DestinationRegion; // [CL-TOP100-DESTINATIONS-20260325]
   coordinates: [number, number]; // [lng, lat] for Mapbox
   concepts: HoneymoonConcept[];
   accommodationTypes: AccommodationType[];
@@ -28,134 +34,9 @@ export interface Destination {
   };
 }
 
-export const DESTINATIONS: Destination[] = [
-  {
-    id: 'maldives',
-    name: '몰디브',
-    nameEn: 'Maldives',
-    coordinates: [73.5, 3.2],
-    concepts: ['휴양'],
-    accommodationTypes: ['풀빌라', '올인클루시브'],
-    budgetRange: { min: 8000000, max: 15000000 },
-    nights: 7,
-    features: ['프라이빗 수상 빌라', '올인클루시브', '스노클링', '선셋 크루즈'],
-    bestBookingWeeks: 21,
-    visaRequired: false,
-    description: '인도양의 보석, 프라이빗 수상 빌라에서 꿈같은 허니문을 보내세요',
-    markerEmoji: '🏝️',
-    highlights: ['수상 빌라', '산호초 스노클링', '돌핀 워칭'],
-    costBreakdown: {
-      flight: { min: 1500000, max: 2500000 },
-      accommodation: { min: 5000000, max: 10000000 },
-      local: { min: 1500000, max: 2500000 },
-    },
-  },
-  {
-    id: 'europe',
-    name: '유럽',
-    nameEn: 'Europe',
-    coordinates: [2.35, 48.86], // Paris
-    concepts: ['관광', '쇼핑'],
-    accommodationTypes: ['호텔', '에어비앤비'],
-    budgetRange: { min: 6000000, max: 12000000 },
-    nights: 10,
-    features: ['파리-로마-바르셀로나', '미술관', '미슐랭 레스토랑', '쇼핑'],
-    bestBookingWeeks: 16,
-    visaRequired: false,
-    description: '파리의 에펠탑, 로마의 콜로세움, 바르셀로나의 가우디까지',
-    markerEmoji: '🗼',
-    highlights: ['에펠탑 야경', '곤돌라 체험', '와이너리 투어'],
-    costBreakdown: {
-      flight: { min: 1800000, max: 3000000 },
-      accommodation: { min: 2500000, max: 5000000 },
-      local: { min: 1700000, max: 4000000 },
-    },
-  },
-  {
-    id: 'hawaii',
-    name: '하와이',
-    nameEn: 'Hawaii',
-    coordinates: [-155.5, 19.9],
-    concepts: ['휴양', '액티비티'],
-    accommodationTypes: ['리조트', '호텔'],
-    budgetRange: { min: 7000000, max: 13000000 },
-    nights: 7,
-    features: ['와이키키 비치', '할레아칼라 일출', '스노클링', '루아우 쇼'],
-    bestBookingWeeks: 18,
-    visaRequired: true,
-    description: '태평양의 낙원, 다양한 액티비티와 휴양을 동시에',
-    markerEmoji: '🌺',
-    highlights: ['와이키키 서핑', '나팔리 코스트', '화산 국립공원'],
-    costBreakdown: {
-      flight: { min: 2000000, max: 3500000 },
-      accommodation: { min: 3000000, max: 6000000 },
-      local: { min: 2000000, max: 3500000 },
-    },
-  },
-  {
-    id: 'bali',
-    name: '발리',
-    nameEn: 'Bali',
-    coordinates: [115.2, -8.65],
-    concepts: ['휴양', '관광'],
-    accommodationTypes: ['풀빌라', '리조트'],
-    budgetRange: { min: 3500000, max: 7000000 },
-    nights: 7,
-    features: ['우붓 라이스 테라스', '프라이빗 풀빌라', '사원', '스파'],
-    bestBookingWeeks: 12,
-    visaRequired: false,
-    description: '가성비 최고의 럭셔리 허니문, 신들의 섬 발리',
-    markerEmoji: '🌴',
-    highlights: ['우붓 정글 스윙', '울루와뚜 절벽 사원', '바투르 화산 트레킹'],
-    costBreakdown: {
-      flight: { min: 800000, max: 1500000 },
-      accommodation: { min: 1500000, max: 3500000 },
-      local: { min: 1200000, max: 2000000 },
-    },
-  },
-  {
-    id: 'cancun',
-    name: '칸쿤',
-    nameEn: 'Cancún',
-    coordinates: [-86.85, 21.16],
-    concepts: ['휴양', '액티비티'],
-    accommodationTypes: ['올인클루시브', '리조트'],
-    budgetRange: { min: 7000000, max: 14000000 },
-    nights: 7,
-    features: ['올인클루시브 리조트', '치첸이트사', '세노테', '카리브해'],
-    bestBookingWeeks: 16,
-    visaRequired: true,
-    description: '카리브해의 에메랄드빛 바다와 마야 유적의 만남',
-    markerEmoji: '🏖️',
-    highlights: ['세노테 다이빙', '치첸이트사', '이슬라무헤레스'],
-    costBreakdown: {
-      flight: { min: 2500000, max: 4000000 },
-      accommodation: { min: 3000000, max: 7000000 },
-      local: { min: 1500000, max: 3000000 },
-    },
-  },
-  {
-    id: 'jeju',
-    name: '제주',
-    nameEn: 'Jeju',
-    coordinates: [126.57, 33.45],
-    concepts: ['휴양', '관광'],
-    accommodationTypes: ['호텔', '에어비앤비', '풀빌라'],
-    budgetRange: { min: 1500000, max: 4000000 },
-    nights: 4,
-    features: ['한라산', '올레길', '해녀 체험', '카페 투어'],
-    bestBookingWeeks: 4,
-    visaRequired: false,
-    description: '국내 최고의 허니문 명소, 부담 없는 가성비 여행',
-    markerEmoji: '🍊',
-    highlights: ['한라산 등반', '성산일출봉', '우도 자전거'],
-    costBreakdown: {
-      flight: { min: 200000, max: 400000 },
-      accommodation: { min: 800000, max: 2500000 },
-      local: { min: 500000, max: 1100000 },
-    },
-  },
-];
+// [CL-TOP100-DESTINATIONS-20260325] 데이터 파일 분리 → import + re-export
+import { DESTINATIONS } from './honeymoon-destinations-data';
+export { DESTINATIONS };
 
 /**
  * 필터 기준으로 여행지 매칭 점수 계산 (0~1)
@@ -226,18 +107,19 @@ export interface Badge {
   color: string; // tailwind bg + text class pair
 }
 
+// [CL-TOP100-DESTINATIONS-20260325] 100개 대응: 가성비 하위 10% + 근거리 뱃지
 export function computeBadges(destination: Destination): Badge[] {
   const badges: Badge[] = [];
 
-  // "가성비 최고" — 1박당 최저 비용이 전체 중 가장 낮은 경우
+  // "가성비 최고" — 1박당 비용이 하위 10% 이내
   const perNightMin = destination.budgetRange.min / destination.nights;
-  const allPerNight = DESTINATIONS.map((d) => d.budgetRange.min / d.nights);
-  const lowestPerNight = Math.min(...allPerNight);
-  if (perNightMin === lowestPerNight) {
+  const allPerNight = DESTINATIONS.map((d) => d.budgetRange.min / d.nights).sort((a, b) => a - b);
+  const threshold10 = allPerNight[Math.floor(allPerNight.length * 0.1)] ?? allPerNight[0];
+  if (perNightMin <= threshold10) {
     badges.push({ label: '가성비 최고', color: 'bg-emerald-100 text-emerald-700' });
   }
 
-  // "인기 허니문" — concepts 3개 이상 또는 accommodationTypes 3개 이상
+  // "인기 허니문" — concepts 2개 이상 & accommodationTypes 2개 이상
   if (destination.concepts.length >= 2 && destination.accommodationTypes.length >= 2) {
     badges.push({ label: '인기 허니문', color: 'bg-rose-100 text-rose-700' });
   }
@@ -250,6 +132,11 @@ export function computeBadges(destination: Destination): Badge[] {
   // "단기 추천" — 4박 이하
   if (destination.nights <= 4) {
     badges.push({ label: '단기 추천', color: 'bg-amber-100 text-amber-700' });
+  }
+
+  // "근거리 추천" — 동아시아/국내
+  if (destination.region === '동아시아' || destination.region === '국내') {
+    badges.push({ label: '근거리 추천', color: 'bg-violet-100 text-violet-700' });
   }
 
   return badges.slice(0, 2); // 최대 2개

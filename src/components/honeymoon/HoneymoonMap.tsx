@@ -125,9 +125,23 @@ export function HoneymoonMap({
     [onViewStateChange]
   );
 
+  // [CL-TOP100-DESTINATIONS-20260325] 100개 중 점수 기반 표시 필터링
+  const visibleDestinations = useMemo(() => {
+    const threshold = viewState.zoom > 3 ? 0.2 : 0.4;
+    return scoredDestinations.filter(({ destination, score }) =>
+      score >= threshold || selectedIds.includes(destination.id) || destination.id === hoveredId
+    );
+  }, [scoredDestinations, selectedIds, hoveredId, viewState.zoom]);
+
   /* ─── 비행 아크 GeoJSON ─── */
+  // [CL-TOP100-DESTINATIONS-20260325] 선택 + 상위 5개만 아크 표시
   const arcGeoJSON = useMemo(() => {
-    const features = scoredDestinations.map(({ destination, score }) => {
+    const sorted = [...scoredDestinations].sort((a, b) => b.score - a.score);
+    const topIds = new Set(sorted.slice(0, 5).map(s => s.destination.id));
+    const arcTargets = scoredDestinations.filter(({ destination }) =>
+      selectedIds.includes(destination.id) || topIds.has(destination.id)
+    );
+    const features = arcTargets.map(({ destination, score }) => {
       const coords = greatCircleArc(ICN_COORDS, destination.coordinates);
       const isSelected = selectedIds.includes(destination.id);
       return {
@@ -257,8 +271,8 @@ export function HoneymoonMap({
           </div>
         </Marker>
 
-        {/* ─── 여행지 마커 ─── */}
-        {scoredDestinations.map(({ destination, score }) => {
+        {/* ─── 여행지 마커 ─── [CL-TOP100-DESTINATIONS-20260325] visibleDestinations 사용 */}
+        {visibleDestinations.map(({ destination, score }) => {
           const isSelected = selectedIds.includes(destination.id);
           const isHovered = hoveredId === destination.id;
           const isActive = score > 0.5;

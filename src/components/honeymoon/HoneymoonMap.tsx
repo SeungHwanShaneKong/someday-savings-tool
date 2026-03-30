@@ -22,6 +22,9 @@ interface ScoredDestination {
 interface HoneymoonMapProps {
   viewState: MapViewState;
   onViewStateChange: (vs: MapViewState) => void;
+  // [CL-MAP-WORLDCUP-FIX-20260330] 프로그래밍 flyTo 전용
+  flyToTarget: MapViewState | null;
+  onFlyToComplete: () => void;
   scoredDestinations: ScoredDestination[];
   selectedIds: string[];
   hoveredId: string | null;
@@ -67,37 +70,34 @@ function greatCircleArc(
   return points;
 }
 
-/* ─── MapController: viewState ↔ map.flyTo 동기화 ─── */
+/**
+ * [CL-MAP-WORLDCUP-FIX-20260330] MapController: 프로그래밍 flyTo 전용
+ * 사용자 드래그(onMove)와 분리 — flyToTarget이 null이 아닐 때만 flyTo 실행
+ */
 function MapController({
-  viewState,
+  flyToTarget,
+  onFlyToComplete,
 }: {
-  viewState: MapViewState;
+  flyToTarget: MapViewState | null;
+  onFlyToComplete: () => void;
 }) {
   const { current: map } = useMap();
-  const [lastView, setLastView] = useState<MapViewState | null>(null);
 
   useEffect(() => {
-    if (!map) return;
-    if (
-      lastView &&
-      lastView.longitude === viewState.longitude &&
-      lastView.latitude === viewState.latitude &&
-      lastView.zoom === viewState.zoom &&
-      lastView.pitch === viewState.pitch &&
-      lastView.bearing === viewState.bearing
-    )
-      return;
+    if (!map || !flyToTarget) return;
 
     map.flyTo({
-      center: [viewState.longitude, viewState.latitude],
-      zoom: viewState.zoom,
-      pitch: viewState.pitch ?? 20,
-      bearing: viewState.bearing ?? 0,
+      center: [flyToTarget.longitude, flyToTarget.latitude],
+      zoom: flyToTarget.zoom,
+      pitch: flyToTarget.pitch ?? 20,
+      bearing: flyToTarget.bearing ?? 0,
       duration: 2000,
       essential: true,
     });
-    setLastView(viewState);
-  }, [map, viewState, lastView]);
+
+    // flyTo 시작 후 즉시 클리어하여 중복 호출 방지
+    onFlyToComplete();
+  }, [map, flyToTarget, onFlyToComplete]);
 
   return null;
 }
@@ -105,6 +105,8 @@ function MapController({
 export function HoneymoonMap({
   viewState,
   onViewStateChange,
+  flyToTarget,
+  onFlyToComplete,
   scoredDestinations,
   selectedIds,
   hoveredId,
@@ -195,7 +197,7 @@ export function HoneymoonMap({
   }, [initialFlyDone]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" style={{ touchAction: 'none' }}> {/* [CL-IMPROVE-7TASKS-20260330] 터치 제스처 활성화 */}
       {/* Loading skeleton overlay */}
       {!mapLoaded && (
         <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-xl">
@@ -221,10 +223,16 @@ export function HoneymoonMap({
         attributionControl={false}
         maxPitch={60}
         reuseMaps
+        touchZoomRotate
+        touchPitch
+        dragPan
+        scrollZoom
+        doubleClickZoom
       >
-        <MapController viewState={viewState} />
+        <MapController flyToTarget={flyToTarget} onFlyToComplete={onFlyToComplete} />
 
-        {!isMobile && <NavigationControl position="top-right" />}
+        {/* [CL-IMPROVE-7TASKS-20260330] 모바일에서도 줌 버튼 표시 */}
+        <NavigationControl position="top-right" showCompass={!isMobile} visualizePitch={false} />
 
         {/* ─── 비행 아크 라인 ─── */}
         <Source id="flight-arcs" type="geojson" data={arcGeoJSON}>

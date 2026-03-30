@@ -44,6 +44,11 @@ const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
   { pattern: /TossApp|toss\//i, name: '토스' },
   { pattern: /Baemin/i, name: '배달의민족' },
   { pattern: /Carrot|DanggnApp/i, name: '당근마켓' },
+  // [CL-IMPROVE-7TASKS-20260330] 추가 메신저/커뮤니티 앱
+  { pattern: /Discord/i, name: 'Discord' },
+  { pattern: /Reddit/i, name: 'Reddit' },
+  { pattern: /WhatsApp/i, name: 'WhatsApp' },
+  { pattern: /Telegram/i, name: 'Telegram' },
   // 기타
   { pattern: /SamsungBrowser\/.*CrossApp/i, name: 'Samsung Internet (앱 내)' },
   { pattern: /Twitter|X-Twitter/i, name: 'X (Twitter)' },
@@ -188,74 +193,100 @@ export function openInExternalBrowserWithFallback(
 }
 
 /**
- * x-safari-https:// 스킴 시도
- * 실패 시 shortcuts:// 폴백으로 이동
+ * [CL-IMPROVE-7TASKS-20260330] visibility 변화 감지 헬퍼
+ * 스킴이 성공하면 document가 hidden 상태가 됨
  */
-function attemptSafariScheme(url: string, onFallback: () => void): void {
-  // 페이지 이탈 감지: 스킴이 성공하면 document가 hidden 상태가 됨
+function waitForEscape(
+  timeoutMs: number,
+  onSuccess: () => void,
+  onTimeout: () => void,
+): () => void {
   let escaped = false;
-  
-  const onVisibilityChange = () => {
+  const handler = () => {
     if (document.hidden) {
       escaped = true;
-      document.removeEventListener('visibilitychange', onVisibilityChange);
+      cleanup();
+      onSuccess();
     }
   };
-  document.addEventListener('visibilitychange', onVisibilityChange);
+  document.addEventListener('visibilitychange', handler);
 
-  // x-safari-https:// 스킴 시도
-  const safariUrl = url
-    .replace(/^https:\/\//, 'x-safari-https://')
-    .replace(/^http:\/\//, 'x-safari-http://');
-  
-  window.location.href = safariUrl;
+  const timer = setTimeout(() => {
+    cleanup();
+    if (!escaped) onTimeout();
+  }, timeoutMs);
 
-  // 800ms 후 성공 여부 확인
-  setTimeout(() => {
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-    
-    if (escaped) {
-      return; // Safari로 이동 성공
-    }
-
-    // 3단계: shortcuts:// 폴백 (구형 iOS 17 이하)
-    attemptShortcutsScheme(url, onFallback);
-  }, 800);
+  function cleanup() {
+    document.removeEventListener('visibilitychange', handler);
+    clearTimeout(timer);
+  }
+  return cleanup;
 }
 
 /**
- * shortcuts:// x-callback-url 폴백 시도
- * iOS 17 이하에서 작동 가능. iOS 18.1+에서는 대부분 실패.
+ * [CL-IMPROVE-7TASKS-20260330] iOS 5단계 탈출 체인
+ *
+ * 1. window.open(_blank) — 일부 인앱 브라우저에서 시스템 브라우저 호출
+ * 2. <a target="_blank"> 프로그래밍 클릭 — DOM 기반 탈출
+ * 3. x-safari-https:// — Safari 직접 호출 스킴
+ * 4. location.replace — 현재 탭에서 직접 이동
+ * 5. 브릿지 UI (자동 URL 복사 + 수동 안내)
  */
-function attemptShortcutsScheme(url: string, onFallback: () => void): void {
-  let escaped = false;
-  
-  const onVisibilityChange = () => {
-    if (document.hidden) {
-      escaped = true;
-      document.removeEventListener('visibilitychange', onVisibilityChange);
+function attemptSafariScheme(url: string, onFallback: () => void): void {
+  const STEP_TIMEOUT = 600;
+
+  // --- Step 1: window.open ---
+  try {
+    const w = window.open(url, '_blank');
+    if (w) {
+      waitForEscape(STEP_TIMEOUT, () => {}, () => step2());
+      return;
     }
-  };
-  document.addEventListener('visibilitychange', onVisibilityChange);
+  } catch { /* blocked — continue */ }
+  step2();
 
-  const fakeShortcutName = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `escape-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  
-  const shortcutsUrl = `shortcuts://x-callback-url/run-shortcut?name=${encodeURIComponent(fakeShortcutName)}&x-error=${encodeURIComponent(url)}`;
-  window.location.href = shortcutsUrl;
-
-  // 800ms 후 성공 여부 확인
-  setTimeout(() => {
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-    
-    if (escaped) {
-      return; // Shortcuts로 이동 성공
+  // --- Step 2: anchor click ---
+  function step2() {
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      waitForEscape(STEP_TIMEOUT, () => {}, () => step3());
+    } catch {
+      step3();
     }
+  }
 
-    // 4단계: 모든 방법 실패 → 브릿지 UI
+  // --- Step 3: x-safari-https:// ---
+  function step3() {
+    const safariUrl = url
+      .replace(/^https:\/\//, 'x-safari-https://')
+      .replace(/^http:\/\//, 'x-safari-http://');
+    window.location.href = safariUrl;
+    waitForEscape(STEP_TIMEOUT, () => {}, () => step4());
+  }
+
+  // --- Step 4: location.replace ---
+  function step4() {
+    try {
+      window.location.replace(url);
+    } catch { /* continue */ }
+    waitForEscape(STEP_TIMEOUT, () => {}, () => step5());
+  }
+
+  // --- Step 5: 브릿지 UI (자동 클립보드 복사 + 수동 안내) ---
+  function step5() {
+    // 자동 URL 클립보드 복사 시도
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).catch(() => {});
+    }
     onFallback();
-  }, 800);
+  }
 }
 
 /**
@@ -310,14 +341,14 @@ export function getAppSpecificGuide(detectedApp: string | null, isIOS: boolean, 
     };
   }
 
-  // iOS 앱별 구체적 안내
+  // [CL-IMPROVE-7TASKS-20260330] iOS 앱별 구체적 안내 (Discord/Reddit/WhatsApp/Telegram 추가)
   switch (detectedApp) {
     case 'Instagram':
     case 'Threads':
       return {
         steps: [
-          '1. 우측 하단 ⋯ 아이콘을 탭하세요',
-          '2. "브라우저에서 열기" 또는 "Safari로 열기"를 선택하세요',
+          '1. 화면 하단 ··· 아이콘을 탭하세요',
+          '2. "Safari에서 열기"를 선택하세요',
         ],
       };
     case '카카오톡':
@@ -346,6 +377,28 @@ export function getAppSpecificGuide(detectedApp: string | null, isIOS: boolean, 
         steps: [
           '1. 우측 하단 공유 아이콘을 탭하세요',
           '2. "Safari로 열기"를 선택하세요',
+        ],
+      };
+    case 'Discord':
+      return {
+        steps: [
+          '1. 링크를 길게 눌러주세요',
+          '2. "Safari에서 열기"를 선택하세요',
+        ],
+      };
+    case 'Reddit':
+      return {
+        steps: [
+          '1. 우측 상단 ⋯ 아이콘을 탭하세요',
+          '2. "Open in Safari"를 선택하세요',
+        ],
+      };
+    case 'WhatsApp':
+    case 'Telegram':
+      return {
+        steps: [
+          '1. 링크를 길게 눌러주세요',
+          '2. "Safari에서 열기"를 선택하세요',
         ],
       };
     default:

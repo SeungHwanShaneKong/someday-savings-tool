@@ -67,6 +67,17 @@ export function LoadingStep({
     }
   }, [curateError, profile, buildLocalFallback, onFallback]);
 
+  // [CL-MECE-TEST-20260330] 30초 타임아웃: API 무응답 시 로컬 폴백으로 전환
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!curationResult && !curateError) {
+        const fallback = buildLocalFallback(profile);
+        onFallback(fallback);
+      }
+    }, 30000);
+    return () => clearTimeout(timeout);
+  }, [curationResult, curateError, profile, buildLocalFallback, onFallback]);
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] py-20 text-center">
       <div className="relative mb-8">

@@ -156,9 +156,33 @@
   .shadow-toss {
     box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.04), 0 4px 16px 0 rgba(0, 0, 0, 0.04);
   }
-  
+
   .shadow-toss-lg {
     box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.06), 0 8px 32px 0 rgba(0, 0, 0, 0.06);
+  }
+
+  .shadow-toss-sm {
+    box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.04), 0 2px 8px 0 rgba(0, 0, 0, 0.03);
+  }
+
+  /* [CL-IMPROVE-7TASKS-20260330] Toss UI/UX 유틸리티 */
+  .toss-card {
+    @apply bg-card rounded-2xl p-6 shadow-toss border border-border/50;
+  }
+  .toss-title {
+    @apply text-lg font-semibold text-foreground;
+  }
+  .toss-desc {
+    @apply text-sm text-muted-foreground leading-relaxed;
+  }
+  .toss-cta {
+    @apply w-full h-12 rounded-xl font-semibold transition-all duration-200 active:scale-[0.98];
+  }
+
+  /* Content visibility for virtualization */
+  .content-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 200px;
   }
   
   /* Smooth number animation */

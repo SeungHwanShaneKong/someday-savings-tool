@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { AdSenseLayout } from "@/components/AdSenseLayout";
 import { MobileDesktopNotice } from "@/components/MobileDesktopNotice";
+import { UpdateNotice } from "@/components/UpdateNotice";
 import { ChatFab } from "@/components/chat/ChatFab";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -37,6 +38,7 @@ function AppRoutes() {
   return (
     <>
       <MobileDesktopNotice />
+      <UpdateNotice />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/" element={<Landing />} />

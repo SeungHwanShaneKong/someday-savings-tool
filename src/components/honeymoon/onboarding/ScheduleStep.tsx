@@ -51,17 +51,18 @@ export function ScheduleStep({
 
       {/* Dual-thumb slider */}
       <div className="w-full max-w-sm mb-10">
+        {/* [CL-SLIDER-FIX-20260330] max 14→20박 확장 */}
         <Slider
           value={[nightsMin, nightsMax]}
           min={2}
-          max={14}
+          max={20}
           step={1}
           onValueChange={([min, max]) => onNightsChange(min, max)}
           aria-label="여행 기간"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
           <span>2박</span>
-          <span>14박</span>
+          <span>20박</span>
         </div>
       </div>
 

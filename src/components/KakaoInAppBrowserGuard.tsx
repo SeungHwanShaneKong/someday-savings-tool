@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { 
-  isInAppBrowser, 
-  openInExternalBrowser, 
+import {
+  openInExternalBrowserWithFallback,
   getBrowserInfo,
-  copyToClipboard 
+  copyToClipboard,
+  getAppSpecificGuide,
 } from '@/lib/kakao-browser';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Copy, CheckCircle2, Smartphone } from 'lucide-react';
 
 interface KakaoInAppBrowserGuardProps {
   children: React.ReactNode;
@@ -15,166 +15,137 @@ interface KakaoInAppBrowserGuardProps {
 }
 
 /**
- * 인앱 브라우저(카카오톡, Threads, Instagram, Facebook 등)에서 접근 시
- * 외부 브라우저로 유도하는 가드 컴포넌트.
- * Google OAuth의 "disallowed_useragent" 정책을 준수합니다.
+ * [CL-IMPROVE-7TASKS-20260330] 인앱 브라우저 가드 — Toss UI/UX 적용
+ *
+ * 인앱 브라우저(카카오톡, Threads, Instagram, Discord 등)에서 접근 시
+ * 5단계 자동 탈출 체인 → 실패 시 Toss 스타일 브릿지 UI 표시.
  */
-export function KakaoInAppBrowserGuard({ 
-  children, 
-  enabled = true 
+export function KakaoInAppBrowserGuard({
+  children,
+  enabled = true
 }: KakaoInAppBrowserGuardProps) {
   const [isIAB, setIsIAB] = useState(false);
   const [detectedApp, setDetectedApp] = useState<string | null>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [phase, setPhase] = useState<'detecting' | 'escaping' | 'bridge'>('detecting');
   const [copied, setCopied] = useState(false);
-  const [showManualGuide, setShowManualGuide] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
-    
+
     const info = getBrowserInfo();
     setIsIAB(info.isInAppBrowser);
     setDetectedApp(info.detectedApp);
-    
+
     if (info.isInAppBrowser) {
-      // 자동으로 외부 브라우저로 전환 시도
-      setIsRedirecting(true);
-      
-      const success = openInExternalBrowser();
-      
-      // 2초 후에도 페이지가 남아있으면 수동 가이드 표시
-      const timer = setTimeout(() => {
-        setIsRedirecting(false);
-        if (!success) {
-          setShowManualGuide(true);
-        }
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+      setPhase('escaping');
+      // 5단계 자동 탈출 체인 시도 → 모두 실패 시 브릿지 UI
+      openInExternalBrowserWithFallback(window.location.href, () => {
+        setPhase('bridge');
+      });
     }
   }, [enabled]);
+
   const handleCopyUrl = async () => {
     const success = await copyToClipboard(window.location.href);
     if (success) {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 3000);
     }
   };
 
-  const handleRetryExternalBrowser = () => {
-    setIsRedirecting(true);
-    openInExternalBrowser();
-    
-    setTimeout(() => {
-      setIsRedirecting(false);
-      setShowManualGuide(true);
-    }, 2000);
+  const handleRetry = () => {
+    setPhase('escaping');
+    openInExternalBrowserWithFallback(window.location.href, () => {
+      setPhase('bridge');
+    });
   };
-
-  const { isAndroid, isIOS } = getBrowserInfo();
 
   // 인앱 브라우저가 아니거나 비활성화된 경우 자식 컴포넌트 렌더링
   if (!enabled || !isIAB) {
     return <>{children}</>;
   }
 
-  // 리다이렉트 중 로딩 화면
-  if (isRedirecting) {
+  const { isIOS, isAndroid } = getBrowserInfo();
+  const guide = getAppSpecificGuide(detectedApp, isIOS, isAndroid);
+
+  // 탈출 시도 중 로딩 화면
+  if (phase === 'escaping') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6">
         <div className="text-center max-w-sm">
-          {/* 로딩 애니메이션 */}
           <div className="mb-6">
             <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-          
-          <h1 className="text-xl font-semibold text-foreground mb-2">
-            안전한 로그인을 위해
-          </h1>
-          <p className="text-muted-foreground">
-            브라우저로 이동 중입니다...
-          </p>
+          <h1 className="toss-title mb-2">브라우저로 이동 중</h1>
+          <p className="toss-desc">잠시만 기다려주세요...</p>
         </div>
       </div>
     );
   }
 
-  // 수동 가이드 화면
+  // 브릿지 UI (Toss 스타일)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 py-8">
       <div className="text-center max-w-sm w-full">
         {/* 아이콘 */}
         <div className="mb-6">
           <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
-            <ExternalLink className="w-10 h-10 text-primary" />
+            <Smartphone className="w-10 h-10 text-primary" />
           </div>
         </div>
-        
+
         {/* 제목 */}
-         <h1 className="text-xl font-semibold text-foreground mb-2">
-           외부 브라우저에서 열어주세요
-         </h1>
-         <p className="text-muted-foreground mb-6 text-sm">
-           {detectedApp ? `${detectedApp} 내` : '현재'} 브라우저에서는 구글 로그인이 제한됩니다.
-           <br />
-           아래 방법으로 외부 브라우저에서 접속해주세요.
+        <h1 className="text-xl font-semibold text-foreground mb-2">
+          외부 브라우저에서 열어주세요
+        </h1>
+        <p className="toss-desc mb-6">
+          {detectedApp ? `${detectedApp}` : '현재'} 앱 내 브라우저에서는
+          <br />일부 기능이 제한될 수 있어요.
         </p>
-        
-        {/* 버튼들 */}
+
+        {/* CTA 버튼 영역 */}
         <div className="space-y-3 mb-8">
-          <Button 
-            onClick={handleRetryExternalBrowser}
-            className="w-full h-12"
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            외부 브라우저로 열기
-          </Button>
-          
-          <Button 
-            variant="outline" 
+          {/* PRIMARY CTA: URL 복사 */}
+          <Button
             onClick={handleCopyUrl}
-            className="w-full h-12"
+            className="toss-cta bg-primary text-white hover:bg-primary/90"
+            size="lg"
           >
             {copied ? (
               <>
-                <CheckCircle2 className="w-4 h-4 mr-2 text-primary" />
-                복사완료! 브라우저에 붙여넣기
+                <CheckCircle2 className="w-5 h-5 mr-2" />
+                복사완료! Safari에 붙여넣기
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4 mr-2" />
+                <Copy className="w-5 h-5 mr-2" />
                 URL 복사하기
               </>
             )}
           </Button>
+
+          {/* SECONDARY: 자동 이동 재시도 */}
+          <Button
+            variant="outline"
+            onClick={handleRetry}
+            className="w-full h-11 rounded-xl transition-all duration-200"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            외부 브라우저로 열기
+          </Button>
         </div>
-        
-        {/* 수동 가이드 */}
-        {showManualGuide && (
-          <div className="bg-muted/50 rounded-xl p-4 text-left">
-            <p className="text-sm font-medium text-foreground mb-3">
-              📱 직접 여는 방법
-            </p>
-            <ol className="text-sm text-muted-foreground space-y-2">
-              {isIOS ? (
-                <>
-                  <li>1. 우측 하단 <strong>Safari</strong> 아이콘 탭</li>
-                  <li>2. 또는 우측 상단 <strong>⋯</strong> → <strong>Safari로 열기</strong></li>
-                </>
-              ) : isAndroid ? (
-                <>
-                  <li>1. 우측 상단 <strong>⋮</strong> 메뉴 탭</li>
-                  <li>2. <strong>다른 브라우저로 열기</strong> 선택</li>
-                </>
-              ) : (
-                <>
-                  <li>1. 우측 상단 메뉴(⋮ 또는 ⋯) 탭</li>
-                  <li>2. "외부 브라우저로 열기" 선택</li>
-                </>
-              )}
-            </ol>
-          </div>
-        )}
+
+        {/* 앱별 안내 가이드 */}
+        <div className="toss-card text-left">
+          <p className="text-sm font-semibold text-foreground mb-3">
+            {detectedApp ? `${detectedApp}에서 여는 방법` : '직접 여는 방법'}
+          </p>
+          <ol className="text-sm text-muted-foreground space-y-2">
+            {guide.steps.map((step, i) => (
+              <li key={i} className="leading-relaxed">{step}</li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );

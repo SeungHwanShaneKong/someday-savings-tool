@@ -29,6 +29,10 @@ import { ScheduleStep } from '@/components/honeymoon/onboarding/ScheduleStep';
 import { LoadingStep } from '@/components/honeymoon/onboarding/LoadingStep';
 import { ResultsStep } from '@/components/honeymoon/onboarding/ResultsStep';
 import { buildLocalFallbackResults } from '@/lib/honeymoon-profile';
+// [CL-WORLDCUP-CONNECT-20260330] 월드컵 우승지 연계
+import { getDestinationById } from '@/lib/honeymoon-destinations';
+import { Trophy, Heart } from 'lucide-react';
+import { DESTINATION_IMAGES } from '@/lib/honeymoon-destination-images';
 
 export default function Honeymoon() {
   const navigate = useNavigate();
@@ -43,6 +47,17 @@ export default function Honeymoon() {
 
   // [CL-HONEYMOON-REDESIGN-20260316] 온보딩 상태
   const onboarding = useHoneymoonOnboarding(user?.id);
+
+  // [CL-IMPROVE-7TASKS-20260330] 페이지 진입 시 항상 월드컵부터 시작
+  const initialMountRef = useRef(true);
+  useEffect(() => {
+    if (initialMountRef.current) {
+      initialMountRef.current = false;
+      onboarding.resetOnboarding();
+      setProfileApplied(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     viewState,
@@ -60,6 +75,8 @@ export default function Honeymoon() {
     popupDestination,
     setPopupDestination,
     flyTo,
+    flyToTarget,
+    clearFlyToTarget,
     resetView,
     applyProfile,
   } = useHoneymoonMap();
@@ -83,12 +100,49 @@ export default function Honeymoon() {
 
   // [CL-HONEYMOON-REDESIGN-20260316] 온보딩 완료 후 프로필 적용
   const [profileApplied, setProfileApplied] = useState(false);
+
+  // [CL-WORLDCUP-CONNECT-20260330] 월드컵 우승 여행지 ID → Destination 연결
+  const worldCupWinnerDest = useMemo(() => {
+    if (!onboarding.state.profile?.finalWinnerId || !onboarding.state.worldCupImages) return null;
+    const winnerImg = onboarding.state.worldCupImages.find(
+      img => img.id === onboarding.state.profile!.finalWinnerId
+    );
+    if (!winnerImg?.destinationId) return null;
+    return getDestinationById(winnerImg.destinationId) ?? null;
+  }, [onboarding.state.profile, onboarding.state.worldCupImages]);
+
+  // [CL-WORLDCUP-CONNECT-20260330] AI 추천 Top 여행지 ID 목록
+  const aiTopDestIds = useMemo(() => {
+    if (!onboarding.state.aiResults?.recommendations) return [];
+    return onboarding.state.aiResults.recommendations
+      .slice(0, 3)
+      .map(r => r.destinationId);
+  }, [onboarding.state.aiResults]);
+
   useEffect(() => {
     if (onboarding.state.isComplete && onboarding.state.profile && !profileApplied) {
       applyProfile(onboarding.state.profile);
+
+      // [CL-WORLDCUP-CONNECT-20260330] 월드컵 우승지 + AI Top 3 자동 선택 & flyTo
+      const autoSelectIds = new Set<string>();
+      if (worldCupWinnerDest) {
+        autoSelectIds.add(worldCupWinnerDest.id);
+      }
+      aiTopDestIds.forEach(id => autoSelectIds.add(id));
+      // 자동 선택 (최대 5개 제한은 toggleSelection 내부에서 처리)
+      autoSelectIds.forEach(id => {
+        if (!selectedIds.includes(id)) {
+          toggleSelection(id);
+        }
+      });
+      // 우승지로 flyTo
+      if (worldCupWinnerDest) {
+        setTimeout(() => flyTo(worldCupWinnerDest), 500);
+      }
+
       setProfileApplied(true);
     }
-  }, [onboarding.state.isComplete, onboarding.state.profile, profileApplied, applyProfile]);
+  }, [onboarding.state.isComplete, onboarding.state.profile, profileApplied, applyProfile, worldCupWinnerDest, aiTopDestIds, selectedIds, toggleSelection, flyTo]);
 
   // Auth check
   if (!authLoading && !user) {
@@ -217,15 +271,53 @@ export default function Honeymoon() {
         </div>
       </header>
 
+      {/* [CL-WORLDCUP-CONNECT-20260330] 월드컵 우승지 하이라이트 배너 */}
+      {worldCupWinnerDest && profileApplied && (
+        <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-primary/20 animate-fade-up">
+          <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3">
+            {/* 우승지 썸네일 */}
+            {DESTINATION_IMAGES[worldCupWinnerDest.id] && (
+              <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 border-2 border-primary/30 shadow-sm">
+                <img
+                  src={DESTINATION_IMAGES[worldCupWinnerDest.id].thumbUrl.replace('w=100', 'w=200')}
+                  alt={worldCupWinnerDest.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-yellow-500 flex-shrink-0" />
+                <span className="text-xs font-bold text-foreground truncate">
+                  월드컵 우승: {worldCupWinnerDest.markerEmoji} {worldCupWinnerDest.name}
+                </span>
+              </div>
+              <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                {onboarding.state.profile?.profileEmoji} {onboarding.state.profile?.profileLabel} 스타일에 딱 맞는 여행지
+              </p>
+            </div>
+            <button
+              onClick={() => flyTo(worldCupWinnerDest)}
+              className="flex items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-lg transition-colors flex-shrink-0"
+            >
+              <Heart className="w-3 h-3" />
+              <span className="hidden sm:inline">지도에서 보기</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main layout */}
       {isMobile ? (
         // Mobile: stacked layout
         <div className="flex-1 flex flex-col">
           {/* Map */}
-          <div className="h-[50vh] min-h-[300px] relative animate-fade-up">
+          <div className="h-[50vh] min-h-[300px] relative animate-fade-up" style={{ touchAction: 'none' }}> {/* [CL-IMPROVE-7TASKS-20260330] */}
             <HoneymoonMap
               viewState={viewState}
               onViewStateChange={setViewState}
+              flyToTarget={flyToTarget}
+              onFlyToComplete={clearFlyToTarget}
               scoredDestinations={scoredDestinations}
               selectedIds={selectedIds}
               hoveredId={hoveredId}
@@ -318,6 +410,8 @@ export default function Honeymoon() {
               <HoneymoonMap
                 viewState={viewState}
                 onViewStateChange={setViewState}
+                flyToTarget={flyToTarget}
+                onFlyToComplete={clearFlyToTarget}
                 scoredDestinations={scoredDestinations}
                 selectedIds={selectedIds}
                 hoveredId={hoveredId}

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { FeatureRequestButton } from '@/components/FeatureRequestButton';
 
 export default function Footer() {
   return (
@@ -68,6 +69,10 @@ export default function Footer() {
                   >
                     자주 묻는 질문
                   </Link>
+                </li>
+                {/* [CL-IMPROVE-7TASKS-20260330] 의견 수집 */}
+                <li>
+                  <FeatureRequestButton />
                 </li>
               </ul>
             </nav>

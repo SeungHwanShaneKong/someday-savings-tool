@@ -88,10 +88,11 @@ export function FilterSliders({ filters, onUpdate, onReset, profileApplied }: Fi
             {filters.minNights}~{filters.maxNights}박
           </span>
         </div>
+        {/* [CL-SLIDER-FIX-20260330] max 14→20박 */}
         <Slider
           value={[filters.minNights, filters.maxNights]}
           min={3}
-          max={14}
+          max={20}
           step={1}
           onValueChange={([min, max]) => {
             onUpdate('minNights', min);

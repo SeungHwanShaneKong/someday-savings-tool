@@ -35,13 +35,15 @@ const DEFAULT_VIEW_STATE: MapViewState = {
 const DEFAULT_FILTERS: HoneymoonFilters = {
   maxBudget: 15000000,
   minNights: 3,
-  maxNights: 14,
+  maxNights: 20, // [CL-SLIDER-FIX-20260330] 14→20박
   concepts: [],
   accommodationTypes: [],
 };
 
 export function useHoneymoonMap() {
   const [viewState, setViewState] = useState<MapViewState>(DEFAULT_VIEW_STATE);
+  // [CL-MAP-WORLDCUP-FIX-20260330] flyToTarget: 프로그래밍 네비게이션 전용 (사용자 드래그와 분리)
+  const [flyToTarget, setFlyToTarget] = useState<MapViewState | null>(null);
   const [filters, setFilters] = useState<HoneymoonFilters>(DEFAULT_FILTERS);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -55,9 +57,12 @@ export function useHoneymoonMap() {
     score: getMatchScore(d, filters),
   }));
 
-  // Fly to destination — 3D 프리미엄 카메라 이동
+  // [CL-MAP-WORLDCUP-FIX-20260330] flyToTarget 클리어 콜백
+  const clearFlyToTarget = useCallback(() => setFlyToTarget(null), []);
+
+  // Fly to destination — 3D 프리미엄 카메라 이동 (flyToTarget 사용)
   const flyTo = useCallback((destination: Destination) => {
-    setViewState({
+    setFlyToTarget({
       longitude: destination.coordinates[0],
       latitude: destination.coordinates[1],
       zoom: 5,
@@ -100,9 +105,9 @@ export function useHoneymoonMap() {
     setFilters(DEFAULT_FILTERS);
   }, []);
 
-  // Reset view — 전체보기
+  // [CL-MAP-WORLDCUP-FIX-20260330] Reset view — 전체보기 (flyToTarget 사용)
   const resetView = useCallback(() => {
-    setViewState(DEFAULT_VIEW_STATE);
+    setFlyToTarget(DEFAULT_VIEW_STATE);
     setPopupDestination(null);
   }, []);
 
@@ -143,6 +148,8 @@ export function useHoneymoonMap() {
     popupDestination,
     setPopupDestination,
     flyTo,
+    flyToTarget,
+    clearFlyToTarget,
     resetView,
     applyProfile,
   };

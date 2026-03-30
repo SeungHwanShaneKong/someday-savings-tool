@@ -14,7 +14,8 @@ interface OnboardingShellProps {
   children: React.ReactNode;
 }
 
-const BACK_ENABLED_STEPS: OnboardingStep[] = ['worldcup', 'budget', 'schedule', 'results'];
+// [CL-MECE-TEST-20260330] budget 제거(월드컵 완료 후 되돌리기 차단), loading 추가
+const BACK_ENABLED_STEPS: OnboardingStep[] = ['worldcup', 'schedule', 'loading', 'results'];
 
 export function OnboardingShell({ step, progress, onBack, children }: OnboardingShellProps) {
   const showBack = BACK_ENABLED_STEPS.includes(step);

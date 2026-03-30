@@ -1,13 +1,16 @@
 /**
  * [CL-HONEYMOON-REDESIGN-20260316] 허니문 온보딩 상태 관리 Hook
+ * [CL-IMPROVE-7TASKS-20260330] 16강(15매치) 확장 + worldCupImages 필드
  * 6단계 플로우: welcome → worldcup → budget → schedule → loading → results → complete
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   generateBracket,
+  generateRandomWorldCupImages,
   advanceBracket,
   type WorldCupMatch,
+  type WorldCupImage,
 } from '@/lib/honeymoon-images';
 import {
   computeProfileFromSelections,
@@ -30,14 +33,18 @@ const STEP_ORDER: OnboardingStep[] = [
   'welcome', 'worldcup', 'budget', 'schedule', 'loading', 'results', 'complete',
 ];
 
+// ── [CL-IMPROVE-7TASKS-20260330] 총 매치 수 ──
+const TOTAL_MATCHES = 15; // R16(8) + QF(4) + SF(2) + FINAL(1)
+
 // ── 상태 타입 ──
 
 export interface OnboardingState {
   step: OnboardingStep;
   // World Cup
-  worldCupRound: number;           // 0-6 (7매치)
+  worldCupRound: number;           // 0-14 (15매치) [CL-IMPROVE-7TASKS-20260330]
   worldCupSelections: string[];    // 매치별 승자 ID
   worldCupBracket: WorldCupMatch[];
+  worldCupImages: WorldCupImage[]; // [CL-IMPROVE-7TASKS-20260330] 현재 세션의 16개 이미지
   // Budget + Schedule
   budget: number;
   nightsMin: number;
@@ -53,11 +60,13 @@ export interface OnboardingState {
 // ── 초기 상태 ──
 
 function createInitialState(): OnboardingState {
+  const images = generateRandomWorldCupImages();
   return {
     step: 'welcome',
     worldCupRound: 0,
     worldCupSelections: [],
-    worldCupBracket: generateBracket(),
+    worldCupBracket: generateBracket(images),
+    worldCupImages: images,
     budget: 5000000,
     nightsMin: 3,
     nightsMax: 10,
@@ -81,6 +90,10 @@ function loadState(userId?: string): OnboardingState | null {
     const parsed = JSON.parse(raw);
     // 유효성 검증: step 필드 존재 확인
     if (!parsed || typeof parsed.step !== 'string') return null;
+    // [CL-IMPROVE-7TASKS-20260330] 기존 7매치 데이터 마이그레이션: worldCupImages 없으면 리셋
+    if (!parsed.worldCupImages || !Array.isArray(parsed.worldCupImages) || parsed.worldCupImages.length < 16) {
+      return null; // 자동 fresh start
+    }
     return parsed as OnboardingState;
   } catch {
     return null;
@@ -100,7 +113,7 @@ function saveState(state: OnboardingState, userId?: string): void {
 function computeProgress(state: OnboardingState): number {
   switch (state.step) {
     case 'welcome':  return 0;
-    case 'worldcup': return 5 + Math.round((state.worldCupRound / 7) * 50);
+    case 'worldcup': return 5 + Math.round((state.worldCupRound / TOTAL_MATCHES) * 50); // [CL-IMPROVE-7TASKS-20260330]
     case 'budget':   return 60;
     case 'schedule': return 75;
     case 'loading':  return 85;
@@ -161,6 +174,7 @@ export function useHoneymoonOnboarding(userId?: string): UseHoneymoonOnboardingR
 
   const goBack = useCallback(() => {
     setState(prev => {
+      // [CL-MECE-TEST-20260330] goBack 리팩토링: budget 차단, loading 추가
       switch (prev.step) {
         case 'worldcup':
           return {
@@ -171,10 +185,12 @@ export function useHoneymoonOnboarding(userId?: string): UseHoneymoonOnboardingR
             departureMonth: prev.departureMonth,
           };
         case 'budget':
-          // 월드컵 결과 보존, 마지막 라운드 상태로 복원
-          return { ...prev, step: 'worldcup' as OnboardingStep };
+          // 15매치 완료 후 월드컵 되돌리기 불가 (UX: 완료된 토너먼트 재진입 차단)
+          return prev;
         case 'schedule':
           return { ...prev, step: 'budget' as OnboardingStep };
+        case 'loading':
+          return { ...prev, step: 'schedule' as OnboardingStep, aiResults: null };
         case 'results':
           return { ...prev, step: 'schedule' as OnboardingStep, aiResults: null };
         default:
@@ -187,19 +203,24 @@ export function useHoneymoonOnboarding(userId?: string): UseHoneymoonOnboardingR
 
   const currentMatch = useMemo(() => {
     if (state.step !== 'worldcup') return null;
-    if (state.worldCupRound >= 7) return null;
+    if (state.worldCupRound >= TOTAL_MATCHES) return null; // [CL-IMPROVE-7TASKS-20260330]
     return state.worldCupBracket[state.worldCupRound] ?? null;
   }, [state.step, state.worldCupRound, state.worldCupBracket]);
 
   const selectWorldCupWinner = useCallback((winnerId: string) => {
     setState(prev => {
       const newSelections = [...prev.worldCupSelections, winnerId];
-      const newBracket = advanceBracket(prev.worldCupBracket, prev.worldCupRound, winnerId);
+      const newBracket = advanceBracket(
+        prev.worldCupBracket,
+        prev.worldCupRound,
+        winnerId,
+        prev.worldCupImages, // [CL-IMPROVE-7TASKS-20260330]
+      );
       const newRound = prev.worldCupRound + 1;
 
-      // 7매치 완료 → 프로필 생성 + budget 단계로
-      if (newRound >= 7) {
-        const profileBase = computeProfileFromSelections(newSelections);
+      // [CL-IMPROVE-7TASKS-20260330] 15매치 완료 → 프로필 생성 + budget 단계로
+      if (newRound >= TOTAL_MATCHES) {
+        const profileBase = computeProfileFromSelections(newSelections, prev.worldCupImages);
         const profile: TravelProfile = {
           ...profileBase,
           budgetRange: { min: 2000000, max: prev.budget },

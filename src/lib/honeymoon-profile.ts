@@ -2,7 +2,7 @@
  * [CL-HONEYMOON-REDESIGN-20260316] 여행 성향 프로필 계산 + AI 폴백 생성
  */
 
-import { WORLD_CUP_IMAGES, type TravelStyle } from './honeymoon-images';
+import { WORLD_CUP_IMAGES, type TravelStyle, type WorldCupImage } from './honeymoon-images';
 import { DESTINATIONS, getMatchScore, type HoneymoonConcept, type AccommodationType } from './honeymoon-destinations';
 
 // ── 프로필 타입 ──
@@ -64,11 +64,13 @@ export const STYLE_TO_ACCOMMODATION: Record<TravelStyle, AccommodationType[]> = 
 
 /**
  * 월드컵 선택 결과로 프로필 계산
+ * [CL-IMPROVE-7TASKS-20260330] 15매치 대응: R16×8(0.5), QF×4(1), SF×2(2), FINAL×1(3)
  *
- * 가중치: QF 승리 1점, SF 승리 2점, FINAL 승리 3점
+ * @param allImages 현재 세션의 WorldCupImage 배열 (16강 확장 대응)
  */
 export function computeProfileFromSelections(
   selections: string[],
+  allImages?: WorldCupImage[],
 ): Omit<TravelProfile, 'budgetRange' | 'nights' | 'departureMonth'> {
   const scores: Record<TravelStyle, number> = {
     relaxation: 0,
@@ -77,10 +79,12 @@ export function computeProfileFromSelections(
     luxury: 0,
   };
 
-  const weights = [1, 1, 1, 1, 2, 2, 3]; // QF×4, SF×2, FINAL×1
+  // [CL-IMPROVE-7TASKS-20260330] R16×8(0.5), QF×4(1), SF×2(2), FINAL×1(3)
+  const weights = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1, 1, 1, 1, 2, 2, 3];
+  const imagePool = allImages ?? WORLD_CUP_IMAGES;
 
   selections.forEach((id, i) => {
-    const img = WORLD_CUP_IMAGES.find(im => im.id === id);
+    const img = imagePool.find(im => im.id === id);
     if (img && i < weights.length) {
       scores[img.travelStyle] += weights[i];
     }

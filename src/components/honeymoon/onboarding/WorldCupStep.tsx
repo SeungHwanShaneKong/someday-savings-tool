@@ -1,30 +1,35 @@
 /**
  * [CL-HONEYMOON-REDESIGN-20260316] 이미지 월드컵 스텝
- * 7매치(8강→4강→결승) 진행, 라운드 인디케이터
+ * [CL-IMPROVE-7TASKS-20260330] 15매치(16강→8강→4강→결승) 진행, 라운드 그룹 인디케이터
  */
 
 import { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { WorldCupCard } from './WorldCupCard';
+import { Check } from 'lucide-react';
 import type { WorldCupMatch } from '@/lib/honeymoon-images';
 
 interface WorldCupStepProps {
   match: WorldCupMatch;
-  round: number; // 0-6
+  round: number; // 0-14
   onSelect: (winnerId: string) => void;
 }
 
-const ROUND_LABELS: Record<string, string> = {
-  QF: '8강',
-  SF: '4강',
-  FINAL: '결승',
+// [CL-IMPROVE-7TASKS-20260330] 라운드 라벨 + 매치 수
+const ROUND_CONFIG: Record<string, { label: string; count: number; startIdx: number }> = {
+  R16:   { label: '16강', count: 8, startIdx: 0 },
+  QF:    { label: '8강',  count: 4, startIdx: 8 },
+  SF:    { label: '4강',  count: 2, startIdx: 12 },
+  FINAL: { label: '결승', count: 1, startIdx: 14 },
 };
 
+const ROUND_ORDER = ['R16', 'QF', 'SF', 'FINAL'] as const;
+
 function getRoundDisplay(match: WorldCupMatch): string {
-  const label = ROUND_LABELS[match.round] ?? '';
-  if (match.round === 'QF') return `${label} ${match.matchIndex + 1}/4`;
-  if (match.round === 'SF') return `${label} ${match.matchIndex + 1}/2`;
-  return label;
+  const cfg = ROUND_CONFIG[match.round];
+  if (!cfg) return '';
+  if (cfg.count === 1) return cfg.label;
+  return `${cfg.label} ${match.matchIndex + 1}/${cfg.count}`;
 }
 
 export function WorldCupStep({ match, round, onSelect }: WorldCupStepProps) {
@@ -53,6 +58,10 @@ export function WorldCupStep({ match, round, onSelect }: WorldCupStepProps) {
     return imageId === winnerId;
   };
 
+  // [CL-IMPROVE-7TASKS-20260330] 현재 라운드의 인덱스 계산
+  const currentRoundCfg = ROUND_CONFIG[match.round];
+  const matchInRound = round - (currentRoundCfg?.startIdx ?? 0);
+
   return (
     <div className="flex flex-col items-center w-full py-6">
       {/* Round indicator */}
@@ -62,19 +71,52 @@ export function WorldCupStep({ match, round, onSelect }: WorldCupStepProps) {
         </span>
       </div>
 
-      {/* Match counter dots */}
-      <div className="flex gap-1.5 mb-6">
-        {Array.from({ length: 7 }, (_, i) => (
-          <div
-            key={i}
-            className={cn(
-              'w-2 h-2 rounded-full transition-all duration-300',
-              i < round ? 'bg-primary' :
-              i === round ? 'bg-primary scale-125' :
-              'bg-muted-foreground/20',
-            )}
-          />
-        ))}
+      {/* [CL-IMPROVE-7TASKS-20260330] 라운드 그룹 인디케이터 */}
+      <div className="flex items-center gap-2 mb-6">
+        {ROUND_ORDER.map((roundKey) => {
+          const cfg = ROUND_CONFIG[roundKey];
+          const isCurrentRound = match.round === roundKey;
+          const isCompletedRound = round >= cfg.startIdx + cfg.count;
+          const isPastRound = round >= cfg.startIdx;
+
+          return (
+            <div key={roundKey} className="flex items-center gap-1">
+              {/* 라운드 라벨 */}
+              <span className={cn(
+                'text-[10px] font-medium transition-colors',
+                isCurrentRound ? 'text-primary' :
+                isCompletedRound ? 'text-primary/60' :
+                'text-muted-foreground/40',
+              )}>
+                {cfg.label}
+              </span>
+              {/* 매치 dots or checkmark */}
+              {isCompletedRound ? (
+                <Check className="w-3 h-3 text-primary" />
+              ) : isCurrentRound ? (
+                <div className="flex gap-0.5">
+                  {Array.from({ length: cfg.count }, (_, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'w-1.5 h-1.5 rounded-full transition-all duration-300',
+                        i < matchInRound ? 'bg-primary' :
+                        i === matchInRound ? 'bg-primary scale-125' :
+                        'bg-muted-foreground/20',
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : isPastRound ? null : (
+                <div className="flex gap-0.5">
+                  {Array.from({ length: Math.min(cfg.count, 4) }, (_, i) => (
+                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-muted-foreground/15" />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Question */}
@@ -111,7 +153,7 @@ export function WorldCupStep({ match, round, onSelect }: WorldCupStepProps) {
 
       {/* Hint */}
       <p className="text-xs text-muted-foreground mt-4">
-        마음에 드는 이미지를 탭해주세요
+        마음에 드는 여행지를 탭해주세요
       </p>
     </div>
   );

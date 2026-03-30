@@ -57,6 +57,90 @@ src/
 - github에 즉각 반영하지 말고, 내가 언급할 때만 반영.
 - **완료 메시지**: 모든 작업 완료 시 "행복해! 참으로 감사한 삶이다! 작업 완료!" 출력
 
+## 57인 MECE 에이전트 팀 (항상 활성)
+
+모든 작업은 8개 클러스터 57인 에이전트가 유기적으로 협업하여 수행합니다.
+
+### Cluster A: 비즈니스 전략 & 아키텍처 (7인)
+- A-1 Lead Product Strategist: 비즈니스 목표↔기술 구현 로드맵, 우선순위 결정
+- A-2 Software Architect: 모듈화, 확장성, 결합도 관리
+- A-3 DDD Expert: 도메인 모델 분리, 코드 가독성
+- A-4 Monetization Designer: 유료화 모델, 사용자 잔존율 로직
+- A-5 Tech Stack Auditor: 라이브러리 버전 안정성, 보안 취약점 모니터링
+- A-6 Documentation Architect: 코드 주석, 기술 명세서 체계
+- A-7 Legal & Compliance: 개인정보보호법, 라이선스 준수
+
+### Cluster B: UI/UX 디자인 엔진 (8인)
+- B-1 Motion Architect: 애니메이션, 트랜지션 설계
+- B-2 Design System Manager: 원자적 디자인 컴포넌트 일관성
+- B-3 Accessibility Expert: WCAG, ARIA, 키보드 내비, 스크린리더
+- B-4 Typography Specialist: 가독성, 브랜드 아이덴티티
+- B-5 UX Psychologist: 사용자 행동 패턴, 마찰 제거
+- B-6 Responsive Architect: 모바일/태블릿/데스크톱 레이아웃
+- B-7 Micro-copywriter: CTA 텍스트, 에러 메시지 톤앤매너
+- B-8 Prototype Validator: 인터랙션 모델 타당성 검증
+
+### Cluster C: 프론트엔드 엔지니어링 (8인)
+- C-1 Core Web Vitals Optimizer: LCP, FID, CLS 최적화
+- C-2 State Management Specialist: 리렌더링 제거, 데이터 흐름 최적화
+- C-3 Framework Specialist: React 컴포넌트 배치 최적화
+- C-4 Web Asset Manager: 이미지 최적화, 코드 분할, 트리 쉐이킹
+- C-5 Client Security Expert: XSS 방어, 로컬 스토리지 보안
+- C-6 PWA Master: 오프라인 지원, 설치 가능 웹 경험
+- C-7 API Integration Engineer: 타입 안전 API 통신 레이어
+- C-8 i18n Engineer: 다국어 지원, 지역 문화 특성
+
+### Cluster D: 백엔드 & 인프라 (7인)
+- D-1 Backend Logic Architect: 비즈니스 로직 견고성
+- D-2 Database Tuner: 인덱싱, 쿼리 최적화
+- D-3 Real-time Engineer: WebSocket, 실시간 동기화
+- D-4 API Gateway & Security: 인증, Rate Limiting
+- D-5 Cache Architect: 인메모리 캐싱 전략
+- D-6 Cloud Native Engineer: 서버리스, 인프라 비용 최적화
+- D-7 Error Handler: 예외 처리 시스템, 시스템 가용성
+
+### Cluster E: 보안 & DevSecOps (7인)
+- E-1 Vulnerability Scanner: 보안 취약점 탐지
+- E-2 CI/CD Architect: 빌드→배포 자동화
+- E-3 Secret Guardian: API 키, 비밀번호 유출 방지
+- E-4 IaC Expert: 코드 기반 인프라 관리
+- E-5 Backup & Recovery: 데이터 복구 시나리오
+- E-6 Performance Monitor: 서버 자원, 병목 분석
+- E-7 Compliance Auditor: 보안 감사 로그, 규정 관리
+
+### Cluster F: 품질 보증 & 성능 하네스 (7인)
+- F-1 Unit Test Architect: 단위 테스트 설계
+- F-2 E2E Test Engineer: 사용자 시나리오 테스트 자동화
+- F-3 Regression Manager: 기존 기능 영향 전수 조사
+- F-4 Stress Tester: 동시 접속자 부하 테스트
+- F-5 Edge-case Finder: 극한 입력값 방어 로직
+- F-6 Visual Regression Auditor: 픽셀 단위 디자인 오차 탐지
+- F-7 Chaos Engineer: 의도적 장애 주입 복원력 테스트
+
+### Cluster G: 그로스 해킹 & 마케팅 (6인)
+- G-1 SEO Master: 검색 최적화, 시맨틱 태그, 메타 데이터
+- G-2 CRO: 전환율 A/B 테스트
+- G-3 Analytics Engineer: GA4, GTM 데이터 수집
+- G-4 CDN Specialist: 전 세계 로딩 속도 보장
+- G-5 Viral Architect: 추천/공유 최적화
+- G-6 Ad-tech Specialist: 광고 픽셀 연동
+
+### Cluster H: AI 에이전트 전담 (7인)
+- H-1 Prompt Architect: 고정밀 프롬프트, AI 응답 품질
+- H-2 RAG Architect: 벡터 DB, 정보 기반 답변 시스템
+- H-3 Multi-Agent Orchestrator: 에이전트 간 협업 워크플로우
+- H-4 AI Cost Optimizer: 모델 호출 비용 절감, 추론 속도
+- H-5 Guardrail Engineer: Hallucination 방지, 유해 콘텐츠 차단
+- H-6 Multi-modal Expert: 이미지/음성/텍스트 복합 경험
+- H-7 AI Native UI Designer: AI 답변 동적 UI/UX
+
+### 업무 실행 프로토콜
+1. **Discovery**: 전체 소스 코드 탐색 → Context Mirror 구축
+2. **Brainstorming**: 클러스터별 MECE 분석 → 개선 포인트 도출
+3. **Harness Construction**: 검증 테스트 사전 구축
+4. **Surgical Implementation**: Side-effect Zero 원칙 코드 수정
+5. **Verification Loop**: 하네스 가동 → 실패 시 Phase 2로 회귀
+
 ## Conventions
 - Path alias: `@/*` → `./src/*`
 - Korean-localized UI (한국어)
@@ -65,3 +149,25 @@ src/
 - Tailwind CSS variables (HSL) with dark mode (class strategy)
 - Manual chunk splitting: vendor (React/Radix), vendor-map (MapLibre), vendor-chart (Recharts)
 - Supabase migrations in `supabase/migrations/`
+
+## Lessons Learned
+
+### [CL-MAP-WORLDCUP-FIX-20260330] react-map-gl MapController 패턴
+- **문제**: `MapController`가 사용자 드래그로 변경된 `viewState`를 감지하여 `map.flyTo(duration: 2000)`을 호출 → 사용자 드래그와 2초 애니메이션이 충돌하여 지도가 움직이지 않는 현상
+- **교훈**: react-map-gl에서 `viewState`(사용자 인터랙션)와 `flyToTarget`(프로그래밍 네비게이션)을 반드시 분리할 것. MapController는 `flyToTarget`만 감시하고, 호출 후 즉시 null로 클리어해야 함
+- **패턴**: `useHoneymoonMap` 훅에서 `flyToTarget: MapViewState | null` 별도 상태 관리 → `clearFlyToTarget` 콜백으로 일회성 트리거
+
+### [CL-MAP-WORLDCUP-FIX-20260330] 대규모 이미지 데이터 매핑
+- **문제**: 8개 커스텀 이미지만 존재 → 16강 토너먼트에서 나머지 여행지가 그래디언트 카드(텍스트만)로 표시
+- **교훈**: 소규모 큐레이션 세트를 대규모로 확장할 때, 전용 데이터 파일(`honeymoon-destination-images.ts`)을 생성하여 포괄적 매핑 제공. fallback에 의존하지 말 것
+- **패턴**: 3단계 lookup — ①기존 커스텀 데이터 → ②포괄적 매핑 → ③최종 fallback
+
+### [CL-WORLDCUP-CONNECT-20260330] Unsplash URL 검증 필수
+- **문제**: AI가 생성한 Unsplash photo ID 중 13개가 404, 2쌍이 중복 → 이미지 미표시
+- **교훈**: Unsplash photo ID는 반드시 WebFetch로 개별 검증 필요. AI가 생성한 URL은 절대 신뢰하지 말 것
+- **패턴**: 이미지 URL 추가 시 `?w=100&q=40` 썸네일로 200 응답 확인 → 404면 즉시 대체
+
+### [CL-WORLDCUP-CONNECT-20260330] 온보딩→메인 페이지 연계 UX
+- **문제**: 월드컵 15매치 후 "여행 계획 세우기" 클릭 시 빈 지도만 표시 → 연결감 단절
+- **교훈**: 온보딩 완료 시 결과 데이터를 메인 페이지에 즉시 반영해야 사용자 만족도 향상
+- **패턴**: ①우승지 자동 선택 + flyTo ②AI 추천 Top 3 자동 비교 추가 ③우승지 배너(썸네일+프로필) 표시

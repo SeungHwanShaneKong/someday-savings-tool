@@ -1,5 +1,6 @@
 /**
  * [CL-HONEYMOON-REDESIGN-20260316] 월드컵 이미지 카드
+ * [CL-IMPROVE-7TASKS-20260330] 그래디언트 카드 fallback (Unsplash 이미지 없는 경우)
  * blur-up 로딩, win/lose 애니메이션, 접근성
  */
 
@@ -23,6 +24,7 @@ export function WorldCupCard({
   disabled,
 }: WorldCupCardProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const hasImage = !!image.url;
 
   return (
     <button
@@ -41,40 +43,57 @@ export function WorldCupCard({
       )}
       aria-label={image.label}
     >
-      {/* Blur thumbnail placeholder */}
-      {!imgLoaded && (
-        <img
-          src={image.thumbUrl}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover blur-lg scale-110"
-          aria-hidden="true"
-        />
+      {hasImage ? (
+        <>
+          {/* Blur thumbnail placeholder */}
+          {!imgLoaded && (
+            <img
+              src={image.thumbUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover blur-lg scale-110"
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Full image */}
+          <img
+            src={image.url}
+            alt={image.label}
+            className={cn(
+              'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
+              imgLoaded ? 'opacity-100' : 'opacity-0',
+            )}
+            loading="eager"
+            onLoad={() => setImgLoaded(true)}
+          />
+
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        </>
+      ) : (
+        /* [CL-IMPROVE-7TASKS-20260330] 그래디언트 카드 (Unsplash 이미지 없는 여행지) */
+        <div className={cn(
+          'absolute inset-0 flex flex-col items-center justify-center',
+          'bg-gradient-to-br',
+          image.regionGradient ?? 'from-blue-400 to-indigo-600',
+        )}>
+          <span className="text-5xl mb-3">{image.markerEmoji ?? '✈️'}</span>
+          <p className="text-white text-lg font-bold">{image.subLabel}</p>
+          <p className="text-white/70 text-xs mt-1">{image.label}</p>
+        </div>
       )}
 
-      {/* Full image */}
-      <img
-        src={image.url}
-        alt={image.label}
-        className={cn(
-          'absolute inset-0 w-full h-full object-cover transition-opacity duration-300',
-          imgLoaded ? 'opacity-100' : 'opacity-0',
-        )}
-        loading="eager"
-        onLoad={() => setImgLoaded(true)}
-      />
-
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-      {/* Label */}
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <p className="text-white text-sm font-bold leading-tight">
-          {image.label}
-        </p>
-        <p className="text-white/70 text-xs mt-0.5">
-          {image.subLabel}
-        </p>
-      </div>
+      {/* Label (Unsplash 이미지 카드용) */}
+      {hasImage && (
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <p className="text-white text-sm font-bold leading-tight">
+            {image.label}
+          </p>
+          <p className="text-white/70 text-xs mt-0.5">
+            {image.subLabel}
+          </p>
+        </div>
+      )}
     </button>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 interface UpdateEntry {
@@ -73,6 +73,10 @@ export function UpdateNotice() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-sm mx-auto rounded-2xl p-0 overflow-hidden border-0 [&>button]:hidden">
         <DialogTitle className="sr-only">업데이트 알림</DialogTitle>
+        <DialogDescription className="sr-only">
+          {/* [CL-PREVIEW-SYNC-20260403-120830] Radix Dialog 접근성 경고 제거용 설명 */}
+          최근 업데이트된 기능 안내와 확인 버튼을 제공하는 알림입니다.
+        </DialogDescription>
         {/* 자동 닫힘 프로그레스 바 */}
         <div className="h-1 bg-muted">
           <div

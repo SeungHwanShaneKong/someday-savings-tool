@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { Button } from '@/components/ui/button';
@@ -15,11 +15,14 @@ import {
 import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
+// [CL-TREE-REDESIGN-20260403] 긴급도 카운트용
+import { getUrgencyLevel } from '@/lib/checklist-nudges';
 // [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
 import { useTimelineOptimizer } from '@/hooks/useTimelineOptimizer';
 import TimelinePanel from '@/components/planning/TimelinePanel';
 import { ChecklistProgress } from '@/components/checklist/ChecklistProgress';
 import { ChecklistPeriodSection } from '@/components/checklist/ChecklistPeriodSection';
+import { ChecklistTreeControls } from '@/components/checklist/ChecklistTreeControls';
 import { NudgeBanner } from '@/components/checklist/NudgeBanner';
 import { PraiseModal } from '@/components/checklist/PraiseModal';
 import { BudgetLinkPrompt } from '@/components/checklist/BudgetLinkPrompt';
@@ -55,8 +58,25 @@ export default function Checklist() {
 
   // [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
   // [CL-TIMELINE-FIX-20260308-203000] retry 추가
-  const { result: timelineResult, loading: timelineLoading, error: timelineError, optimize: optimizeTimeline, retry: retryTimeline } = useTimelineOptimizer();
+  const { result: timelineResult, loading: timelineLoading, error: timelineError, isFallback: timelineFallback, optimize: optimizeTimeline, retry: retryTimeline } = useTimelineOptimizer();
   const [timelineOpen, setTimelineOpen] = useState(false);
+  // [CL-TREE-REDESIGN-20260403] 전체 펼치기/접기 제어
+  const [globalExpand, setGlobalExpand] = useState<boolean | null>(null);
+
+  // [CL-TREE-REDESIGN-20260403] 긴급도 카운트 — ChecklistProgress에 전달
+  const urgencyCounts = useMemo(() => {
+    let overdueCount = 0;
+    let urgentCount = 0;
+    let soonCount = 0;
+    for (const item of items) {
+      if (item.is_completed) continue;
+      const level = getUrgencyLevel(item.due_date, false);
+      if (level === 'overdue') overdueCount++;
+      else if (level === 'urgent') urgentCount++;
+      else if (level === 'soon') soonCount++;
+    }
+    return { overdueCount, urgentCount, soonCount };
+  }, [items]);
 
   // Add custom item state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -156,7 +176,14 @@ export default function Checklist() {
         )}
 
         {/* Progress */}
-        {!loading && items.length > 0 && <ChecklistProgress stats={stats} />}
+        {!loading && items.length > 0 && (
+          <ChecklistProgress
+            stats={stats}
+            overdueCount={urgencyCounts.overdueCount}
+            urgentCount={urgencyCounts.urgentCount}
+            soonCount={urgencyCounts.soonCount}
+          />
+        )}
 
         {/* [AGENT-TEAM-9-20260307] P2 AI 일정 최적화 버튼 */}
         {/* [CL-TIMELINE-FIX-20260308-203000] items[0].due_date → 실제 weddingDate 사용 */}
@@ -241,6 +268,21 @@ export default function Checklist() {
           <NudgeBanner type="incomplete" />
         )}
 
+        {/* [CL-TREE-REDESIGN-20260403] 트리 컨트롤 바 */}
+        {!loading && items.length > 0 && (
+          <ChecklistTreeControls
+            items={items}
+            onExpandAll={() => {
+              setGlobalExpand(true);
+              setTimeout(() => setGlobalExpand(null), 500);
+            }}
+            onCollapseAll={() => {
+              setGlobalExpand(false);
+              setTimeout(() => setGlobalExpand(null), 500);
+            }}
+          />
+        )}
+
         {/* Period sections — staggered animation, 2-col grid on desktop */}
         {!loading && items.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
@@ -261,6 +303,7 @@ export default function Checklist() {
                       period={period}
                       items={periodItems}
                       isActive={period === activePeriod}
+                      forceExpand={globalExpand}
                       onToggle={toggleItem}
                       onDelete={deleteItem}
                       onUpdateNotes={updateNotes}
@@ -296,12 +339,14 @@ export default function Checklist() {
 
       {/* [AGENT-TEAM-9-20260307] P2 일정 최적화 패널 */}
       {/* [CL-TIMELINE-FIX-20260308-203000] onRetry 추가 */}
+      {/* [CL-TIMELINE-FALLBACK-20260403] isFallback 전달 */}
       <TimelinePanel
         open={timelineOpen}
         onOpenChange={setTimelineOpen}
         result={timelineResult}
         loading={timelineLoading}
         error={timelineError}
+        isFallback={timelineFallback}
         onRetry={retryTimeline}
       />
     </div>

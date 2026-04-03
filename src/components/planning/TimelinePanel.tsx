@@ -1,6 +1,7 @@
 // [AGENT-TEAM-9-20260307]
 // [CL-AI-LOADING-MSG-20260308-201500] skeleton → AI 로딩 메시지
-import React, { useState, useEffect } from 'react';
+// [CL-TIMELINE-FALLBACK-20260403] Toss 스타일 폴백 UI
+import { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -9,13 +10,15 @@ import {
 } from '@/components/ui/sheet';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Sparkles } from 'lucide-react';
 import type { TimelineResult, TimelineMonth, TimelineTask } from '@/hooks/useTimelineOptimizer';
 
-// [CL-TIMELINE-FIX-20260308-203000] onRetry 콜백 추가
+// [CL-TIMELINE-FALLBACK-20260403] isFallback prop 추가
 interface TimelinePanelProps {
   result: TimelineResult | null;
   loading: boolean;
   error: string | null;
+  isFallback?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRetry?: () => void;
@@ -177,12 +180,37 @@ function MonthSection({ monthData }: { monthData: TimelineMonth }) {
   );
 }
 
+/* ── [CL-TIMELINE-FALLBACK-20260403] 폴백 배너 ── */
+function FallbackBanner({ onRetry }: { onRetry?: () => void }) {
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 text-center animate-fade-up">
+      <div className="text-2xl mb-2">💡</div>
+      <p className="text-sm font-semibold text-amber-900 mb-1">
+        기본 일정을 준비했어요
+      </p>
+      <p className="text-xs text-amber-700/80 mb-3">
+        체크리스트 템플릿 기반의 일정이에요
+      </p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 active:scale-[0.97] transition-all shadow-sm"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          AI 맞춤 일정 받기
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ── Main Panel ── */
-// [CL-TIMELINE-FIX-20260308-203000] onRetry 추가
+// [CL-TIMELINE-FALLBACK-20260403] isFallback 추가
 export default function TimelinePanel({
   result,
   loading,
   error,
+  isFallback = false,
   open,
   onOpenChange,
   onRetry,
@@ -207,8 +235,8 @@ export default function TimelinePanel({
           {/* Loading state */}
           {loading && <LoadingSkeleton />}
 
-          {/* [CL-TIMELINE-FIX-20260308-203000] Error state + 재시도 버튼 */}
-          {error && !loading && (
+          {/* [CL-TIMELINE-FALLBACK-20260403] 에러만 있고 결과 없을 때 — 레거시 호환 */}
+          {error && !loading && !result && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-center">
               <div className="text-3xl mb-3">😥</div>
               <p className="text-sm font-semibold text-red-800 mb-1">오류가 발생했어요</p>
@@ -234,15 +262,23 @@ export default function TimelinePanel({
             </div>
           )}
 
-          {/* Result */}
-          {!loading && !error && result && (
-            <div className="space-y-3">
+          {/* [CL-TIMELINE-FALLBACK-20260403] Result — 폴백이든 AI든 결과가 있으면 표시 */}
+          {!loading && result && (
+            <div className="space-y-3 animate-fade-up">
+              {/* 폴백 배너 — AI 실패 시 대안 안내 */}
+              {isFallback && <FallbackBanner onRetry={onRetry} />}
+
               {/* Summary header */}
-              <div className="rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
+              <div className={`rounded-lg p-4 text-white ${
+                isFallback
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500'
+                  : 'bg-gradient-to-r from-blue-500 to-blue-600'
+              }`}>
                 <p className="text-sm font-medium opacity-90">결혼식까지</p>
                 <p className="text-2xl font-bold">D-{result.dday_count}</p>
                 <p className="text-xs opacity-75 mt-1">
                   총 {result.timeline.length}개월 · {result.timeline.reduce((sum, m) => sum + m.tasks.length, 0)}개 할 일
+                  {isFallback && ' · 기본 일정'}
                 </p>
               </div>
 

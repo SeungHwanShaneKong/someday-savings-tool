@@ -1,10 +1,15 @@
 // [CL-AI-HIERARCHY-20260308-163000]
+// [CL-TREE-REDESIGN-20260403] 긴급 항목 뱃지 추가
 import { cn } from '@/lib/utils';
+import { AlertTriangle, Clock } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import type { ChecklistStats } from '@/hooks/useChecklist';
 
 interface ChecklistProgressProps {
   stats: ChecklistStats;
+  overdueCount?: number;
+  urgentCount?: number;
+  soonCount?: number;
 }
 
 function getBarColor(percentage: number): string {
@@ -13,7 +18,7 @@ function getBarColor(percentage: number): string {
   return 'bg-muted-foreground/30';
 }
 
-export function ChecklistProgress({ stats }: ChecklistProgressProps) {
+export function ChecklistProgress({ stats, overdueCount = 0, urgentCount = 0, soonCount = 0 }: ChecklistProgressProps) {
   return (
     <div className="bg-card rounded-2xl border border-border p-5 sm:p-6 lg:p-8 shadow-toss-sm animate-fade-up">
       {/* Overall progress ring */}
@@ -66,6 +71,30 @@ export function ChecklistProgress({ stats }: ChecklistProgressProps) {
             <p className="text-sm text-green-600 font-medium mt-1">
               🎉 모든 준비를 완료했어요!
             </p>
+          )}
+
+          {/* [CL-TREE-REDESIGN-20260403] 긴급 항목 뱃지 */}
+          {(overdueCount > 0 || urgentCount > 0 || soonCount > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {overdueCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                  <AlertTriangle className="w-3 h-3" />
+                  {overdueCount} 긴급
+                </span>
+              )}
+              {urgentCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                  <Clock className="w-3 h-3" />
+                  {urgentCount} 이번주
+                </span>
+              )}
+              {soonCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                  <Clock className="w-3 h-3" />
+                  {soonCount} 이번달
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

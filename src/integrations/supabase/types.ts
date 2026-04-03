@@ -44,6 +44,31 @@ export type Database = {
         }
         Relationships: []
       }
+      // [CL-ADMIN-FEATURE-REQ-20260403] 사용자 기능 요청 테이블
+      feature_requests: {
+        Row: {
+          id: string
+          user_id: string | null
+          content: string
+          category: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          content: string
+          category?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          content?: string
+          category?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       budget_collaborators: {
         Row: {
           budget_id: string

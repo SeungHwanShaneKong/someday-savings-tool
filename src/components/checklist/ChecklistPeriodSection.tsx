@@ -1,6 +1,7 @@
 // [CL-AI-HIERARCHY-20260308-163000]
 // [CL-TREE-HIERARCHY-20260308-190000] flat → grouped tree rendering
-import { useState } from 'react';
+// [CL-TREE-REDESIGN-20260403] forceExpand + 트리 노드 스타일
+import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -19,6 +20,7 @@ interface ChecklistPeriodSectionProps {
   period: ChecklistPeriod;
   items: ChecklistItemType[];
   isActive: boolean;
+  forceExpand?: boolean | null;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateNotes: (id: string, notes: string) => void;
@@ -29,6 +31,7 @@ export function ChecklistPeriodSection({
   period,
   items,
   isActive,
+  forceExpand,
   onToggle,
   onDelete,
   onUpdateNotes,
@@ -40,6 +43,12 @@ export function ChecklistPeriodSection({
     items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
   const allDone = percentage === 100;
   const hasProgress = completed > 0 && !allDone;
+
+  // [CL-TREE-REDESIGN-20260403] forceExpand 동기화
+  useEffect(() => {
+    if (forceExpand === true) setIsOpen(true);
+    else if (forceExpand === false) setIsOpen(false);
+  }, [forceExpand]);
 
   // Visual differentiation based on period status
   const sectionStyle = cn(
@@ -58,6 +67,8 @@ export function ChecklistPeriodSection({
     !allDone && !isActive && !hasProgress && 'bg-muted-foreground/30'
   );
 
+  const categoryGroups = groupItemsByCategory(items);
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className={sectionStyle}>
@@ -68,7 +79,11 @@ export function ChecklistPeriodSection({
             aria-expanded={isOpen}
             aria-label={`${PERIOD_LABELS[period]} 체크리스트, ${items.length}개 항목 중 ${completed}개 완료`}
           >
-            <span className="text-xl" aria-hidden="true">
+            {/* [CL-TREE-REDESIGN-20260403] 트리 루트 노드 — 원형 배경 */}
+            <span className={cn(
+              'text-xl w-9 h-9 flex items-center justify-center rounded-full flex-shrink-0',
+              isActive ? 'bg-primary/10' : allDone ? 'bg-green-100' : 'bg-muted/50'
+            )} aria-hidden="true">
               {PERIOD_EMOJI[period]}
             </span>
 
@@ -110,7 +125,7 @@ export function ChecklistPeriodSection({
           </button>
         </CollapsibleTrigger>
 
-        {/* [CL-TREE-HIERARCHY-20260308-190000] Items — 카테고리 그룹 트리 */}
+        {/* [CL-TREE-REDESIGN-20260403] Items — 카테고리 그룹 트리 */}
         <CollapsibleContent className="collapsible-content">
           <div className="px-3 sm:px-4 pb-4 sm:pb-5 space-y-1">
             {/* Progress message */}
@@ -118,10 +133,11 @@ export function ChecklistPeriodSection({
               {getProgressMessage(completed, items.length)}
             </p>
 
-            {groupItemsByCategory(items).map((group) => (
+            {categoryGroups.map((group) => (
               <ChecklistCategoryGroup
                 key={group.key}
                 group={group}
+                forceExpand={forceExpand}
                 onToggle={onToggle}
                 onDelete={onDelete}
                 onUpdateNotes={onUpdateNotes}

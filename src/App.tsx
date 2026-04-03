@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,6 +34,11 @@ const queryClient = new QueryClient();
 function AppRoutes() {
   usePageTracking();
   const [chatOpen, setChatOpen] = useState(false);
+
+  // [CL-ADMIN-FEATURE-REQ-20260403] 오프라인 기능 요청 큐 flush
+  useEffect(() => {
+    import('@/lib/feature-request-queue').then(m => m.flushFeatureRequestQueue()).catch(() => {});
+  }, []);
 
   return (
     <>

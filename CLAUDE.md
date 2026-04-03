@@ -171,3 +171,18 @@ src/
 - **문제**: 월드컵 15매치 후 "여행 계획 세우기" 클릭 시 빈 지도만 표시 → 연결감 단절
 - **교훈**: 온보딩 완료 시 결과 데이터를 메인 페이지에 즉시 반영해야 사용자 만족도 향상
 - **패턴**: ①우승지 자동 선택 + flyTo ②AI 추천 Top 3 자동 비교 추가 ③우승지 배너(썸네일+프로필) 표시
+
+### [CL-TIMELINE-FALLBACK-20260403] Edge Function 실패 시 로컬 폴백 패턴
+- **문제**: AI 일정 최적화 Edge Function 호출 실패 → 에러 다이얼로그만 표시 (막다른 골목 UX)
+- **교훈**: 외부 AI API 의존 기능은 반드시 로컬 폴백을 준비할 것. 에러 화면 대신 로컬 데이터로 즉시 대안 제공 → "AI 버전 받기" 업그레이드 유도
+- **패턴**: `buildTimelineFallback()` — CHECKLIST_TEMPLATES + PERIOD_MONTH_OFFSETS로 클라이언트 사이드 타임라인 생성. `isFallback` state로 폴백/AI 결과 구분. catch 블록에서 에러 설정 + 폴백 결과 동시 설정
+
+### [CL-TREE-REDESIGN-20260403] CSS 트리 커넥터와 기존 스타일 충돌
+- **문제**: ChecklistItem의 `border-l-4` 긴급도 스타일이 트리 커넥터 `::before`/`::after` pseudo-elements와 시각적으로 충돌
+- **교훈**: CSS pseudo-element 기반 트리 구조 도입 시, 자식 컴포넌트의 border-left 계열 스타일을 ring 또는 background로 대체해야 충돌 방지
+- **패턴**: `border-l-4 border-l-destructive` → `ring-1 ring-destructive/20 bg-destructive/5` (ring으로 대체)
+
+### [CL-TREE-REDESIGN-20260403] forceExpand 트리 제어 패턴
+- **문제**: 전체 펼치기/접기 시 각 Collapsible의 개별 open state와 충돌
+- **교훈**: 부모→자식 일괄 제어는 `forceExpand: boolean | null` 패턴 사용. null = 개별 제어, true/false = 강제. 500ms 후 null 리셋으로 개별 제어 복원
+- **패턴**: useEffect에서 forceExpand 감시 → setIsOpen 동기화. 부모에서 setTimeout(() => setGlobalExpand(null), 500)

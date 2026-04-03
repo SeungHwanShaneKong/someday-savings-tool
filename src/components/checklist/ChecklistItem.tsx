@@ -1,4 +1,5 @@
 // [CL-AI-HIERARCHY-20260308-163000]
+// [CL-TREE-REDESIGN-20260403] leaf 노드 스타일 — border-l-4 제거, 트리 커넥터 호환
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -27,12 +28,13 @@ interface ChecklistItemProps {
   onBudgetLink?: (categoryLink: string, subCategoryLink: string) => void;
 }
 
+// [CL-TREE-REDESIGN-20260403] border-l-4 제거 → 배경색만 사용 (트리 커넥터와 충돌 방지)
 const URGENCY_STYLES = {
-  overdue: 'border-l-4 border-l-destructive bg-destructive/5',
-  urgent: 'border-l-4 border-l-orange-500 bg-orange-50/50',
-  soon: 'border-l-4 border-l-yellow-500 bg-yellow-50/30',
-  normal: 'border-l-4 border-l-transparent',
-  done: 'border-l-4 border-l-primary/30 bg-primary/5',
+  overdue: 'bg-destructive/5 ring-1 ring-destructive/20',
+  urgent: 'bg-orange-50/50 ring-1 ring-orange-200/50',
+  soon: 'bg-yellow-50/30 ring-1 ring-yellow-200/50',
+  normal: '',
+  done: 'bg-primary/5',
 };
 
 const URGENCY_LABELS: Record<string, string> = {

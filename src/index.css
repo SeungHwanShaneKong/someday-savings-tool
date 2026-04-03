@@ -331,6 +331,41 @@
     to   { height: 0; opacity: 0; }
   }
 
+  /* [CL-TREE-REDESIGN-20260403] 하이어라키칼 트리 커넥터 */
+  .tree-branch {
+    position: relative;
+    padding-left: 18px;
+  }
+  .tree-branch::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 0;
+    bottom: 0;
+    width: 1.5px;
+    background: hsl(var(--border));
+  }
+  .tree-branch:last-child::before {
+    bottom: 50%;
+  }
+  .tree-branch::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 18px;
+    width: 9px;
+    height: 1.5px;
+    background: hsl(var(--border));
+  }
+  /* 카테고리 색상 트리 라인 */
+  .tree-branch-blue::before, .tree-branch-blue::after { background: rgb(96 165 250); }
+  .tree-branch-pink::before, .tree-branch-pink::after { background: rgb(244 114 182); }
+  .tree-branch-amber::before, .tree-branch-amber::after { background: rgb(251 191 36); }
+  .tree-branch-emerald::before, .tree-branch-emerald::after { background: rgb(52 211 153); }
+  .tree-branch-sky::before, .tree-branch-sky::after { background: rgb(56 189 248); }
+  .tree-branch-gray::before, .tree-branch-gray::after { background: rgb(156 163 175); }
+  .tree-branch-slate::before, .tree-branch-slate::after { background: rgb(203 213 225); }
+
   /* Check completion pop animation */
   .animate-check-pop {
     animation: checkPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);

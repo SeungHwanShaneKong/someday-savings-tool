@@ -1,8 +1,9 @@
 // [CL-TREE-HIERARCHY-20260308-190000]
-// 인터렉티브 카테고리 그룹 — Collapsible 트리 노드
-import { useState } from 'react';
+// [CL-TREE-REDESIGN-20260403] 트리 커넥터 + forceExpand + 미니 프로그레스
+import { useState, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 import {
   Collapsible,
   CollapsibleContent,
@@ -11,19 +12,21 @@ import {
 import { ChecklistItem } from './ChecklistItem';
 import type { CategoryGroup } from '@/lib/checklist-tree';
 
-/** 카테고리 색상 → Tailwind border-l 클래스 매핑 */
-const TREE_LINE_COLORS: Record<string, string> = {
-  'blue-400':    'border-l-blue-400',
-  'pink-400':    'border-l-pink-400',
-  'amber-400':   'border-l-amber-400',
-  'emerald-400': 'border-l-emerald-400',
-  'sky-400':     'border-l-sky-400',
-  'gray-400':    'border-l-gray-400',
-  'slate-300':   'border-l-slate-300',
+/** 카테고리 색상 → tree-branch CSS 클래스 매핑 */
+const TREE_BRANCH_COLORS: Record<string, string> = {
+  'blue-400':    'tree-branch-blue',
+  'pink-400':    'tree-branch-pink',
+  'amber-400':   'tree-branch-amber',
+  'emerald-400': 'tree-branch-emerald',
+  'sky-400':     'tree-branch-sky',
+  'gray-400':    'tree-branch-gray',
+  'slate-300':   'tree-branch-slate',
 };
 
 interface ChecklistCategoryGroupProps {
   group: CategoryGroup;
+  isLast?: boolean;
+  forceExpand?: boolean | null;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateNotes: (id: string, notes: string) => void;
@@ -32,6 +35,7 @@ interface ChecklistCategoryGroupProps {
 
 export function ChecklistCategoryGroup({
   group,
+  forceExpand,
   onToggle,
   onDelete,
   onUpdateNotes,
@@ -39,11 +43,18 @@ export function ChecklistCategoryGroup({
 }: ChecklistCategoryGroupProps) {
   const { meta, items, completed } = group;
   const allDone = completed === items.length && items.length > 0;
+  const percentage = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
 
   // 스마트 기본 상태: 완료 그룹은 접힘, 미완료는 펼침
   const [isOpen, setIsOpen] = useState(!allDone);
 
-  const treeLine = TREE_LINE_COLORS[meta.color] || 'border-l-slate-300';
+  // [CL-TREE-REDESIGN-20260403] forceExpand 동기화
+  useEffect(() => {
+    if (forceExpand === true) setIsOpen(true);
+    else if (forceExpand === false) setIsOpen(false);
+  }, [forceExpand]);
+
+  const treeBranchColor = TREE_BRANCH_COLORS[meta.color] || 'tree-branch-slate';
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -73,19 +84,28 @@ export function ChecklistCategoryGroup({
               {meta.name}
             </span>
 
-            {/* 진행률 pill */}
-            <span
-              className={cn(
-                'text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ml-auto mr-1',
-                allDone
-                  ? 'bg-green-100 text-green-700'
-                  : completed > 0
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-muted text-muted-foreground'
-              )}
-            >
-              {completed}/{items.length}
-            </span>
+            {/* [CL-TREE-REDESIGN-20260403] 미니 프로그레스 바 + 카운트 */}
+            <div className="flex items-center gap-1.5 ml-auto mr-1 flex-shrink-0">
+              <Progress
+                value={percentage}
+                className="w-12 h-1 hidden sm:block"
+                indicatorClassName={cn(
+                  allDone ? 'bg-green-500' : 'bg-primary/60'
+                )}
+              />
+              <span
+                className={cn(
+                  'text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-full',
+                  allDone
+                    ? 'bg-green-100 text-green-700'
+                    : completed > 0
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                )}
+              >
+                {completed}/{items.length}
+              </span>
+            </div>
 
             {/* 접기/펼치기 인디케이터 */}
             <ChevronDown
@@ -99,24 +119,29 @@ export function ChecklistCategoryGroup({
           </button>
         </CollapsibleTrigger>
 
-        {/* 아이템 컨테이너 — 트리라인 + 들여쓰기 */}
+        {/* [CL-TREE-REDESIGN-20260403] 아이템 컨테이너 — 트리 커넥터 */}
         <CollapsibleContent className="collapsible-content">
-          <div
-            className={cn(
-              'ml-3 sm:ml-4 pl-3 sm:pl-4 border-l-2 space-y-2 sm:space-y-2.5 pb-1',
-              treeLine,
-              allDone && 'opacity-60'
-            )}
-          >
-            {items.map((item) => (
-              <ChecklistItem
+          <div className={cn(
+            'ml-3 sm:ml-4 space-y-2 sm:space-y-2.5 pb-1',
+            allDone && 'opacity-60'
+          )}>
+            {items.map((item, idx) => (
+              <div
                 key={item.id}
-                item={item}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                onUpdateNotes={onUpdateNotes}
-                onBudgetLink={onBudgetLink}
-              />
+                className={cn(
+                  'tree-branch',
+                  treeBranchColor,
+                  idx === items.length - 1 && 'last-tree-item'
+                )}
+              >
+                <ChecklistItem
+                  item={item}
+                  onToggle={onToggle}
+                  onDelete={onDelete}
+                  onUpdateNotes={onUpdateNotes}
+                  onBudgetLink={onBudgetLink}
+                />
+              </div>
             ))}
           </div>
         </CollapsibleContent>

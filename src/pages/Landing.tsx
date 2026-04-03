@@ -15,7 +15,6 @@ import {
   Brain,
   MapPin,
   MessageCircle,
-  Share2,
 } from 'lucide-react';
 import Footer from '@/components/Footer';
 import type { LucideIcon } from 'lucide-react';
@@ -38,11 +37,12 @@ interface Feature {
   link?: string;
 }
 
+// [CL-LANDING-CONCISE-20260403] 예산요약 저장 & 공유 제거 + 설명 간결화
 const FEATURES: Feature[] = [
   {
     icon: Calculator,
     title: '예산 시뮬레이터',
-    description: '카테고리별 비용을 입력하면 평균 비용과 비교 분석해줘요',
+    description: '카테고리별 비용 입력 → 평균과 비교 분석',
     isAI: false,
     gradient: 'from-blue-500/10 to-blue-600/5',
     iconColor: 'text-blue-500',
@@ -51,7 +51,7 @@ const FEATURES: Feature[] = [
   {
     icon: CalendarCheck,
     title: 'D-day 체크리스트 AI',
-    description: '✨ 결혼일 기준으로 AI가 자동 생성하는 시기별 준비 리스트',
+    description: '결혼일 기준 AI 자동 생성 시기별 준비 리스트',
     isAI: true,
     gradient: 'from-emerald-500/10 to-emerald-600/5',
     iconColor: 'text-emerald-500',
@@ -60,7 +60,7 @@ const FEATURES: Feature[] = [
   {
     icon: Brain,
     title: 'AI 비용 인사이트',
-    description: '숨겨진 비용 경고, 절약 팁, 예산 최적화를 실시간 추천',
+    description: '숨겨진 비용 경고 + 절약 팁 실시간 추천',
     isAI: true,
     gradient: 'from-violet-500/10 to-violet-600/5',
     iconColor: 'text-violet-500',
@@ -69,7 +69,7 @@ const FEATURES: Feature[] = [
   {
     icon: MapPin,
     title: 'AI 허니문 큐레이션',
-    description: '예산과 취향에 맞는 여행지를 AI가 추천하고 지도로 비교',
+    description: '취향 맞춤 여행지 AI 추천 + 지도 비교',
     isAI: true,
     gradient: 'from-amber-500/10 to-amber-600/5',
     iconColor: 'text-amber-500',
@@ -78,20 +78,11 @@ const FEATURES: Feature[] = [
   {
     icon: MessageCircle,
     title: 'AI Q&A 챗봇',
-    description: '결혼 준비 궁금증을 실시간 AI 어드바이저에게 질문',
+    description: '결혼 준비 궁금증, AI에게 실시간 질문',
     isAI: true,
     gradient: 'from-rose-500/10 to-rose-600/5',
     iconColor: 'text-rose-500',
     link: '/chat',
-  },
-  {
-    icon: Share2,
-    title: '예산요약 저장 & 공유',
-    description: '예산표를 이미지로 저장하고 링크로 간편하게 공유',
-    isAI: false,
-    gradient: 'from-slate-500/10 to-slate-600/5',
-    iconColor: 'text-slate-500',
-    link: '/summary',
   },
 ];
 
@@ -286,9 +277,12 @@ export default function Landing() {
           <h2 className="text-sm font-semibold text-muted-foreground text-center mb-4 tracking-wider uppercase">
             주요 기능
           </h2>
+          {/* [CL-LANDING-CONCISE-20260403] 5개 카드: 2+2+1(full-width) 레이아웃 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {FEATURES.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} onNavigate={feature.link ? () => navigate(feature.link!) : undefined} />
+            {FEATURES.map((feature, idx) => (
+              <div key={feature.title} className={cn(idx === FEATURES.length - 1 && FEATURES.length % 2 === 1 && 'sm:col-span-2')}>
+                <FeatureCard feature={feature} onNavigate={feature.link ? () => navigate(feature.link!) : undefined} />
+              </div>
             ))}
           </div>
         </section>

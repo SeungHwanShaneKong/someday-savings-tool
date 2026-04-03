@@ -39,6 +39,9 @@ import { PerformancePanel } from '@/components/admin/PerformancePanel';
 import { DataQualityPanel } from '@/components/admin/DataQualityPanel';
 import { EmbeddingTunerPanel } from '@/components/admin/EmbeddingTunerPanel';
 import { SEOAmplifierPanel } from '@/components/admin/SEOAmplifierPanel';
+// [CL-ADMIN-FEATURE-REQ-20260403] 기능 요청 패널
+import { FeatureRequestPanel } from '@/components/admin/FeatureRequestPanel';
+import { useFeatureRequests } from '@/hooks/useFeatureRequests';
 
 // ========= 기간 프리셋 =========
 const PERIOD_OPTIONS = [
@@ -81,6 +84,8 @@ export default function Admin() {
   const { result: dqResult, loading: dqLoading, error: dqError, runScan } = useDataQualityGuardian();
   const { result: etResult, loading: etLoading, error: etError, analyze: analyzeEmbeddings } = useEmbeddingTuner();
   const { content: seoContent, loading: seoLoading, error: seoError, generate: generateSEO } = useSEOAmplifier();
+  // [CL-ADMIN-FEATURE-REQ-20260403]
+  const { requests: featureRequests, loading: frLoading, error: frError, fetchRequests } = useFeatureRequests();
 
   const [period, setPeriod] = useState('30');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -106,8 +111,9 @@ export default function Admin() {
       fetchData(startDate, endDate),
       fetchRAGStats(),
       fetchMetrics(),
+      fetchRequests(),
     ]).then(() => setLastUpdated(new Date()));
-  }, [fetchData, startDate, endDate, fetchRAGStats, fetchMetrics]);
+  }, [fetchData, startDate, endDate, fetchRAGStats, fetchMetrics, fetchRequests]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -430,6 +436,14 @@ export default function Admin() {
             loading={seoLoading}
             error={seoError}
             onGenerate={generateSEO}
+          />
+
+          {/* [CL-ADMIN-FEATURE-REQ-20260403] 사용자 기능 요청 패널 */}
+          <FeatureRequestPanel
+            requests={featureRequests}
+            loading={frLoading}
+            error={frError}
+            onRefresh={fetchRequests}
           />
 
           <section>

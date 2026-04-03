@@ -73,7 +73,13 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            // [CL-PREVIEW-SYNC-20260403-120830] Silence React Router v7 migration warnings in preview
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
           <AdSenseLayout>
             <AppRoutes />
           </AdSenseLayout>

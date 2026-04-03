@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { forwardRef, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 
 declare global {
@@ -11,7 +11,7 @@ interface AdSenseSidebarProps {
   className?: string;
 }
 
-export function AdSenseSidebar({ className }: AdSenseSidebarProps) {
+export const AdSenseSidebar = forwardRef<HTMLDivElement, AdSenseSidebarProps>(function AdSenseSidebar({ className }, forwardedRef) {
   const containerRef = useRef<HTMLDivElement>(null);
   const adInitialized = useRef(false);
   const location = useLocation();
@@ -65,6 +65,18 @@ export function AdSenseSidebar({ className }: AdSenseSidebarProps) {
   }, [location.pathname, initAd]);
 
   return (
-    <div ref={containerRef} className={className} />
+    <div
+      ref={(node) => {
+        // [CL-PREVIEW-SYNC-20260403-120830] Forward incoming refs to avoid dev ref warnings in layout wrappers
+        containerRef.current = node;
+
+        if (typeof forwardedRef === 'function') {
+          forwardedRef(node);
+        } else if (forwardedRef) {
+          forwardedRef.current = node;
+        }
+      }}
+      className={className}
+    />
   );
-}
+});

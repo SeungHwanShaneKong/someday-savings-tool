@@ -314,7 +314,7 @@ export default function Landing() {
             <div className="text-center flex-1">
               <p className="text-lg sm:text-2xl font-bold text-primary">무료</p>
               <p className="text-[11px] sm:text-xs text-muted-foreground">
-                시작 비용
+                평생 비용
               </p>
             </div>
           </div>

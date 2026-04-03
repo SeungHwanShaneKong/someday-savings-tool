@@ -77,15 +77,7 @@ export const WORLD_CUP_IMAGES: WorldCupImage[] = [
     travelStyle: 'luxury',
     destinationId: 'europe',
   },
-  {
-    id: 'img-jeju-coast',
-    url: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=100&q=40',
-    label: '제주 해안 드라이브',
-    subLabel: '제주 올레길',
-    travelStyle: 'relaxation',
-    destinationId: 'jeju',
-  },
+  // [CL-REMOVE-KR-DESTINATIONS-20260403-210000] 제주 월드컵 이미지 제거
   {
     id: 'img-cancun-cenote',
     url: 'https://images.unsplash.com/photo-1552074284-5e88ef1aef18?w=800&q=80',

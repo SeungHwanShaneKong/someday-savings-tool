@@ -156,6 +156,7 @@ export default function Honeymoon() {
         step={onboarding.state.step}
         progress={onboarding.progress}
         onBack={onboarding.goBack}
+        onHome={() => navigate('/')} /* [CL-HOME-BTN-ALL-20260403-223000] */
       >
         {onboarding.state.step === 'welcome' && (
           <WelcomeStep

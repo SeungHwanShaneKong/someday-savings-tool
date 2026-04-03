@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useSEO } from '@/hooks/useSEO';
@@ -12,7 +12,7 @@ import {
   TrendingDown,
   Sparkles,
   CheckCircle2,
-  ArrowLeft, // [CL-HOME-BTN-20260315-140000]
+  ArrowLeft,
 } from 'lucide-react';
 
 /* ─── Budget Category Data ─── */
@@ -128,6 +128,7 @@ const HOW_TO_STEPS = [
 
 /* ─── Guide Page ─── */
 export default function Guide() {
+  const navigate = useNavigate();
   const breadcrumbItems = [{ label: '결혼 예산 가이드', href: '/guide' }];
 
   const jsonLd = useMemo(
@@ -160,14 +161,25 @@ export default function Guide() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <main className="flex-1 px-6 pt-10 pb-12">
-        <div className="max-w-lg mx-auto">
-          {/* [CL-HOME-BTN-20260315-140000] Home button */}
-          <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4" aria-label="홈으로">
-            <ArrowLeft className="w-4 h-4" />
-            <span>홈</span>
-          </Link>
+      {/* [CL-HOME-BTN-ALL-20260403-223000] sticky header */}
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
+        <div className="flex items-center px-4 h-14 max-w-lg mx-auto">
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="홈으로"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="flex-1 text-center text-sm font-semibold text-foreground">
+            결혼 예산 가이드
+          </h1>
+          <div className="w-9" />
+        </div>
+      </header>
 
+      <main className="flex-1 px-6 pt-6 pb-12">
+        <div className="max-w-lg mx-auto">
           <Breadcrumb items={breadcrumbItems} />
 
           {/* Header */}

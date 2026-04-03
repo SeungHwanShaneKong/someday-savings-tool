@@ -3,21 +3,23 @@
  * 프로그레스바, 뒤로가기 버튼, step 영역 래퍼
  */
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Home } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import type { OnboardingStep } from '@/hooks/useHoneymoonOnboarding';
 
+// [CL-HOME-BTN-ALL-20260403-223000] onHome prop 추가
 interface OnboardingShellProps {
   step: OnboardingStep;
   progress: number;
   onBack: () => void;
+  onHome?: () => void;
   children: React.ReactNode;
 }
 
 // [CL-MECE-TEST-20260330] budget 제거(월드컵 완료 후 되돌리기 차단), loading 추가
 const BACK_ENABLED_STEPS: OnboardingStep[] = ['worldcup', 'schedule', 'loading', 'results'];
 
-export function OnboardingShell({ step, progress, onBack, children }: OnboardingShellProps) {
+export function OnboardingShell({ step, progress, onBack, onHome, children }: OnboardingShellProps) {
   const showBack = BACK_ENABLED_STEPS.includes(step);
 
   return (
@@ -42,7 +44,18 @@ export function OnboardingShell({ step, progress, onBack, children }: Onboarding
               className="h-1.5 transition-all duration-500"
             />
           </div>
-          <div className="w-9" /> {/* right spacer for symmetry */}
+          {/* [CL-HOME-BTN-ALL-20260403-223000] 홈 버튼 (모든 단계) */}
+          {onHome ? (
+            <button
+              onClick={onHome}
+              className="p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="홈으로"
+            >
+              <Home className="w-5 h-5" />
+            </button>
+          ) : (
+            <div className="w-9" />
+          )}
         </div>
       </header>
 

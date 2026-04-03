@@ -26,10 +26,7 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     url: 'https://images.unsplash.com/photo-1552074284-5e88ef1aef18?w=800&q=80',
     thumbUrl: 'https://images.unsplash.com/photo-1552074284-5e88ef1aef18?w=100&q=40',
   },
-  'jeju': {
-    url: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=100&q=40',
-  },
+  // [CL-REMOVE-KR-DESTINATIONS-20260403-210000] 제주 이미지 제거
 
   // ── 동남아 ──
   'phuket': {
@@ -403,25 +400,5 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1512632578888-169bbbc64f33?w=100&q=40',
   },
 
-  // ── 국내 ──
-  'busan': {
-    url: 'https://images.unsplash.com/photo-1538485399081-7191377e8241?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1538485399081-7191377e8241?w=100&q=40',
-  },
-  'yeosu': {
-    url: 'https://images.unsplash.com/photo-1535139262971-c51845709a48?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1535139262971-c51845709a48?w=100&q=40',
-  },
-  'gangneung': {
-    url: 'https://images.unsplash.com/photo-1528164344705-47542687000d?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1528164344705-47542687000d?w=100&q=40',
-  },
-  'sokcho': {
-    url: 'https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=100&q=40',
-  },
-  'gyeongju': {
-    url: 'https://images.unsplash.com/photo-1548115184-bc6544d06a58?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1548115184-bc6544d06a58?w=100&q=40',
-  },
+  // [CL-REMOVE-KR-DESTINATIONS-20260403-210000] 국내 5개 이미지 제거
 };

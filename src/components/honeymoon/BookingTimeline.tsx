@@ -1,20 +1,35 @@
+// [CL-HONEYMOON-JOURNEY-20260405-180000] getCurrentStep 수리 — useWeddingDate 연동
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { CheckCircle2 } from 'lucide-react';
+import { useWeddingDate } from '@/hooks/useWeddingDate';
 import type { Destination } from '@/lib/honeymoon-destinations';
 
 interface BookingTimelineProps {
   destination: Destination;
+  /** 외부에서 결혼일 전달 (PlanStep 인라인 등) */
+  weddingDateOverride?: string | null;
 }
 
-// Determine which step is "current" based on weeks before departure
-// This is a simplified heuristic — in real app, would use actual wedding date
-function getCurrentStep(destination: Destination): number {
-  // Default: step 0 (flights) is current — user hasn't started booking yet
-  return 0;
-}
+export function BookingTimeline({ destination, weddingDateOverride }: BookingTimelineProps) {
+  // [CL-HONEYMOON-JOURNEY-20260405-180000] 결혼일 기준 주수 계산 → 자동 단계 진행
+  const { weddingDate: hookWeddingDate } = useWeddingDate();
+  const effectiveWeddingDate = weddingDateOverride ?? hookWeddingDate;
 
-export function BookingTimeline({ destination }: BookingTimelineProps) {
-  const currentStep = getCurrentStep(destination);
+  const currentStep = useMemo(() => {
+    if (!effectiveWeddingDate) return 0;
+    const now = new Date();
+    const wedding = new Date(effectiveWeddingDate);
+    const diffMs = wedding.getTime() - now.getTime();
+    const weeksLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 7)));
+
+    if (weeksLeft <= 1) return 5;  // 모두 완료
+    if (weeksLeft <= 2) return 4;  // 환전 완료
+    if (weeksLeft <= 4) return 3;  // 여행자 보험 완료
+    if (weeksLeft <= 8) return 2;  // 비자 완료
+    if (weeksLeft <= 12) return 1; // 숙소 완료
+    return 0; // 항공권부터 시작
+  }, [effectiveWeddingDate]);
 
   const steps = [
     {

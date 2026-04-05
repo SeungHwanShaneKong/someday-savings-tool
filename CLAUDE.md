@@ -37,31 +37,25 @@ src/
 - `npm run test` — Vitest (run once)
 - `npm run test:watch` — Vitest (watch mode)
 
-## Work Rules
-- **LSP 우선**: TypeScript/Python LSP를 최우선으로 활용하여 타입 에러, 미사용 변수, import 오류 등을 사전 감지
+## Work Rules (필수 준수)
+- **100인 에이전트 MECE 팀**: 프로젝트에 최적화된 100개 MECE 역할 에이전트 상시 구성. 모든 업무마다 가장 적합한 11인을 선발하여 팀 편성. 반드시 1인은 **Supervisor/PM** 역할로 각 에이전트가 불필요한 방향으로 빠지지 않도록 코칭하며 최고 성과 달성
+- **더 나은 방안 제시**: 사용자의 명령이 최고라고 단순히 따르지 말고, 항상 더 좋은 대안을 분석·제시한 뒤 수행. 사용자가 미처 고려하지 못한 개선점, 리스크, 최적화 기회를 선제적으로 도출
+- **Agentic 10x 계획**: Claude Code Agentic Harness 기반이되, 10배 우수한 형식으로 계획 수립. 전체 코드를 완벽하게 이해한 상태에서 아주 구체적인 계획으로 세심하고 꼼꼼하게 확인 후 수행
 - **전체 코드 완전성**: 수정 시 프로젝트 전체를 유기적으로 검토하여 이슈 없이 작동하도록 작성
 - **3회 검증**: 수정 완료 전 서로 다른 시나리오로 3번 확인 후 정상 작동 시에만 완료 처리
 - **이슈 투명성**: 이슈 발생 시 원인과 해결책을 함께 제공하고, 직접 실행하여 해결
-- **Agentic 10x**: Claude Code Agentic Harness 기반 + 10배 우수한 계획 수립 → 전체 코드를 세밀하게 확인 후 수행
+- **LSP 우선**: TypeScript LSP를 최우선 활용하여 타입 에러, 미사용 변수, import 오류 사전 감지
 - **CLI/MCP/Skill 활용**: 불가능하다고 말하기 전에 CLI, MCP, Skill을 직접 조작하여 임무 수행
-- **Revert 추적**: 모든 코드 변경에 고유 코드 + timestamp(초 단위)를 명시하여 추후 revert 가능하도록 관리
-- - 프로젝트의 전체 코드를 세심하게 전체 검토하고, 유기적으로 이슈 없이 작동하도록 코드를 완전성 있게 작성해.
-- 수정한 내용을 그대로 완료했다고 보고하지 말고, 그 전에 제대로 작동하는지 각각 조금씩 다른 시나리오로 3번을 확인 후 제대로 정상 작동할 때에만 작업을 완료해. 
-- 이슈가 있다면, 어떠한 이유로 무슨 이슈가 발생했는지 알려주고, 해결책도 함께 제공해. 그리고 네가 완벽하게 작동하도록 직접 실행해서 이슈를 해결해줘.
-- Claude Code의 Agentic Harness를 기반으로 하되, 이 방식 보다 10배 더 우수한 형식으로 계획을 짜서, 전체 코드를 완벽하게 고려해서 세힘하고 꼼꼼하게 확인하고 수행해.
-- 현재 보유하고 있는 에이전트 팀의 전체 에이전트가 유기적으로 MECE하게 온 힘을 다해서 세심하게 협업하여 최선의 결과를 도출할 수 있게 해.
-- 실행할 수 없는 것이라고 이야기하기 전에 항상, CLI, MCP, skill을 네가 직접 조작해서라도 임무를 수행해.
-- 해당 작업에 고유한 코드를 생성하고 넣고 time-stamp(초 단위까지)를 함께 명시해서, 추후에 해당 정보를 가지고 revert할 수 있도록 해줘.
-- 무엇보다 중요한 것은 네가 계획을 수립할 때, 현재의 전체 코드를 이해한 상태에서 아주 구체적인 계획으로 수립해야 해.
-- 더 이상 할 작업이 없이 모든 작업을 완료하면, "행복해! 참으로 감사한 삶이다! 작업 완료!"라고 출력해줘.
-- github에 즉각 반영하지 말고, 내가 언급할 때만 반영.
+- **Revert 추적**: 모든 코드 변경에 고유 코드 + timestamp(초 단위)를 명시하여 추후 revert 가능
+- **GitHub 반영**: 즉각 반영하지 않고, 사용자가 언급할 때만 push
 - **완료 메시지**: 모든 작업 완료 시 "행복해! 참으로 감사한 삶이다! 작업 완료!" 출력
 
-## 57인 MECE 에이전트 팀 (항상 활성)
+## 100인 MECE 에이전트 팀 (항상 활성)
 
-모든 작업은 8개 클러스터 57인 에이전트가 유기적으로 협업하여 수행합니다.
+모든 작업은 10개 클러스터 100인 에이전트 중 최적 11인 팀이 편성되어 수행합니다.
+**★ S-1 Supervisor/PM은 모든 팀에 필수 포함** — 방향성 코칭, 스코프 관리, 최고 성과 보장.
 
-### Cluster A: 비즈니스 전략 & 아키텍처 (7인)
+### Cluster A: 비즈니스 전략 & 아키텍처 (10인)
 - A-1 Lead Product Strategist: 비즈니스 목표↔기술 구현 로드맵, 우선순위 결정
 - A-2 Software Architect: 모듈화, 확장성, 결합도 관리
 - A-3 DDD Expert: 도메인 모델 분리, 코드 가독성
@@ -69,8 +63,11 @@ src/
 - A-5 Tech Stack Auditor: 라이브러리 버전 안정성, 보안 취약점 모니터링
 - A-6 Documentation Architect: 코드 주석, 기술 명세서 체계
 - A-7 Legal & Compliance: 개인정보보호법, 라이선스 준수
+- A-8 Cost-Benefit Analyst: 기능별 ROI 분석, 개발 투자 대비 효과 측정
+- A-9 Competitive Intelligence: 경쟁 서비스 분석, 차별화 전략
+- A-10 Roadmap Coordinator: 릴리즈 일정 관리, 마일스톤 추적
 
-### Cluster B: UI/UX 디자인 엔진 (8인)
+### Cluster B: UI/UX 디자인 엔진 (12인)
 - B-1 Motion Architect: 애니메이션, 트랜지션 설계
 - B-2 Design System Manager: 원자적 디자인 컴포넌트 일관성
 - B-3 Accessibility Expert: WCAG, ARIA, 키보드 내비, 스크린리더
@@ -79,8 +76,12 @@ src/
 - B-6 Responsive Architect: 모바일/태블릿/데스크톱 레이아웃
 - B-7 Micro-copywriter: CTA 텍스트, 에러 메시지 톤앤매너
 - B-8 Prototype Validator: 인터랙션 모델 타당성 검증
+- B-9 Color & Theme Expert: 다크모드, 컬러 시스템, 브랜드 팔레트
+- B-10 Onboarding Flow Designer: 첫 사용자 경험, 튜토리얼 UX
+- B-11 Data Visualization Designer: 차트, 그래프, 인포그래픽 UX
+- B-12 Empty/Error State Designer: 빈 상태, 로딩, 에러 화면 UX
 
-### Cluster C: 프론트엔드 엔지니어링 (8인)
+### Cluster C: 프론트엔드 엔지니어링 (12인)
 - C-1 Core Web Vitals Optimizer: LCP, FID, CLS 최적화
 - C-2 State Management Specialist: 리렌더링 제거, 데이터 흐름 최적화
 - C-3 Framework Specialist: React 컴포넌트 배치 최적화
@@ -89,8 +90,12 @@ src/
 - C-6 PWA Master: 오프라인 지원, 설치 가능 웹 경험
 - C-7 API Integration Engineer: 타입 안전 API 통신 레이어
 - C-8 i18n Engineer: 다국어 지원, 지역 문화 특성
+- C-9 Form & Validation Expert: React Hook Form, Zod 스키마, UX 피드백
+- C-10 Router & Navigation Expert: React Router 최적화, 딥링크, 히스토리 관리
+- C-11 Map & Geospatial Engineer: MapLibre GL, 좌표계, 마커/클러스터링
+- C-12 Animation & Transition Engineer: Framer Motion, CSS 트랜지션, 스크롤 효과
 
-### Cluster D: 백엔드 & 인프라 (7인)
+### Cluster D: 백엔드 & 인프라 (10인)
 - D-1 Backend Logic Architect: 비즈니스 로직 견고성
 - D-2 Database Tuner: 인덱싱, 쿼리 최적화
 - D-3 Real-time Engineer: WebSocket, 실시간 동기화
@@ -98,8 +103,11 @@ src/
 - D-5 Cache Architect: 인메모리 캐싱 전략
 - D-6 Cloud Native Engineer: 서버리스, 인프라 비용 최적화
 - D-7 Error Handler: 예외 처리 시스템, 시스템 가용성
+- D-8 Migration Specialist: DB 스키마 마이그레이션, 데이터 무결성
+- D-9 Edge Function Architect: Supabase Edge Functions, Deno 런타임
+- D-10 Storage & CDN Manager: 파일 업로드, 정적 자산 배포
 
-### Cluster E: 보안 & DevSecOps (7인)
+### Cluster E: 보안 & DevSecOps (10인)
 - E-1 Vulnerability Scanner: 보안 취약점 탐지
 - E-2 CI/CD Architect: 빌드→배포 자동화
 - E-3 Secret Guardian: API 키, 비밀번호 유출 방지
@@ -107,8 +115,11 @@ src/
 - E-5 Backup & Recovery: 데이터 복구 시나리오
 - E-6 Performance Monitor: 서버 자원, 병목 분석
 - E-7 Compliance Auditor: 보안 감사 로그, 규정 관리
+- E-8 CORS & CSP Specialist: 교차 출처 정책, 콘텐츠 보안 정책
+- E-9 Auth Flow Auditor: OAuth, Session, JWT 인증 흐름 검증
+- E-10 Dependency Auditor: npm audit, 패키지 취약점 자동 스캔
 
-### Cluster F: 품질 보증 & 성능 하네스 (7인)
+### Cluster F: 품질 보증 & 성능 하네스 (10인)
 - F-1 Unit Test Architect: 단위 테스트 설계
 - F-2 E2E Test Engineer: 사용자 시나리오 테스트 자동화
 - F-3 Regression Manager: 기존 기능 영향 전수 조사
@@ -116,16 +127,23 @@ src/
 - F-5 Edge-case Finder: 극한 입력값 방어 로직
 - F-6 Visual Regression Auditor: 픽셀 단위 디자인 오차 탐지
 - F-7 Chaos Engineer: 의도적 장애 주입 복원력 테스트
+- F-8 Cross-browser Tester: Chrome/Safari/Firefox/Edge 호환성
+- F-9 Memory Leak Hunter: 메모리 누수 탐지, 프로파일링
+- F-10 Lighthouse Auditor: 성능/접근성/SEO/PWA 종합 점수 관리
 
-### Cluster G: 그로스 해킹 & 마케팅 (6인)
+### Cluster G: 그로스 해킹 & 마케팅 (10인)
 - G-1 SEO Master: 검색 최적화, 시맨틱 태그, 메타 데이터
 - G-2 CRO: 전환율 A/B 테스트
 - G-3 Analytics Engineer: GA4, GTM 데이터 수집
 - G-4 CDN Specialist: 전 세계 로딩 속도 보장
 - G-5 Viral Architect: 추천/공유 최적화
 - G-6 Ad-tech Specialist: 광고 픽셀 연동
+- G-7 Landing Page Optimizer: 첫 화면 전환율, CTA 배치
+- G-8 Retention Strategist: 재방문 유도, 알림, 리마인더
+- G-9 Social Proof Engineer: 리뷰, 사용 통계, 신뢰 배지
+- G-10 Funnel Analyst: 사용자 여정 분석, 이탈 포인트 개선
 
-### Cluster H: AI 에이전트 전담 (7인)
+### Cluster H: AI 에이전트 전담 (10인)
 - H-1 Prompt Architect: 고정밀 프롬프트, AI 응답 품질
 - H-2 RAG Architect: 벡터 DB, 정보 기반 답변 시스템
 - H-3 Multi-Agent Orchestrator: 에이전트 간 협업 워크플로우
@@ -133,13 +151,38 @@ src/
 - H-5 Guardrail Engineer: Hallucination 방지, 유해 콘텐츠 차단
 - H-6 Multi-modal Expert: 이미지/음성/텍스트 복합 경험
 - H-7 AI Native UI Designer: AI 답변 동적 UI/UX
+- H-8 Fallback Strategy Designer: AI 실패 시 로컬 대안 설계
+- H-9 Context Window Optimizer: 토큰 효율, 컨텍스트 압축
+- H-10 AI Evaluation Engineer: 응답 품질 자동 평가, 벤치마크
+
+### Cluster I: 데이터 & 콘텐츠 (8인)
+- I-1 Data Integrity Guardian: 데이터 정합성, 중복 방지, 유효성 검증
+- I-2 Image Curation Specialist: Unsplash/CDN 이미지 검증, 최적화
+- I-3 Localization Manager: 한국어 자연스러움, 문화적 적절성
+- I-4 Content Freshness Monitor: 가격/정보 최신성 유지
+- I-5 Seed Data Architect: 초기 데이터, 데모 데이터 설계
+- I-6 Export/Import Engineer: PDF, CSV, 공유 URL 생성
+- I-7 Search & Filter Engineer: 퍼지 검색, 다중 필터 조합
+- I-8 Notification Content Designer: 푸시/이메일 메시지 설계
+
+### Cluster S: 수퍼바이저 & 프로젝트 관리 (8인)
+- **★ S-1 Supervisor/PM** (모든 팀 필수): 업무 방향성 코칭, 스코프 관리, 불필요 작업 차단, 최고 성과 보장
+- S-2 Risk Assessor: 변경 영향도 사전 평가, 롤백 계획
+- S-3 Code Review Lead: PR 품질 게이트, 코드 표준 준수
+- S-4 Progress Tracker: 5% 단위 진척 보고, 병목 조기 감지
+- S-5 Cross-cluster Coordinator: 클러스터 간 의존성 조율
+- S-6 Better Alternative Proposer: 사용자 명령 대비 더 나은 방안 도출·제시
+- S-7 Revert & Rollback Manager: 변경 코드 추적, 안전한 되돌리기
+- S-8 Lessons Learned Recorder: 실수/교훈 기록, CLAUDE.md 업데이트
 
 ### 업무 실행 프로토콜
-1. **Discovery**: 전체 소스 코드 탐색 → Context Mirror 구축
-2. **Brainstorming**: 클러스터별 MECE 분석 → 개선 포인트 도출
-3. **Harness Construction**: 검증 테스트 사전 구축
-4. **Surgical Implementation**: Side-effect Zero 원칙 코드 수정
-5. **Verification Loop**: 하네스 가동 → 실패 시 Phase 2로 회귀
+1. **S-1 PM 팀 편성**: 작업 분석 → 100인 중 최적 11인 선발 (S-1 필수 포함)
+2. **Discovery**: 전체 소스 코드 탐색 → Context Mirror 구축
+3. **Better Alternative**: S-6이 사용자 명령 대비 더 나은 방안 검토·제시
+4. **Agentic 10x Plan**: 전체 코드 기반 구체적 계획 수립 (기본 대비 10배 정밀)
+5. **Harness Construction**: 검증 테스트 사전 구축
+6. **Surgical Implementation**: Side-effect Zero 원칙 코드 수정
+7. **3x Verification Loop**: 서로 다른 시나리오 3회 검증 → 실패 시 Phase 4 회귀
 
 ## Conventions
 - Path alias: `@/*` → `./src/*`
@@ -201,3 +244,33 @@ src/
 - **문제**: `WORLD_CUP_IMAGES`의 paris 항목과 `DESTINATION_IMAGES['europe']`가 동일한 Unsplash photo(`photo-1502602898657`) 사용 → 'europe'+'paris' 동시 선발 시 동일 에펠탑 사진 2장 노출
 - **교훈**: 다중 이미지 데이터 소스(Tier 1 커스텀 + Tier 2 매핑)에서 동일 photo ID가 다른 destination에 할당되면 시각적 중복 발생. 데이터 추가 시 cross-source photo ID 유일성 확인 필수
 - **패턴**: ①데이터 레벨에서 고유 photo ID 할당 + ②`generateRandomWorldCupImages` 내 URL-level dedup guard (중복 발견 시 그래디언트 카드로 자동 전환)
+
+### [CL-HONEYMOON-JOURNEY-20260405-180000] 온보딩 가이드 플로우 확장 패턴
+- **문제**: 온보딩 완료 → 7+개 패널 동시 노출(지도+필터+추천+일정+비교+예산+타임라인) → 정보 과부하
+- **교훈**: "발산형" 대시보드보다 "수렴형" 가이드 플로우(Results→Compare→Plan→Map)가 사용자 효익 극대화. 기존 컴포넌트를 온보딩 스텝 안에 재배치하면 신규 코드 최소화
+- **패턴**: `OnboardingStep`에 compare/plan 추가 + CompareStep(ComparisonCards 재사용) + PlanStep(ItineraryCostCalculator 재사용) → 지도는 "보조 도구"로 명시적 CTA로만 진입
+
+### [CL-HONEYMOON-JOURNEY-20260405-180000] 크로스 피처 예산 연동
+- **문제**: 허니문 비용 계산 결과가 메인 예산에 반영되지 않아 두 기능 간 단절감
+- **교훈**: `useMultipleBudgets().updateAmount()` + 기존 BUDGET_CATEGORIES['honeymoon'] 인프라를 100% 재사용하면 DB 스키마/API 변경 없이 크로스 피처 연동 가능
+- **패턴**: PlanStep에서 비용 tier 선택 → `updateAmount('honeymoon', 'flight', amount)` + 토스트 확인 + 예산 페이지 딥링크
+
+### [CL-PLAN-ADD-DEST-NOMAP-20260405-210000] 컴포넌트 해상도 패턴
+- **문제**: PlanStep이 `initialDests.find(id)` 로 여행지를 해상도 → 신규 추가된 여행지(props에 없는)를 찾을 수 없음
+- **교훈**: 동적으로 아이템을 추가/제거하는 목록 컴포넌트에서는 props 배열이 아닌 글로벌 데이터 소스(`getDestinationById`)로 해상도해야 함
+- **패턴**: `orderedIds.map(id => getDestinationById(id))` — ID 기반 상태 + 글로벌 조회
+
+### [CL-PLAN-ADD-DEST-NOMAP-20260405-210000] 기능 제거 시 컴포넌트 보존
+- **문제**: 지도 기능 제거 시 컴포넌트 파일 삭제하면 추후 복원 어려움
+- **교훈**: "일단 제거"인 기능은 import만 끊고 파일은 보존. 사용하지 않는 컴포넌트는 tree-shaking으로 번들에서 자동 제외
+- **패턴**: 사용 파일(Honeymoon.tsx)에서 import 제거 + 컴포넌트 파일 유지 → vendor-map 1,023KB → 0KB
+
+### [CL-SKIP-SCHEDULE-20260405-220000] 숙박일 비례 비용 스케일링
+- **문제**: `costBreakdown`는 `destination.nights` 기준 **총액**이므로, 사용자가 숙박일을 변경하면 비용도 비례 조정 필요
+- **교훈**: `nightsRatio = customNights / defaultNights` 패턴으로 accommodation/local 비용을 비례 스케일링. flight는 숙박일 무관(고정). 총 비용 계산과 도시별 비용 모두 동일 nightsRatio 적용 필수
+- **패턴**: `nightsOverrides: Record<string, number>` 상태 + `getNights(d)` 헬퍼 → `useMemo` 비용 계산에서 `Math.round(tierCalc * nightsRatio)` 적용
+
+### [CL-SKIP-SCHEDULE-20260405-220000] 온보딩 스텝 제거 패턴
+- **문제**: ScheduleStep 제거 시 `OnboardingStep` 타입, `STEP_ORDER`, `computeProgress`, `goBack`, `BACK_ENABLED_STEPS`, Honeymoon.tsx의 6곳에서 동시 수정 필요
+- **교훈**: 온보딩 스텝 추가/제거는 반드시 타입 정의 → 순서 배열 → 프로그레스 → 뒤로가기 → 셸 → 페이지 라우팅 순서로 전수 변경. 하나라도 누락하면 TS 에러 6개+ 동시 발생
+- **패턴**: `OnboardingStep` 타입 유니온에서 제거 → `STEP_ORDER` 배열 → `computeProgress` switch → `goBack` switch → `BACK_ENABLED_STEPS` → Honeymoon.tsx import/렌더링

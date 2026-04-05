@@ -24,7 +24,8 @@ export function WorldCupCard({
   disabled,
 }: WorldCupCardProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
-  const hasImage = !!image.url;
+  const [imgError, setImgError] = useState(false); // [CL-WORLDCUP-IMG-ALGO-20260405-140000]
+  const hasImage = !!image.url && !imgError;
 
   return (
     <button
@@ -52,6 +53,7 @@ export function WorldCupCard({
               alt=""
               className="absolute inset-0 w-full h-full object-cover blur-lg scale-110"
               aria-hidden="true"
+              onError={() => setImgError(true)}
             />
           )}
 
@@ -65,6 +67,7 @@ export function WorldCupCard({
             )}
             loading="eager"
             onLoad={() => setImgLoaded(true)}
+            onError={() => setImgError(true)}
           />
 
           {/* Gradient overlay */}

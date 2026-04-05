@@ -15,8 +15,9 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=100&q=40',
   },
   'europe': {
-    url: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=100&q=40',
+    // [CL-WORLDCUP-DEDUP-20260405-163500] 기존 photo-1502602898657 = paris 에펠탑과 중복 → 유럽 중세 마을 거리로 교체
+    url: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=100&q=40',
   },
   'hawaii': {
     url: 'https://images.unsplash.com/photo-1505852679233-d9fd70aff56d?w=800&q=80',
@@ -98,8 +99,8 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1559628233-100c798642d4?w=100&q=40',
   },
   'phi-phi': {
-    url: 'https://images.unsplash.com/photo-1548181464-36c3e0e0f03b?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1548181464-36c3e0e0f03b?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=100&q=40',
   },
   'coron': {
     url: 'https://images.unsplash.com/photo-1553603227-2358aabe821e?w=800&q=80',
@@ -232,8 +233,8 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1491166617655-0723a0999cfc?w=100&q=40',
   },
   'florence': {
-    url: 'https://images.unsplash.com/photo-1543429258-1a30f1c1b4f5?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1543429258-1a30f1c1b4f5?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1541370976299-4d24ebbc9077?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1541370976299-4d24ebbc9077?w=100&q=40',
   },
   'vienna': {
     url: 'https://images.unsplash.com/photo-1516550893923-42d28e5677af?w=800&q=80',
@@ -260,16 +261,16 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1555881400-74d7acaacd8b?w=100&q=40',
   },
   'malta': {
-    url: 'https://images.unsplash.com/photo-1561412612-8226e66e7fea?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1561412612-8226e66e7fea?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1558642452-9d2a7deb7f62?w=100&q=40',
   },
   'cinque-terre': {
     url: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=800&q=80',
     thumbUrl: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=100&q=40',
   },
   'split': {
-    url: 'https://images.unsplash.com/photo-1555990538-1e7b9733871b?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1555990538-1e7b9733871b?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1504512485720-7d83a16ee930?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1504512485720-7d83a16ee930?w=100&q=40',
   },
   'hallstatt': {
     url: 'https://images.unsplash.com/photo-1511884642898-4c92249e20b6?w=800&q=80',
@@ -280,12 +281,12 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1506377585622-bedcbb027afc?w=100&q=40',
   },
   'norway': {
-    url: 'https://images.unsplash.com/photo-1513519245088-0e12902e35ca?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1513519245088-0e12902e35ca?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=100&q=40',
   },
   'montenegro': {
-    url: 'https://images.unsplash.com/photo-1586523969643-c946e6f3be03?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1586523969643-c946e6f3be03?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1590523278191-995cbcda646b?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1590523278191-995cbcda646b?w=100&q=40',
   },
 
   // ── 북미 ──
@@ -302,8 +303,8 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1533106497176-45ae19e68ba2?w=100&q=40',
   },
   'vancouver': {
-    url: 'https://images.unsplash.com/photo-1559511260-66a68e7e4112?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1559511260-66a68e7e4112?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1609825488888-3a766db05542?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1609825488888-3a766db05542?w=100&q=40',
   },
 
   // ── 중남미/카리브 ──
@@ -320,8 +321,8 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1526392060635-9d6019884377?w=100&q=40',
   },
   'jamaica': {
-    url: 'https://images.unsplash.com/photo-1570071677470-1f9a56e414ff?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1570071677470-1f9a56e414ff?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1500835556837-99ac94a94552?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1500835556837-99ac94a94552?w=100&q=40',
   },
 
   // ── 오세아니아/태평양 ──
@@ -358,8 +359,8 @@ export const DESTINATION_IMAGES: Record<string, { url: string; thumbUrl: string 
     thumbUrl: 'https://images.unsplash.com/photo-1469521669194-babb45599def?w=100&q=40',
   },
   'cairns': {
-    url: 'https://images.unsplash.com/photo-1523916330348-c67c2d3e2664?w=800&q=80',
-    thumbUrl: 'https://images.unsplash.com/photo-1523916330348-c67c2d3e2664?w=100&q=40',
+    url: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=800&q=80',
+    thumbUrl: 'https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=100&q=40',
   },
   'bora-bora': {
     url: 'https://images.unsplash.com/photo-1559494007-9f5847c49d94?w=800&q=80',

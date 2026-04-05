@@ -77,6 +77,7 @@ export function useHoneymoonPlanner(): UseHoneymoonPlannerResult {
             action: 'curate',
             ...profile,
             ...(candidates.length > 0 ? { candidates } : {}),
+            ...(travelProfile?.worldCupRanking ? { worldCupRanking: travelProfile.worldCupRanking } : {}), // [CL-WORLDCUP-IMG-ALGO-20260405-140000]
           },
         });
 

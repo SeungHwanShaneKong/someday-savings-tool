@@ -57,7 +57,7 @@ export const WORLD_CUP_IMAGES: WorldCupImage[] = [
     label: '에펠탑이 보이는 카페 테라스',
     subLabel: '파리',
     travelStyle: 'culture',
-    destinationId: 'europe',
+    destinationId: 'paris', // [CL-WORLDCUP-IMG-ALGO-20260405-140000] europe → paris
   },
   {
     id: 'img-hawaii-surf',
@@ -75,7 +75,7 @@ export const WORLD_CUP_IMAGES: WorldCupImage[] = [
     label: '지중해 석양의 매력',
     subLabel: '산토리니',
     travelStyle: 'luxury',
-    destinationId: 'europe',
+    destinationId: 'santorini', // [CL-WORLDCUP-IMG-ALGO-20260405-140000] europe → santorini
   },
   // [CL-REMOVE-KR-DESTINATIONS-20260403-210000] 제주 월드컵 이미지 제거
   {
@@ -94,7 +94,7 @@ export const WORLD_CUP_IMAGES: WorldCupImage[] = [
     label: '2000년 역사의 콜로세움',
     subLabel: '로마',
     travelStyle: 'culture',
-    destinationId: 'europe',
+    destinationId: 'rome', // [CL-WORLDCUP-IMG-ALGO-20260405-140000] europe → rome
   },
 ];
 
@@ -175,7 +175,7 @@ export function generateRandomWorldCupImages(count = 16): WorldCupImage[] {
   // 1순위: 기존 WORLD_CUP_IMAGES (라벨/스타일 커스텀)
   // 2순위: DESTINATION_IMAGES (100개 Unsplash 매핑)
   // 3순위: 그래디언트 카드 fallback
-  return finalList.map(d => {
+  const rawImages = finalList.map(d => {
     const existingImg = WORLD_CUP_IMAGES.find(img => img.destinationId === d.id);
     if (existingImg) {
       return { ...existingImg };
@@ -206,6 +206,34 @@ export function generateRandomWorldCupImages(count = 16): WorldCupImage[] {
       markerEmoji: d.markerEmoji,
       regionGradient: REGION_GRADIENTS[d.region] ?? 'from-blue-400 to-indigo-600',
     };
+  });
+
+  // [CL-WORLDCUP-DEDUP-20260405-163500] URL 중복 방지 가드
+  // 다른 destination이 동일 Unsplash photo를 사용할 경우 → 그래디언트 카드로 전환
+  const usedPhotoIds = new Set<string>();
+  return rawImages.map(img => {
+    if (!img.url) return img; // 이미 그래디언트 카드
+
+    const photoMatch = img.url.match(/photo-([a-zA-Z0-9_-]+)\?/);
+    const photoId = photoMatch?.[1];
+    if (!photoId) return img;
+
+    if (usedPhotoIds.has(photoId)) {
+      // 중복 photo 감지 → 그래디언트 카드로 전환
+      const dest = DESTINATIONS.find(dd => dd.id === img.destinationId);
+      return {
+        ...img,
+        url: '',
+        thumbUrl: '',
+        markerEmoji: dest?.markerEmoji ?? '✈️',
+        regionGradient: dest
+          ? REGION_GRADIENTS[dest.region] ?? 'from-blue-400 to-indigo-600'
+          : 'from-blue-400 to-indigo-600',
+      };
+    }
+
+    usedPhotoIds.add(photoId);
+    return img;
   });
 }
 
@@ -277,4 +305,70 @@ export function advanceBracket(
   }
 
   return updated;
+}
+
+// ── [CL-WORLDCUP-IMG-ALGO-20260405-140000] 월드컵 랭킹 추출 ──
+
+export interface WorldCupRanking {
+  champion: string;          // destination ID
+  finalist: string;          // destination ID
+  semiFinalists: string[];   // 2 destination IDs (SF losers)
+  quarterFinalists: string[]; // up to 4 destination IDs (QF losers)
+}
+
+/**
+ * 완료된 bracket + selections에서 월드컵 랭킹(destination ID) 추출
+ * Champion(우승) → Finalist(준우승) → SF losers(4강) → QF losers(8강)
+ */
+export function extractWorldCupRanking(
+  bracket: WorldCupMatch[],
+  selections: string[],
+  images: WorldCupImage[],
+): WorldCupRanking | null {
+  if (selections.length < 15 || bracket.length < 15) return null;
+
+  const getDestId = (imgId: string): string => {
+    const img = images.find(i => i.id === imgId);
+    return img?.destinationId ?? imgId;
+  };
+
+  // Champion = selections[14] (final winner)
+  const championImgId = selections[14];
+
+  // Finalist = the other participant of match 14
+  const finalMatch = bracket[14];
+  const finalistImgId = finalMatch.imageA.id === championImgId
+    ? finalMatch.imageB.id
+    : finalMatch.imageA.id;
+
+  // SF losers = participants of matches 12,13 NOT winning (not in selections[12,13])
+  const sfWinnerIds = new Set([selections[12], selections[13]]);
+  const sfLosers: string[] = [];
+  for (const idx of [12, 13]) {
+    const m = bracket[idx];
+    if (!sfWinnerIds.has(m.imageA.id)) sfLosers.push(m.imageA.id);
+    if (!sfWinnerIds.has(m.imageB.id)) sfLosers.push(m.imageB.id);
+  }
+
+  // QF losers = participants of matches 8-11 NOT winning
+  const qfWinnerIds = new Set([selections[8], selections[9], selections[10], selections[11]]);
+  const qfLosers: string[] = [];
+  for (const idx of [8, 9, 10, 11]) {
+    const m = bracket[idx];
+    if (!qfWinnerIds.has(m.imageA.id)) qfLosers.push(m.imageA.id);
+    if (!qfWinnerIds.has(m.imageB.id)) qfLosers.push(m.imageB.id);
+  }
+
+  // Deduplicate destination IDs
+  const champion = getDestId(championImgId);
+  const finalist = getDestId(finalistImgId);
+  const sfDests = [...new Set(sfLosers.map(getDestId))].filter(id => id !== champion && id !== finalist);
+  const qfDests = [...new Set(qfLosers.map(getDestId))].filter(id => id !== champion && id !== finalist && !sfDests.includes(id));
+
+  return {
+    champion,
+    finalist,
+    semiFinalists: sfDests,
+    quarterFinalists: qfDests,
+  };
 }

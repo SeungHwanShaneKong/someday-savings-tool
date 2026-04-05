@@ -101,8 +101,13 @@ export default function Honeymoon() {
   // [CL-HONEYMOON-REDESIGN-20260316] 온보딩 완료 후 프로필 적용
   const [profileApplied, setProfileApplied] = useState(false);
 
-  // [CL-WORLDCUP-CONNECT-20260330] 월드컵 우승 여행지 ID → Destination 연결
+  // [CL-WORLDCUP-IMG-ALGO-20260405-140000] 월드컵 우승 여행지 — ranking 우선, fallback 유지
   const worldCupWinnerDest = useMemo(() => {
+    const ranking = onboarding.state.profile?.worldCupRanking;
+    if (ranking) {
+      return getDestinationById(ranking.champion) ?? null;
+    }
+    // 하위호환: ranking 없으면 기존 finalWinnerId 방식
     if (!onboarding.state.profile?.finalWinnerId || !onboarding.state.worldCupImages) return null;
     const winnerImg = onboarding.state.worldCupImages.find(
       img => img.id === onboarding.state.profile!.finalWinnerId
@@ -123,12 +128,20 @@ export default function Honeymoon() {
     if (onboarding.state.isComplete && onboarding.state.profile && !profileApplied) {
       applyProfile(onboarding.state.profile);
 
-      // [CL-WORLDCUP-CONNECT-20260330] 월드컵 우승지 + AI Top 3 자동 선택 & flyTo
+      // [CL-WORLDCUP-IMG-ALGO-20260405-140000] 월드컵 상위 4 + AI 보충 자동 선택
       const autoSelectIds = new Set<string>();
-      if (worldCupWinnerDest) {
+      const ranking = onboarding.state.profile?.worldCupRanking;
+      if (ranking) {
+        autoSelectIds.add(ranking.champion);
+        autoSelectIds.add(ranking.finalist);
+        ranking.semiFinalists.forEach(id => autoSelectIds.add(id));
+      } else if (worldCupWinnerDest) {
         autoSelectIds.add(worldCupWinnerDest.id);
       }
-      aiTopDestIds.forEach(id => autoSelectIds.add(id));
+      // 나머지 슬롯 AI 추천으로 보충 (최대 5개)
+      aiTopDestIds.forEach(id => {
+        if (autoSelectIds.size < 5) autoSelectIds.add(id);
+      });
       // 자동 선택 (최대 5개 제한은 toggleSelection 내부에서 처리)
       autoSelectIds.forEach(id => {
         if (!selectedIds.includes(id)) {
@@ -283,6 +296,7 @@ export default function Honeymoon() {
                   src={DESTINATION_IMAGES[worldCupWinnerDest.id].thumbUrl.replace('w=100', 'w=200')}
                   alt={worldCupWinnerDest.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /* [CL-WORLDCUP-IMG-ALGO-20260405-140000] */
                 />
               </div>
             )}

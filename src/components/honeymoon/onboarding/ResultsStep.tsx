@@ -56,17 +56,24 @@ export function ResultsStep({ profile, results, onComplete, onRetry }: ResultsSt
               key={rec.destinationId}
               className={cn(
                 'p-4 transition-all duration-200 hover:shadow-toss animate-fade-up',
-                idx === 0 && 'border-primary/30 bg-primary/[0.02]',
+                idx === 0 && profile.worldCupRanking?.champion === rec.destinationId
+                  ? 'border-yellow-400/50 bg-yellow-50/30 dark:bg-yellow-900/10'
+                  : idx === 0 && 'border-primary/30 bg-primary/[0.02]',
               )}
               style={{ animationDelay: `${idx * 0.1}s` }}
             >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  {idx === 0 && (
-                    <Badge className="bg-primary text-white text-[10px] px-2 py-0.5">
-                      BEST
-                    </Badge>
-                  )}
+                  {/* [CL-WORLDCUP-IMG-ALGO-20260405-140000] 월드컵 랭크 배지 */}
+                  {(() => {
+                    const r = profile.worldCupRanking;
+                    if (r?.champion === rec.destinationId) return <Badge className="bg-yellow-500 text-white text-[10px] px-2 py-0.5">🏆 우승</Badge>;
+                    if (r?.finalist === rec.destinationId) return <Badge className="bg-gray-400 text-white text-[10px] px-2 py-0.5">🥈 준우승</Badge>;
+                    if (r?.semiFinalists.includes(rec.destinationId)) return <Badge className="bg-amber-600 text-white text-[10px] px-2 py-0.5">🥉 4강</Badge>;
+                    if (r?.quarterFinalists.includes(rec.destinationId)) return <Badge className="bg-primary/80 text-white text-[10px] px-2 py-0.5">8강</Badge>;
+                    if (idx === 0) return <Badge className="bg-primary text-white text-[10px] px-2 py-0.5">BEST</Badge>;
+                    return null;
+                  })()}
                   <span className="text-xl">{dest.markerEmoji}</span>
                   <div>
                     <h3 className="text-sm font-bold text-foreground">

@@ -129,6 +129,7 @@ export function WorldCupStep({ match, round, onSelect }: WorldCupStepProps) {
       {/* Two cards */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-md">
         <WorldCupCard
+          key={match.imageA.id} /* [CL-WORLDCUP-IMG-ALGO-20260405-140000] */
           image={match.imageA}
           position="left"
           onSelect={() => handleSelect(match.imageA.id)}
@@ -136,6 +137,7 @@ export function WorldCupStep({ match, round, onSelect }: WorldCupStepProps) {
           disabled={isAnimating}
         />
         <WorldCupCard
+          key={match.imageB.id} /* [CL-WORLDCUP-IMG-ALGO-20260405-140000] */
           image={match.imageB}
           position="right"
           onSelect={() => handleSelect(match.imageB.id)}

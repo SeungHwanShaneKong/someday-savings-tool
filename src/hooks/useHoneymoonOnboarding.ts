@@ -9,6 +9,7 @@ import {
   generateBracket,
   generateRandomWorldCupImages,
   advanceBracket,
+  extractWorldCupRanking, // [CL-WORLDCUP-IMG-ALGO-20260405-140000]
   type WorldCupMatch,
   type WorldCupImage,
 } from '@/lib/honeymoon-images';
@@ -221,11 +222,16 @@ export function useHoneymoonOnboarding(userId?: string): UseHoneymoonOnboardingR
       // [CL-IMPROVE-7TASKS-20260330] 15매치 완료 → 프로필 생성 + budget 단계로
       if (newRound >= TOTAL_MATCHES) {
         const profileBase = computeProfileFromSelections(newSelections, prev.worldCupImages);
+        // [CL-WORLDCUP-IMG-ALGO-20260405-140000] 월드컵 랭킹 추출
+        const worldCupRanking = extractWorldCupRanking(
+          newBracket, newSelections, prev.worldCupImages,
+        );
         const profile: TravelProfile = {
           ...profileBase,
           budgetRange: { min: 2000000, max: prev.budget },
           nights: { min: prev.nightsMin, max: prev.nightsMax },
           departureMonth: prev.departureMonth,
+          worldCupRanking: worldCupRanking ?? undefined,
         };
         return {
           ...prev,

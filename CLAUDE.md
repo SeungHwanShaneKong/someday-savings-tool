@@ -186,3 +186,18 @@ src/
 - **문제**: 전체 펼치기/접기 시 각 Collapsible의 개별 open state와 충돌
 - **교훈**: 부모→자식 일괄 제어는 `forceExpand: boolean | null` 패턴 사용. null = 개별 제어, true/false = 강제. 500ms 후 null 리셋으로 개별 제어 복원
 - **패턴**: useEffect에서 forceExpand 감시 → setIsOpen 동기화. 부모에서 setTimeout(() => setGlobalExpand(null), 500)
+
+### [CL-WORLDCUP-IMG-ALGO-20260405-140000] 이미지 onError 런타임 방어
+- **문제**: Unsplash URL 404 → `<img>` 태그 깨짐 → 사용자에게 빈 카드 노출
+- **교훈**: 외부 CDN 이미지는 빌드 타임 검증(URL HEAD 체크)과 런타임 방어(`onError` handler)를 동시 적용해야 함. 빌드 시 검증해도 CDN 측에서 사후 삭제 가능
+- **패턴**: `imgError` state + `onError={() => setImgError(true)}` → `hasImage = !!url && !imgError` → false면 그래디언트 카드 fallback. 매치 전환 시 `key={image.id}`로 재마운트하여 에러 상태 자동 리셋
+
+### [CL-WORLDCUP-IMG-ALGO-20260405-140000] 월드컵 랭킹 기반 추천 알고리즘
+- **문제**: 16강 토너먼트 결과(우승/준우승/4강/8강)가 최종 추천에 반영되지 않아 사용자 선택과 추천 결과 간 연결감 단절
+- **교훈**: 사용자가 직접 선택한 데이터(월드컵 랭킹)는 AI 매칭 점수보다 강한 시그널. 랭킹 상위 여행지를 고정 슬롯으로 배치하고 나머지를 매칭 기반으로 채우는 하이브리드 방식이 최적
+- **패턴**: `extractWorldCupRanking()` → `TravelProfile.worldCupRanking` → `buildLocalFallbackResults()`에서 Champion(0.99)/Finalist(0.92)/SF(0.85) 고정 + `preFilterCandidates()`에서 QF +0.15 부스팅
+
+### [CL-WORLDCUP-DEDUP-20260405-163500] 이미지 데이터 소스 간 중복 방지
+- **문제**: `WORLD_CUP_IMAGES`의 paris 항목과 `DESTINATION_IMAGES['europe']`가 동일한 Unsplash photo(`photo-1502602898657`) 사용 → 'europe'+'paris' 동시 선발 시 동일 에펠탑 사진 2장 노출
+- **교훈**: 다중 이미지 데이터 소스(Tier 1 커스텀 + Tier 2 매핑)에서 동일 photo ID가 다른 destination에 할당되면 시각적 중복 발생. 데이터 추가 시 cross-source photo ID 유일성 확인 필수
+- **패턴**: ①데이터 레벨에서 고유 photo ID 할당 + ②`generateRandomWorldCupImages` 내 URL-level dedup guard (중복 발견 시 그래디언트 카드로 자동 전환)

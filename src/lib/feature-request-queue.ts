@@ -29,7 +29,7 @@ export async function flushFeatureRequestQueue(): Promise<void> {
   const remaining: QueuedRequest[] = [];
 
   for (const item of queue) {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('feature_requests')
       .insert({
         user_id: item.user_id,

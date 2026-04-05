@@ -56,7 +56,7 @@ export function FeatureRequestButton() {
       const { data: { user } } = await supabase.auth.getUser();
       payload.user_id = user?.id ?? null;
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('feature_requests')
         .insert(payload);
 

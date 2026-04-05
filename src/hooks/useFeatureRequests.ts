@@ -23,7 +23,7 @@ export function useFeatureRequests() {
     setError(null);
 
     try {
-      const { data, error: err } = await supabase
+      const { data, error: err } = await (supabase as any)
         .from('feature_requests')
         .select('*')
         .order('created_at', { ascending: false })

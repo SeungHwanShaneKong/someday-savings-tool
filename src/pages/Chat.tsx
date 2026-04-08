@@ -22,6 +22,10 @@ export default function Chat() {
     sendMessage,
     clearMessages,
     messagesEndRef,
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터 (qa = 5/일)
+    remainingToday,
+    dailyLimit,
+    limitReached,
   } = useAIChat({ feature: 'qa' });
 
   if (!authLoading && !user) {
@@ -61,8 +65,13 @@ export default function Chat() {
         onSend={sendMessage}
         messagesEndRef={messagesEndRef}
         placeholder="결혼 준비에 대해 무엇이든 물어보세요..."
-        welcomeMessage="안녕하세요! 결혼 준비에 관해 무엇이든 물어보세요 😊 예식장 비용, 스드메 팁, 일정 관리, 신혼여행 추천 등 도움이 필요하시면 말씀해 주세요!"
+        welcomeMessage="안녕하세요! 결혼 준비에 관해 무엇이든 물어보세요 😊 예식장 비용, 스드메 팁, 일정 관리, 신혼여행 추천 등 도움이 필요하시면 말씀해 주세요! (하루 5회 질문 가능)"
         className="flex-1"
+        // [CL-AI-CHAT-LIMIT5-20260408-100500] qa 5/일 카운터
+        remainingToday={remainingToday}
+        dailyLimit={dailyLimit}
+        limitReached={limitReached}
+        showLimitCounter={true}
       />
     </div>
   );

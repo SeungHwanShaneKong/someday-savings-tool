@@ -274,3 +274,18 @@ src/
 - **문제**: ScheduleStep 제거 시 `OnboardingStep` 타입, `STEP_ORDER`, `computeProgress`, `goBack`, `BACK_ENABLED_STEPS`, Honeymoon.tsx의 6곳에서 동시 수정 필요
 - **교훈**: 온보딩 스텝 추가/제거는 반드시 타입 정의 → 순서 배열 → 프로그레스 → 뒤로가기 → 셸 → 페이지 라우팅 순서로 전수 변경. 하나라도 누락하면 TS 에러 6개+ 동시 발생
 - **패턴**: `OnboardingStep` 타입 유니온에서 제거 → `STEP_ORDER` 배열 → `computeProgress` switch → `goBack` switch → `BACK_ENABLED_STEPS` → Honeymoon.tsx import/렌더링
+
+### [CL-AI-CHAT-LIMIT5-20260408-100500] Edge Function 이중 레이어 rate limit
+- **문제**: `useAIChat`가 `rag-query` → `ai-chat` 폴백 체인으로 작동하는데, `rag-query`에 rate limit이 없어 한도 우회 가능. 또한 `ai-chat`의 카운트가 `feature` 컬럼을 무시해서 QA 질문이 honeymoon/budget 쿼터까지 침해
+- **교훈**: 폴백 체인으로 연결된 여러 Edge Function에 rate limit을 부여할 때, 모든 단계에 동일한 제한 로직을 복제하고 `feature` 컬럼 기반으로 scope 제한해야 다른 feature 쿼터를 침해하지 않음. 클라이언트는 RAG 429를 받으면 폴백을 차단해야 우회 방지
+- **패턴**: `DAILY_LIMITS: Record<feature, number>` 맵 (qa=5, honeymoon=20, budget=20) + `.eq('feature', feature)` 쿼리 필터 + `rag-query`에도 동일 코드 블록 + `useAIChat`이 RAG 429를 catch해서 ai-chat fallback skip + 응답에 `remaining`/`limit` 포함하여 클라이언트 카운터 표시
+
+### [CL-HONEYMOON-BACK-STATE-20260408-100500] 의도적 마운트 리셋 vs 뒤로가기 보존 충돌
+- **문제**: Honeymoon 페이지가 모든 mount 시 `resetOnboarding()`을 호출 → /budget에서 브라우저 back 시 추천 데이터 소실. 기존 "항상 월드컵부터" 제품 정책(`CL-IMPROVE-7TASKS-20260330`)은 유지해야 함
+- **교훈**: "항상 초기화" 정책과 "뒤로가기 시 상태 보존" 요구가 충돌할 때, navigate 시 `sessionStorage` 플래그를 세팅하고 mount 시 해당 플래그로 분기하면 두 요구사항이 공존 가능. 출발 측이 의도를 명시적으로 신호함
+- **패턴**: 출발 측(PlanStep, 완료 화면 모두)에서 `sessionStorage.setItem('honeymoon-returning','1')` → 도착 측(Honeymoon mount effect)에서 `getItem` 후 `removeItem`(consume) → 플래그 있으면 reset skip, 없으면 정상 reset → localStorage 하이드레이션은 자동 복원
+
+### [CL-QA-50-SWEEP-20260408-133000] Radix Sheet/Dialog a11y — SheetDescription 누락 경고
+- **문제**: ChatDrawer(Sheet 기반)가 `<SheetTitle>`만 렌더하고 `<SheetDescription>`을 누락 → Radix DialogContent가 콘솔에 `Missing Description or aria-describedby={undefined}` 경고 반복 출력
+- **교훈**: Radix Sheet/Dialog는 WCAG 접근성 준수를 위해 `aria-describedby`가 존재하지 않는 DOM 노드를 가리키면 런타임 경고. 시각적으로 노출할 설명이 없더라도 `<SheetDescription className="sr-only">`로 스크린리더 전용 설명을 제공해야 경고 해소 + 접근성 동시 확보
+- **패턴**: `import { SheetDescription } from '@/components/ui/sheet'` + `<SheetHeader>` 안에 `<SheetDescription className="sr-only">설명 텍스트</SheetDescription>` 추가. Tailwind `sr-only`는 `position:absolute; w:1px; h:1px; overflow:hidden`로 시각적 숨김 유지하며 스크린리더에는 노출

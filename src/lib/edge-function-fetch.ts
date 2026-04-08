@@ -16,12 +16,15 @@ export type EdgeFunctionErrorType =
 export class EdgeFunctionError extends Error {
   type: EdgeFunctionErrorType;
   status?: number;
+  // [CL-AI-CHAT-LIMIT5-20260408-100500] 서버 응답 본문 (429 한도 정보 등)
+  responseBody?: unknown;
 
-  constructor(type: EdgeFunctionErrorType, message: string, status?: number) {
+  constructor(type: EdgeFunctionErrorType, message: string, status?: number, responseBody?: unknown) {
     super(message);
     this.name = 'EdgeFunctionError';
     this.type = type;
     this.status = status;
+    this.responseBody = responseBody;
   }
 }
 
@@ -98,12 +101,13 @@ export async function edgeFunctionFetch<T>(
       const serverMessage = (errorData as any)?.error || '';
 
       if (response.status === 401 || response.status === 403) {
-        throw new EdgeFunctionError('AUTH_ERROR', serverMessage || '인증이 필요합니다', response.status);
+        throw new EdgeFunctionError('AUTH_ERROR', serverMessage || '인증이 필요합니다', response.status, errorData);
       }
       if (response.status >= 500) {
-        throw new EdgeFunctionError('SERVER_ERROR', serverMessage || `서버 오류 (${response.status})`, response.status);
+        throw new EdgeFunctionError('SERVER_ERROR', serverMessage || `서버 오류 (${response.status})`, response.status, errorData);
       }
-      throw new EdgeFunctionError('CLIENT_ERROR', serverMessage || `요청 오류 (${response.status})`, response.status);
+      // [CL-AI-CHAT-LIMIT5-20260408-100500] 4xx (429 포함)는 errorData 본문을 보존
+      throw new EdgeFunctionError('CLIENT_ERROR', serverMessage || `요청 오류 (${response.status})`, response.status, errorData);
     }
 
     // 4. JSON parse

@@ -200,6 +200,15 @@ export default function Admin() {
               </Button>
             </Card>
           )}
+
+          {/* [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 사용자 의견 패널 — 한눈에 보기 위해 최상단으로 이동 */}
+          <FeatureRequestPanel
+            requests={featureRequests}
+            loading={frLoading}
+            error={frError}
+            onRefresh={fetchRequests}
+          />
+
           {/* ===== 필터 패널 ===== */}
           <div className="flex flex-wrap items-center gap-3">
             <Select value={period} onValueChange={setPeriod}>
@@ -438,13 +447,7 @@ export default function Admin() {
             onGenerate={generateSEO}
           />
 
-          {/* [CL-ADMIN-FEATURE-REQ-20260403] 사용자 기능 요청 패널 */}
-          <FeatureRequestPanel
-            requests={featureRequests}
-            loading={frLoading}
-            error={frError}
-            onRefresh={fetchRequests}
-          />
+          {/* [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] FeatureRequestPanel은 main 최상단으로 이동됨 */}
 
           <section>
             <h2 className="text-base sm:text-lg font-bold mb-4 leading-relaxed">📊 18개 핵심 운영 지표</h2>

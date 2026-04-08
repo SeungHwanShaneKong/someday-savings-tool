@@ -13,6 +13,24 @@ const openai = new OpenAI({
 
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 
+// [CL-AI-CHAT-LIMIT5-20260408-100500] RAG 경로에도 동일한 rate limit 적용 (폴백 우회 방지)
+const DAILY_LIMITS: Record<string, number> = {
+  qa: 5,
+  honeymoon: 20,
+  budget: 20,
+};
+const DEFAULT_DAILY_LIMIT = 20;
+
+function getSeoulResetAt(): string {
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const tomorrow = new Date(kstNow);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  tomorrow.setUTCHours(0, 0, 0, 0);
+  const resetUtc = new Date(tomorrow.getTime() - 9 * 60 * 60 * 1000);
+  return resetUtc.toISOString();
+}
+
 interface RagRequest {
   question: string;
   feature?: string;       // 'qa' | 'honeymoon' | 'budget'
@@ -74,6 +92,34 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: '질문이 필요합니다' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] Feature-scoped rate limit (RAG 폴백 우회 방지)
+    const limit = DAILY_LIMITS[feature] ?? DEFAULT_DAILY_LIMIT;
+    const today = new Date().toISOString().split('T')[0];
+    const { count } = await supabase
+      .from('ai_conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('feature', feature)
+      .gte('created_at', `${today}T00:00:00Z`);
+
+    const usedToday = count ?? 0;
+    if (usedToday >= limit) {
+      const isQa = feature === 'qa';
+      const friendlyMsg = isQa
+        ? `오늘의 AI Q&A 질문 ${limit}회를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`
+        : `오늘의 AI 사용 한도(${limit}회)를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`;
+      return new Response(
+        JSON.stringify({
+          error: friendlyMsg,
+          remaining: 0,
+          limit,
+          feature,
+          resetAt: getSeoulResetAt(),
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -139,6 +185,23 @@ serve(async (req) => {
     // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 계산
     const freshnessInfo = buildFreshnessInfo(citations);
 
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] RAG 호출 성공도 ai_conversations에 기록 (count 정확성)
+    try {
+      await supabase.from('ai_conversations').insert({
+        user_id: userId,
+        feature,
+        messages: [
+          { role: 'user', content: question },
+          { role: 'assistant', content: reply },
+        ],
+        metadata: { rag_used: citations.length > 0, sources_count: citations.length },
+      });
+    } catch (saveError) {
+      console.warn('Failed to save RAG conversation:', saveError);
+    }
+
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] 응답에 remaining 포함 (클라이언트 카운터용)
+    const remaining = Math.max(0, limit - (usedToday + 1));
     return new Response(
       JSON.stringify({
         reply,
@@ -147,6 +210,8 @@ serve(async (req) => {
         model: DEFAULT_MODEL,
         rag_used: citations.length > 0,
         freshness_info: freshnessInfo,
+        remaining,
+        limit,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

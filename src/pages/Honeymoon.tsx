@@ -40,11 +40,19 @@ export default function Honeymoon() {
   const onboarding = useHoneymoonOnboarding(user?.id);
 
   // [CL-IMPROVE-7TASKS-20260330] 페이지 진입 시 항상 월드컵부터 시작
+  // [CL-HONEYMOON-BACK-STATE-20260408-100500] 단, /budget에서 뒤로가기 복귀 시 sessionStorage 플래그로 reset 스킵
   const initialMountRef = useRef(true);
   useEffect(() => {
     if (initialMountRef.current) {
       initialMountRef.current = false;
-      onboarding.resetOnboarding();
+      const returning = sessionStorage.getItem('honeymoon-returning') === '1';
+      if (returning) {
+        // 복귀: 추천 데이터(localStorage 하이드레이션) 그대로 보존, 플래그만 소비
+        sessionStorage.removeItem('honeymoon-returning');
+      } else {
+        // 신규 진입: 기존 동작 유지 — 항상 월드컵부터
+        onboarding.resetOnboarding();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -189,7 +197,11 @@ export default function Honeymoon() {
         <div className="space-y-3 pt-2 animate-fade-up" style={{ animationDelay: '0.15s' }}>
           <Button
             size="lg"
-            onClick={() => navigate('/budget')}
+            onClick={() => {
+              // [CL-HONEYMOON-BACK-STATE-20260408-100500] 복귀 시 추천 데이터 보존
+              sessionStorage.setItem('honeymoon-returning', '1');
+              navigate('/budget');
+            }}
             className="w-full rounded-2xl py-5 text-base font-semibold shadow-primary-glow"
           >
             예산 확인하기

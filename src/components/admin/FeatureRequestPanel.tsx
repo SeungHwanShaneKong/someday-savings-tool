@@ -1,10 +1,11 @@
 /**
  * [CL-ADMIN-FEATURE-REQ-20260403] 관리자 — 사용자 기능 요청 패널 (Toss 스타일)
+ * [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 한눈에 보기 강화 — stats tiles + 검색 + CSV export
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { MessageSquare, RefreshCw } from 'lucide-react';
+import { MessageSquare, RefreshCw, Search, Download } from 'lucide-react';
 import type { FeatureRequest } from '@/hooks/useFeatureRequests';
 
 interface FeatureRequestPanelProps {
@@ -44,14 +45,80 @@ function CategoryBadge({ category }: { category: string | null }) {
   );
 }
 
+// [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] CSV 행 이스케이프
+function csvEscape(value: string | null | undefined): string {
+  const s = (value ?? '').toString();
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+// [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 통계 타일
+function StatTile({ label, value, accent }: { label: string; value: number; accent?: 'primary' | 'amber' | 'green' | 'rose' }) {
+  const accentClass = {
+    primary: 'text-primary',
+    amber: 'text-amber-600',
+    green: 'text-emerald-600',
+    rose: 'text-rose-600',
+  }[accent || 'primary'];
+  return (
+    <div className="flex-1 min-w-[80px] bg-muted/30 rounded-xl border border-border/50 px-3 py-2.5">
+      <div className="text-[10px] sm:text-[11px] text-muted-foreground font-medium">{label}</div>
+      <div className={cn('text-lg sm:text-xl font-bold mt-0.5', accentClass)}>{value}</div>
+    </div>
+  );
+}
+
 export function FeatureRequestPanel({ requests, loading, error, onRefresh }: FeatureRequestPanelProps) {
   const [filter, setFilter] = useState<string>('전체');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 검색 (debounced 200ms)
+  const [searchInput, setSearchInput] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim().toLowerCase()), 200);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 한눈에 보기 — aggregate stats
+  const stats = useMemo(() => {
+    const now = new Date();
+    // KST 기준 오늘 00:00 (UTC+9)
+    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const kstTodayStart = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate())).getTime() - 9 * 60 * 60 * 1000;
+    const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+
+    let today = 0;
+    let last7d = 0;
+    let uncategorized = 0;
+    for (const r of requests) {
+      const t = new Date(r.created_at).getTime();
+      if (t >= kstTodayStart) today += 1;
+      if (t >= sevenDaysAgo) last7d += 1;
+      if (!r.category) uncategorized += 1;
+    }
+    return {
+      total: requests.length,
+      today,
+      last7d,
+      uncategorized,
+    };
+  }, [requests]);
 
   const filtered = useMemo(() => {
-    if (filter === '전체') return requests;
-    return requests.filter(r => (r.category || '미분류') === filter);
-  }, [requests, filter]);
+    let list = requests;
+    if (filter !== '전체') {
+      list = list.filter(r => (r.category || '미분류') === filter);
+    }
+    if (searchQuery) {
+      list = list.filter(r =>
+        (r.content || '').toLowerCase().includes(searchQuery) ||
+        (r.category || '').toLowerCase().includes(searchQuery)
+      );
+    }
+    return list;
+  }, [requests, filter, searchQuery]);
 
   // 카테고리별 건수
   const categoryStats = useMemo(() => {
@@ -62,6 +129,30 @@ export function FeatureRequestPanel({ requests, loading, error, onRefresh }: Fea
     }
     return map;
   }, [requests]);
+
+  // [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] CSV 다운로드
+  const handleExportCsv = () => {
+    if (requests.length === 0) return;
+    const header = ['id', 'created_at', 'category', 'content', 'user_id'];
+    const rows = requests.map(r => [
+      r.id,
+      r.created_at,
+      r.category || '',
+      r.content || '',
+      r.user_id || '',
+    ].map(csvEscape).join(','));
+    const csv = '\uFEFF' + [header.join(','), ...rows].join('\n'); // BOM for Excel
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    a.href = url;
+    a.download = `feature-requests-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="bg-card rounded-2xl border border-border shadow-toss-sm overflow-hidden">
@@ -74,13 +165,47 @@ export function FeatureRequestPanel({ requests, loading, error, onRefresh }: Fea
             {requests.length}건
           </span>
         </div>
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          className="p-2 rounded-lg hover:bg-muted transition-colors active:scale-[0.95]"
-        >
-          <RefreshCw className={cn('w-4 h-4 text-muted-foreground', loading && 'animate-spin')} />
-        </button>
+        <div className="flex items-center gap-1">
+          {/* [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] CSV export 버튼 */}
+          <button
+            onClick={handleExportCsv}
+            disabled={loading || requests.length === 0}
+            title="CSV로 내보내기"
+            className="p-2 rounded-lg hover:bg-muted transition-colors active:scale-[0.95] disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            title="새로고침"
+            className="p-2 rounded-lg hover:bg-muted transition-colors active:scale-[0.95]"
+          >
+            <RefreshCw className={cn('w-4 h-4 text-muted-foreground', loading && 'animate-spin')} />
+          </button>
+        </div>
+      </div>
+
+      {/* [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 통계 타일 4종 — 한눈에 보기 */}
+      <div className="flex gap-2 px-4 sm:px-5 pt-3">
+        <StatTile label="총 의견" value={stats.total} accent="primary" />
+        <StatTile label="오늘" value={stats.today} accent="green" />
+        <StatTile label="최근 7일" value={stats.last7d} accent="amber" />
+        <StatTile label="미분류" value={stats.uncategorized} accent="rose" />
+      </div>
+
+      {/* [CL-ADMIN-FEEDBACK-BOARD-20260408-100500] 검색 인풋 */}
+      <div className="px-4 sm:px-5 pt-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="의견 내용 검색..."
+            className="w-full pl-8 pr-3 py-2 text-sm rounded-xl border border-border/50 bg-muted/30 focus:outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-muted-foreground/50"
+          />
+        </div>
       </div>
 
       {/* 카테고리 필터 */}

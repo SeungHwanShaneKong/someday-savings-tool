@@ -34,11 +34,26 @@ interface RAGResponse {
   citations?: Citation[];
   rag_used?: boolean;
   freshness_info?: FreshnessInfo;
+  // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터
+  remaining?: number;
+  limit?: number;
 }
 
 // ── ai-chat 응답 타입 ──
 interface AIChatResponse {
   reply: string;
+  // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터
+  remaining?: number;
+  limit?: number;
+}
+
+// [CL-AI-CHAT-LIMIT5-20260408-100500] 429 응답 본문 타입
+interface RateLimitErrorBody {
+  error?: string;
+  remaining?: number;
+  limit?: number;
+  feature?: string;
+  resetAt?: string;
 }
 
 export function useAIChat({ feature, context }: UseAIChatOptions) {
@@ -49,6 +64,11 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dbAvailable = useRef(true); // Tracks if ai_conversations table exists
+  // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터 상태
+  const [remainingToday, setRemainingToday] = useState<number | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
+  const [limitReached, setLimitReached] = useState<boolean>(false);
+  const [resetAt, setResetAt] = useState<string | null>(null);
 
   // Load existing conversation
   useEffect(() => {
@@ -156,7 +176,14 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
             ragUsed = ragData.rag_used || false;
             // [ZERO-COST-PIPELINE-2026-03-07] 신선도 정보 파싱
             freshnessInfo = ragData.freshness_info || undefined;
-          } catch {
+            // [CL-AI-CHAT-LIMIT5-20260408-100500] 한도 카운터 업데이트
+            if (typeof ragData.remaining === 'number') setRemainingToday(ragData.remaining);
+            if (typeof ragData.limit === 'number') setDailyLimit(ragData.limit);
+          } catch (ragErr) {
+            // [CL-AI-CHAT-LIMIT5-20260408-100500] RAG가 429를 반환하면 ai-chat 폴백 차단(중복 제한 우회 방지)
+            if (ragErr instanceof EdgeFunctionError && ragErr.status === 429) {
+              throw ragErr;
+            }
             // RAG not deployed or failed — fall back to ai-chat
             const data = await edgeFunctionFetch<AIChatResponse>({
               functionName: 'ai-chat',
@@ -164,6 +191,9 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
               body: chatBody,
             });
             reply = data.reply;
+            // [CL-AI-CHAT-LIMIT5-20260408-100500] 한도 카운터 업데이트
+            if (typeof data.remaining === 'number') setRemainingToday(data.remaining);
+            if (typeof data.limit === 'number') setDailyLimit(data.limit);
           }
         } else {
           // Non-Q&A features: use ai-chat directly
@@ -173,6 +203,9 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
             body: chatBody,
           });
           reply = data.reply;
+          // [CL-AI-CHAT-LIMIT5-20260408-100500] 한도 카운터 업데이트
+          if (typeof data.remaining === 'number') setRemainingToday(data.remaining);
+          if (typeof data.limit === 'number') setDailyLimit(data.limit);
         }
 
         const assistantMessage: ChatMessage = {
@@ -219,21 +252,47 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
       } catch (error: unknown) {
         console.error('AI chat error:', error);
 
-        const friendlyMsg = getUserFriendlyError(error);
+        // [CL-AI-CHAT-LIMIT5-20260408-100500] 429 (한도 초과) 친절한 처리
+        if (error instanceof EdgeFunctionError && error.status === 429) {
+          const body = (error.responseBody ?? {}) as RateLimitErrorBody;
+          const limitMsg = body.error
+            || `오늘의 AI Q&A 질문 ${body.limit ?? 5}회를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`;
 
-        // Add error message
-        const errorMessage: ChatMessage = {
-          role: 'assistant',
-          content: `죄송해요, 응답 생성 중 오류가 발생했어요. ${friendlyMsg}`,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+          setRemainingToday(0);
+          setLimitReached(true);
+          if (typeof body.limit === 'number') setDailyLimit(body.limit);
+          if (body.resetAt) setResetAt(body.resetAt);
 
-        toast({
-          title: 'AI 응답 오류',
-          description: friendlyMsg,
-          variant: 'destructive',
-        });
+          const limitMessage: ChatMessage = {
+            role: 'assistant',
+            content: limitMsg,
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, limitMessage]);
+
+          toast({
+            title: '오늘 질문을 모두 사용했어요',
+            description: limitMsg,
+            // 한도 도달은 에러가 아닌 정상 안내
+            variant: 'default',
+          });
+        } else {
+          const friendlyMsg = getUserFriendlyError(error);
+
+          // Add error message
+          const errorMessage: ChatMessage = {
+            role: 'assistant',
+            content: `죄송해요, 응답 생성 중 오류가 발생했어요. ${friendlyMsg}`,
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+
+          toast({
+            title: 'AI 응답 오류',
+            description: friendlyMsg,
+            variant: 'destructive',
+          });
+        }
       } finally {
         setIsLoading(false);
       }
@@ -258,5 +317,10 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
     sendMessage,
     clearMessages,
     messagesEndRef,
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터
+    remainingToday,
+    dailyLimit,
+    limitReached,
+    resetAt,
   };
 }

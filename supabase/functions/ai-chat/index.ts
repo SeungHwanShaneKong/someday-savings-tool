@@ -42,7 +42,26 @@ const SYSTEM_PROMPTS: Record<string, string> = {
 톤: 신뢰감 있는 한국어. 금액은 정확한 숫자로.`,
 };
 
-const DAILY_LIMIT = 50;
+// [CL-AI-CHAT-LIMIT5-20260408-100500] Feature-scoped daily limits
+// qa는 하루 5회 제한(사용자 요청), 그 외(honeymoon/budget)는 기존 20회 유지
+const DAILY_LIMITS: Record<string, number> = {
+  qa: 5,
+  honeymoon: 20,
+  budget: 20,
+};
+const DEFAULT_DAILY_LIMIT = 20;
+
+function getSeoulResetAt(): string {
+  // 다음 00:00 KST(UTC+9)를 ISO 문자열로 계산
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const tomorrow = new Date(kstNow);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  tomorrow.setUTCHours(0, 0, 0, 0);
+  // KST 00:00 → UTC 기준 -9h
+  const resetUtc = new Date(tomorrow.getTime() - 9 * 60 * 60 * 1000);
+  return resetUtc.toISOString();
+}
 
 Deno.serve(async (req: Request) => {
   // CORS
@@ -88,17 +107,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Rate limit check (50 per day per user)
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] Feature-scoped rate limit
+    // feature 컬럼으로 필터링하여 qa 5회/일, 나머지 20회/일 (feature 간 카운트 격리)
+    const limit = DAILY_LIMITS[feature] ?? DEFAULT_DAILY_LIMIT;
     const today = new Date().toISOString().split('T')[0];
     const { count } = await supabase
       .from('ai_conversations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
+      .eq('feature', feature)
       .gte('created_at', `${today}T00:00:00Z`);
 
-    if ((count ?? 0) >= DAILY_LIMIT) {
+    const usedToday = count ?? 0;
+    if (usedToday >= limit) {
+      const isQa = feature === 'qa';
+      const friendlyMsg = isQa
+        ? `오늘의 AI Q&A 질문 ${limit}회를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`
+        : `오늘의 AI 사용 한도(${limit}회)를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`;
       return new Response(
-        JSON.stringify({ error: `일일 AI 사용 한도(${DAILY_LIMIT}회)를 초과했습니다. 내일 다시 이용해주세요.` }),
+        JSON.stringify({
+          error: friendlyMsg,
+          remaining: 0,
+          limit,
+          feature,
+          resetAt: getSeoulResetAt(),
+        }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -133,8 +166,10 @@ Deno.serve(async (req: Request) => {
       console.warn('Failed to save conversation:', saveError);
     }
 
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] 성공 응답에 remaining 포함 (클라이언트 카운터용)
+    const remaining = Math.max(0, limit - (usedToday + 1));
     return new Response(
-      JSON.stringify({ reply, feature }),
+      JSON.stringify({ reply, feature, remaining, limit }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {

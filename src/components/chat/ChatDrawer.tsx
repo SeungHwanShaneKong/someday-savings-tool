@@ -1,8 +1,10 @@
+// [CL-QA-50-SWEEP-20260408-133000] SheetDescription 추가 — Radix a11y 경고 해소
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Maximize2, Trash2 } from 'lucide-react';
@@ -26,6 +28,10 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
     sendMessage,
     clearMessages,
     messagesEndRef,
+    // [CL-AI-CHAT-LIMIT5-20260408-100500] qa 5/일 카운터
+    remainingToday,
+    dailyLimit,
+    limitReached,
   } = useAIChat({ feature: 'qa' });
 
   const handleFullScreen = () => {
@@ -48,6 +54,10 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
           <SheetTitle className="text-sm font-semibold flex items-center gap-2">
             💬 웨딩셈 Q&A
           </SheetTitle>
+          {/* [CL-QA-50-SWEEP-20260408-133000] Screen-reader description (시각적으로 숨김) */}
+          <SheetDescription className="sr-only">
+            결혼 준비에 대한 질문을 입력하면 AI가 답변해드립니다. 하루 5회까지 이용 가능합니다.
+          </SheetDescription>
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
               <Button
@@ -77,8 +87,13 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
           onSend={sendMessage}
           messagesEndRef={messagesEndRef}
           placeholder="결혼 준비에 대해 무엇이든 물어보세요..."
-          welcomeMessage="안녕하세요! 결혼 준비에 관해 무엇이든 물어보세요 😊 예식장 비용, 스드메 팁, 일정 관리 등 도움이 필요하시면 말씀해 주세요!"
+          welcomeMessage="안녕하세요! 결혼 준비에 관해 무엇이든 물어보세요 😊 예식장 비용, 스드메 팁, 일정 관리 등 도움이 필요하시면 말씀해 주세요! (하루 5회 질문 가능)"
           className={isMobile ? 'h-[calc(80vh-52px)]' : 'h-[calc(100vh-52px)]'}
+          // [CL-AI-CHAT-LIMIT5-20260408-100500]
+          remainingToday={remainingToday}
+          dailyLimit={dailyLimit}
+          limitReached={limitReached}
+          showLimitCounter={true}
         />
       </SheetContent>
     </Sheet>

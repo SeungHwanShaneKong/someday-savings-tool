@@ -579,7 +579,11 @@ export function PlanStep({ selectedDestinations: initialDests, onComplete }: Pla
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate('/budget')}
+                  onClick={() => {
+                    // [CL-HONEYMOON-BACK-STATE-20260408-100500] 복귀 시 추천/플랜 데이터 보존
+                    sessionStorage.setItem('honeymoon-returning', '1');
+                    navigate('/budget');
+                  }}
                   className="gap-1.5"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -606,7 +610,10 @@ export function PlanStep({ selectedDestinations: initialDests, onComplete }: Pla
                 </Button>
                 {!activeBudgetId && (
                   <p className="text-[11px] text-orange-500">
-                    * 예산을 먼저 생성해주세요. <button onClick={() => navigate('/budget')} className="underline">예산 페이지로 이동</button>
+                    * 예산을 먼저 생성해주세요. <button onClick={() => {
+                      sessionStorage.setItem('honeymoon-returning', '1');
+                      navigate('/budget');
+                    }} className="underline">예산 페이지로 이동</button>
                   </p>
                 )}
               </div>

@@ -300,9 +300,15 @@ export function useMultipleBudgets() {
     }
 
     try {
+      // [CL-FK-BUDGET-DELETE-20260412-124100] Unlink checklist items first (FK constraint)
+      await supabase
+        .from('user_checklist_items')
+        .update({ budget_id: null })
+        .eq('budget_id', budgetId);
+
       // Delete items first
       await supabase.from('budget_items').delete().eq('budget_id', budgetId);
-      
+
       // Delete budget
       const { error } = await supabase
         .from('budgets')
@@ -665,6 +671,14 @@ export function useMultipleBudgets() {
             });
           }
         }
+      }
+
+      // [CL-FK-BUDGET-DELETE-20260412-124100] Step 2.5: Unlink checklist items from all budgets (FK constraint)
+      for (const budget of budgets) {
+        await supabase
+          .from('user_checklist_items')
+          .update({ budget_id: null })
+          .eq('budget_id', budget.id);
       }
 
       // Step 3: Delete all OLD budget items

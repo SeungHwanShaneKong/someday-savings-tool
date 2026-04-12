@@ -143,9 +143,16 @@ export function useVersionRecovery() {
     if (budgetIds.length === 0) return true;
 
     try {
+      // [CL-FK-BUDGET-DELETE-20260412-124100] Unlink checklist items first (FK constraint)
+      await Promise.all(
+        budgetIds.map(id =>
+          supabase.from('user_checklist_items').update({ budget_id: null }).eq('budget_id', id)
+        )
+      );
+
       // Delete all items in parallel using Promise.all for speed
       await Promise.all(
-        budgetIds.map(id => 
+        budgetIds.map(id =>
           supabase.from('budget_items').delete().eq('budget_id', id)
         )
       );

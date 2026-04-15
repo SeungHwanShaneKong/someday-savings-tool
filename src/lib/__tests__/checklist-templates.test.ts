@@ -11,8 +11,9 @@ import {
 
 describe('checklist-templates', () => {
   describe('CHECKLIST_TEMPLATES', () => {
-    it('has at least 55 items', () => {
-      expect(CHECKLIST_TEMPLATES.length).toBeGreaterThanOrEqual(55);
+    // [CL-CHECKLIST-ROADMAP-STRICT-20260412-170000] 로드맵 엄격 적용 — 정확히 33개
+    it('has exactly 33 roadmap items', () => {
+      expect(CHECKLIST_TEMPLATES.length).toBe(33);
     });
 
     it('every template has required fields', () => {

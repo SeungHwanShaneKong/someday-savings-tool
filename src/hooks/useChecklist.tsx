@@ -59,6 +59,7 @@ export function useChecklist() {
   const [praiseEvent, setPraiseEvent] = useState<PraiseEvent | null>(null);
   const previousCompletedRef = useRef(0);
   const dbAvailable = useRef(true); // Tracks if user_checklist_items table exists
+  const migrationDoneRef = useRef(false); // [CL-CHECKLIST-AUTO-MIGRATE-20260412-140000] 5→9 period 마이그레이션 1회만 실행
 
   // ─── Fetch items ───
   const fetchItems = useCallback(async () => {
@@ -389,6 +390,98 @@ export function useChecklist() {
 
   const activePeriod = weddingDate ? getActivePeriod(weddingDate) : null;
 
+  // [CL-CHECKLIST-AUTO-MIGRATE-20260412-140000] Legacy 5단계 period → 9단계 자동 매핑
+  const mapLegacyPeriod = useCallback((legacyPeriod: string, title: string): ChecklistPeriod => {
+    if (legacyPeriod === 'D-12~10m') return 'D-12~10m';
+    if (legacyPeriod === 'D-9~7m') {
+      if (/예복|스냅|영상|혼주 메이크업|플래너|드레스|스튜디오|메이크업/.test(title)) return 'D-10~8m';
+      if (/혼수 목록/.test(title)) return 'D-5~4m';
+      if (/신혼여행/.test(title)) return 'D-8~6m';
+      if (/예물|예단/.test(title)) return 'D-5~4m';
+      if (/가전|가구/.test(title)) return 'D-4~3m';
+      if (/예산 중간/.test(title)) return 'D-5~4m';
+      return 'D-10~8m';
+    }
+    if (legacyPeriod === 'D-6~4m') {
+      if (/촬영|부케|드레스 셀렉|신혼집/.test(title)) return 'D-6~5m';
+      if (/항공|숙소|청첩장 스타일|예산 중간/.test(title)) return 'D-5~4m';
+      if (/예물|예단|한복|혼수|청첩장|본식 드레스|식전 영상|아버지 예복|답례품 알아보기|축가|사회자/.test(title))
+        return 'D-4~3m';
+      return 'D-5~4m';
+    }
+    if (legacyPeriod === 'D-3~2m') {
+      if (/피팅|리허설|입주|답례품 주문|예식장 최종|본식 스냅 사전|혼주 의상|신혼여행 최종/.test(title))
+        return 'D-2~1m';
+      return 'D-3~2m';
+    }
+    if (legacyPeriod === 'D-1m~D') return 'D-1~0';
+    return legacyPeriod as ChecklistPeriod;
+  }, []);
+
+  const migrateAndSync = useCallback(async () => {
+    if (!user || !weddingDate || !dbAvailable.current || migrationDoneRef.current) return;
+    if (items.length === 0) return;
+
+    migrationDoneRef.current = true; // 1회만 실행
+    const LEGACY_PERIODS = new Set(['D-9~7m', 'D-6~4m', 'D-1m~D']);
+    const NEW_PERIODS = new Set(PERIOD_ORDER as string[]);
+
+    try {
+      // 1) Legacy period → 새 period로 업데이트
+      const legacyItems = items.filter(
+        (i) => LEGACY_PERIODS.has(i.period as unknown as string) || !NEW_PERIODS.has(i.period as unknown as string)
+      );
+      if (legacyItems.length > 0) {
+        for (const item of legacyItems) {
+          const newPeriod = mapLegacyPeriod(item.period as unknown as string, item.title);
+          if (newPeriod !== (item.period as unknown as string)) {
+            await (supabase as any)
+              .from('user_checklist_items')
+              .update({ period: newPeriod, updated_at: new Date().toISOString() })
+              .eq('id', item.id);
+          }
+        }
+      }
+
+      // 2) 신규 템플릿 항목 자동 시드
+      const existingTitles = new Set(items.filter((i) => !i.is_custom).map((i) => i.title));
+      const missingTemplates = CHECKLIST_TEMPLATES.filter((t) => !existingTitles.has(t.title));
+      if (missingTemplates.length > 0) {
+        const periodTotals: Record<string, number> = {};
+        for (const t of CHECKLIST_TEMPLATES) {
+          periodTotals[t.period] = (periodTotals[t.period] || 0) + 1;
+        }
+        const newItems = missingTemplates.map((t) => ({
+          user_id: user.id,
+          budget_id: null,
+          title: t.title,
+          period: t.period,
+          sort_order: t.sortOrder,
+          is_completed: false,
+          due_date: calculateDueDate(weddingDate, t.period, t.sortOrder, periodTotals[t.period]),
+          notes: t.description || null,
+          category_link: t.categoryLink || null,
+          sub_category_link: t.subCategoryLink || null,
+          is_custom: false,
+        }));
+        await (supabase as any).from('user_checklist_items').insert(newItems);
+      }
+
+      // 3) 변경 사항 있으면 재조회
+      if (legacyItems.length > 0 || missingTemplates.length > 0) {
+        await fetchItems();
+        toast({
+          title: '체크리스트가 업데이트되었어요 ✨',
+          description: `로드맵 9단계 기준으로 ${missingTemplates.length}개 항목 추가, ${legacyItems.length}개 항목 재분류됨`,
+        });
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[useChecklist] 자동 마이그레이션 실패:', msg);
+      migrationDoneRef.current = false; // 실패 시 다음 번에 재시도
+    }
+  }, [user, weddingDate, items, fetchItems, mapLegacyPeriod, toast]);
+
   // ─── Effects ───
   useEffect(() => {
     if (user) {
@@ -405,6 +498,13 @@ export function useChecklist() {
       generateFromTemplates();
     }
   }, [user, weddingDate, items.length, loading, generateFromTemplates]);
+
+  // [CL-CHECKLIST-AUTO-MIGRATE-20260412-140000] 기존 사용자 자동 업그레이드 (5→9 period + 신규 템플릿 시드)
+  useEffect(() => {
+    if (user && weddingDate && items.length > 0 && !loading && !migrationDoneRef.current) {
+      migrateAndSync();
+    }
+  }, [user, weddingDate, items, loading, migrateAndSync]);
 
   // Initialize previous completed count on first load
   useEffect(() => {

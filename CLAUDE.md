@@ -41,6 +41,7 @@ src/
 - **100인 에이전트 MECE 팀**: 프로젝트에 최적화된 100개 MECE 역할 에이전트 상시 구성. 모든 업무마다 가장 적합한 11인을 선발하여 팀 편성. 반드시 1인은 **Supervisor/PM** 역할로 각 에이전트가 불필요한 방향으로 빠지지 않도록 코칭하며 최고 성과 달성
 - **더 나은 방안 제시**: 사용자의 명령이 최고라고 단순히 따르지 말고, 항상 더 좋은 대안을 분석·제시한 뒤 수행. 사용자가 미처 고려하지 못한 개선점, 리스크, 최적화 기회를 선제적으로 도출
 - **Agentic 10x 계획**: Claude Code Agentic Harness 기반이되, 10배 우수한 형식으로 계획 수립. 전체 코드를 완벽하게 이해한 상태에서 아주 구체적인 계획으로 세심하고 꼼꼼하게 확인 후 수행
+- **로그 확인 필수**: 계획대로 작동하지 않거나 오류 발생 시, **무조건 로그 데이터**(console, Edge Function logs, Supabase logs, browser DevTools, 빌드 출력, 진단 메시지)를 먼저 확인한 뒤 해결책 도출. 추측 기반 수정 금지
 - **전체 코드 완전성**: 수정 시 프로젝트 전체를 유기적으로 검토하여 이슈 없이 작동하도록 작성
 - **3회 검증**: 수정 완료 전 서로 다른 시나리오로 3번 확인 후 정상 작동 시에만 완료 처리
 - **이슈 투명성**: 이슈 발생 시 원인과 해결책을 함께 제공하고, 직접 실행하여 해결
@@ -289,3 +290,11 @@ src/
 - **문제**: ChatDrawer(Sheet 기반)가 `<SheetTitle>`만 렌더하고 `<SheetDescription>`을 누락 → Radix DialogContent가 콘솔에 `Missing Description or aria-describedby={undefined}` 경고 반복 출력
 - **교훈**: Radix Sheet/Dialog는 WCAG 접근성 준수를 위해 `aria-describedby`가 존재하지 않는 DOM 노드를 가리키면 런타임 경고. 시각적으로 노출할 설명이 없더라도 `<SheetDescription className="sr-only">`로 스크린리더 전용 설명을 제공해야 경고 해소 + 접근성 동시 확보
 - **패턴**: `import { SheetDescription } from '@/components/ui/sheet'` + `<SheetHeader>` 안에 `<SheetDescription className="sr-only">설명 텍스트</SheetDescription>` 추가. Tailwind `sr-only`는 `position:absolute; w:1px; h:1px; overflow:hidden`로 시각적 숨김 유지하며 스크린리더에는 노출
+
+### [CL-FK-BUDGET-DELETE-20260412-124100] FK 제약 조건 vs 클라이언트 삭제 순서
+- **교훈**: FK 참조 테이블이 여러 개인 엔티티 삭제 시 (1) DB `ON DELETE` 정책 + (2) 클라이언트 사전 cleanup 이중 방어 필수
+- **패턴**: `deleteBudget`/`resetBudget`/`batchDeleteBudgets` 3곳에서 `user_checklist_items` `update({budget_id: null})` 먼저 → budget 삭제. DB 마이그레이션으로 `ON DELETE SET NULL` 추가
+
+### [CL-CHECKLIST-9PERIOD-20260412-130000] Period 타입 5→9 확장 시 전방위 영향
+- **교훈**: 유니온 타입 확장 리팩토링은 타입 정의/상수 맵/템플릿 배열/분기 로직/테스트/DB 마이그레이션이 동시 일치해야 TS 통과. grep으로 기존 리터럴 전수 조사 후 일괄 치환 필수
+- **패턴**: ① 타입 먼저 수정 → TS 컴파일러가 영향 위치 표시 → ② 일괄 수정 → ③ `npm run build` 검증 → ④ 기존 DB는 `CASE WHEN title ILIKE '%X%'` 기반 무손실 매핑 SQL

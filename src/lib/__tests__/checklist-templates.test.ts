@@ -51,8 +51,9 @@ describe('checklist-templates', () => {
   });
 
   describe('PERIOD_ORDER', () => {
-    it('has exactly 5 periods', () => {
-      expect(PERIOD_ORDER.length).toBe(5);
+    // [CL-CHECKLIST-9PERIOD-20260412-130000] 5 → 9 periods
+    it('has exactly 9 periods', () => {
+      expect(PERIOD_ORDER.length).toBe(9);
     });
 
     it('is in chronological order (earliest first)', () => {
@@ -82,18 +83,19 @@ describe('checklist-templates', () => {
       expect(result).toBe('D-12~10m');
     });
 
-    it('returns D-9~7m for wedding 8 months away', () => {
+    // [CL-CHECKLIST-9PERIOD-20260412-130000] 9단계 분기 테스트
+    it('returns D-8~6m for wedding 7 months away', () => {
       const futureDate = new Date();
-      futureDate.setMonth(futureDate.getMonth() + 8);
+      futureDate.setDate(futureDate.getDate() + 213); // ~7 months
       const result = getActivePeriod(futureDate.toISOString().split('T')[0]);
-      expect(result).toBe('D-9~7m');
+      expect(result).toBe('D-8~6m');
     });
 
-    it('returns D-6~4m for wedding 5 months away', () => {
+    it('returns D-5~4m for wedding 4.5 months away', () => {
       const futureDate = new Date();
-      futureDate.setMonth(futureDate.getMonth() + 5);
+      futureDate.setDate(futureDate.getDate() + 137); // ~4.5 months
       const result = getActivePeriod(futureDate.toISOString().split('T')[0]);
-      expect(result).toBe('D-6~4m');
+      expect(result).toBe('D-5~4m');
     });
 
     it('returns D-3~2m for wedding 2.5 months away', () => {
@@ -103,11 +105,11 @@ describe('checklist-templates', () => {
       expect(result).toBe('D-3~2m');
     });
 
-    it('returns D-1m~D for wedding 2 weeks away', () => {
+    it('returns D-1~0 for wedding 2 weeks away', () => {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 14);
       const result = getActivePeriod(futureDate.toISOString().split('T')[0]);
-      expect(result).toBe('D-1m~D');
+      expect(result).toBe('D-1~0');
     });
 
     it('returns null for past wedding date (>1 month ago)', () => {
@@ -132,8 +134,8 @@ describe('checklist-templates', () => {
     });
 
     it('later sort orders produce later due dates within same period', () => {
-      const early = calculateDueDate(weddingDate, 'D-6~4m', 1, 5);
-      const late = calculateDueDate(weddingDate, 'D-6~4m', 5, 5);
+      const early = calculateDueDate(weddingDate, 'D-5~4m', 1, 5);
+      const late = calculateDueDate(weddingDate, 'D-5~4m', 5, 5);
       expect(new Date(early) <= new Date(late)).toBe(true);
     });
 

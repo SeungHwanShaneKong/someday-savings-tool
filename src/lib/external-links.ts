@@ -3,7 +3,7 @@ export const EXTERNAL_URLS = {
   honeymoon: 'https://honeymoon.moderninsightspot.com',
 } as const;
 
-/** 허니문 큐레이션 외부 사이트를 새 탭으로 열기 */
+/** 허니문 큐레이션 외부 사이트로 같은 탭에서 이동 [CL-HONEYMOON-SAMETAB-20260416-224500] */
 export function openHoneymoon() {
-  window.open(EXTERNAL_URLS.honeymoon, '_blank', 'noopener,noreferrer');
+  window.location.href = EXTERNAL_URLS.honeymoon;
 }

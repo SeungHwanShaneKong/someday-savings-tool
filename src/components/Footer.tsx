@@ -34,8 +34,6 @@ export default function Footer() {
                 <li>
                   <a
                     href={EXTERNAL_URLS.honeymoon}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     AI 허니문 큐레이션

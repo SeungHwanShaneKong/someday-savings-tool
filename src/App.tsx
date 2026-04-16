@@ -12,6 +12,7 @@ import { UpdateNotice } from "@/components/UpdateNotice";
 import { ChatFab } from "@/components/chat/ChatFab";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { EXTERNAL_URLS } from "@/lib/external-links"; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 
 /* ─── Static import: Landing (첫 화면 LCP 최적화) ─── */
 import Landing from "./pages/Landing";
@@ -22,7 +23,7 @@ const BudgetFlow = lazy(() => import("./pages/BudgetFlow"));
 const Summary = lazy(() => import("./pages/Summary"));
 const SharedBudget = lazy(() => import("./pages/SharedBudget"));
 const Checklist = lazy(() => import("./pages/Checklist"));
-const Honeymoon = lazy(() => import("./pages/Honeymoon"));
+// [CL-HONEYMOON-EXTERNAL-20260416-221500] Honeymoon lazy import 제거 → 외부 리다이렉트
 const Chat = lazy(() => import("./pages/Chat"));
 const Admin = lazy(() => import("./pages/Admin"));
 const FAQ = lazy(() => import("./pages/FAQ"));
@@ -30,6 +31,12 @@ const Guide = lazy(() => import("./pages/Guide"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
+
+// [CL-HONEYMOON-EXTERNAL-20260416-221500] /honeymoon 직접 접속 → 외부 사이트 리다이렉트
+function HoneymoonRedirect() {
+  useEffect(() => { window.location.href = EXTERNAL_URLS.honeymoon; }, []);
+  return <LoadingSpinner />;
+}
 
 function AppRoutes() {
   usePageTracking();
@@ -51,7 +58,7 @@ function AppRoutes() {
           <Route path="/budget" element={<BudgetFlow />} />
           <Route path="/summary" element={<Summary />} />
           <Route path="/checklist" element={<Checklist />} />
-          <Route path="/honeymoon" element={<Honeymoon />} />
+          <Route path="/honeymoon" element={<HoneymoonRedirect />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/shared/:token" element={<SharedBudget />} />
           <Route path="/admin" element={<Admin />} />

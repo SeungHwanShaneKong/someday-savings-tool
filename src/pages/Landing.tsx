@@ -25,6 +25,7 @@ import {
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
 import { useSEO } from '@/hooks/useSEO';
+import { EXTERNAL_URLS, openHoneymoon } from '@/lib/external-links';
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -35,6 +36,7 @@ interface Feature {
   gradient: string;
   iconColor: string;
   link?: string;
+  externalLink?: string; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 }
 
 // [CL-LANDING-CONCISE-20260403] 예산요약 저장 & 공유 제거 + 설명 간결화
@@ -73,7 +75,7 @@ const FEATURES: Feature[] = [
     isAI: true,
     gradient: 'from-amber-500/10 to-amber-600/5',
     iconColor: 'text-amber-500',
-    link: '/honeymoon',
+    externalLink: EXTERNAL_URLS.honeymoon, // [CL-HONEYMOON-EXTERNAL-20260416-221500]
   },
   {
     icon: MessageCircle,
@@ -281,7 +283,7 @@ export default function Landing() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {FEATURES.map((feature, idx) => (
               <div key={feature.title} className={cn(idx === FEATURES.length - 1 && FEATURES.length % 2 === 1 && 'sm:col-span-2')}>
-                <FeatureCard feature={feature} onNavigate={feature.link ? () => navigate(feature.link!) : undefined} />
+                <FeatureCard feature={feature} onNavigate={feature.externalLink ? () => openHoneymoon() : feature.link ? () => navigate(feature.link!) : undefined} />
               </div>
             ))}
           </div>

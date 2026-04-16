@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FeatureRequestButton } from '@/components/FeatureRequestButton';
+import { EXTERNAL_URLS } from '@/lib/external-links'; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 
 export default function Footer() {
   return (
@@ -29,13 +30,16 @@ export default function Footer() {
                     D-day 체크리스트 AI
                   </Link>
                 </li>
+                {/* [CL-HONEYMOON-EXTERNAL-20260416-221500] 외부 사이트로 이동 */}
                 <li>
-                  <Link
-                    to="/honeymoon"
+                  <a
+                    href={EXTERNAL_URLS.honeymoon}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     AI 허니문 큐레이션
-                  </Link>
+                  </a>
                 </li>
                 <li>
                   <Link

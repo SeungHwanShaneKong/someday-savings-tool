@@ -36,7 +36,7 @@ export function ItineraryExport({ destinations, captureRef }: ItineraryExportPro
     text += '\n━━━━━━━━━━━━━━━━━━━━\n';
     text += `📊 총 일정: ${totalNights}박\n`;
     text += `💰 총 예산: ${formatKoreanWon(totalMin)} ~ ${formatKoreanWon(totalMax)}\n`;
-    text += '\n🔗 wedsem.moderninsightspot.com/honeymoon';
+    text += '\n🔗 honeymoon.moderninsightspot.com'; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 
     return text;
   }, [destinations]);

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { Plus, Pencil, Check, X, Users, Trash2, ChevronDown, ChevronUp, GripVertical, Sparkles } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { openHoneymoon } from '@/lib/external-links'; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
@@ -86,7 +86,6 @@ export function BudgetTableMobile({
   onDeleteItem,
   onCostSplitChange
 }: BudgetTableMobileProps) {
-  const navigate = useNavigate();
   const { orderedCategories, reorderCategories } = useCategoryOrder();
   
   // Expanded categories state
@@ -346,8 +345,8 @@ export function BudgetTableMobile({
                             <span
                               role="link"
                               tabIndex={0}
-                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate('/honeymoon'); }}
-                              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); navigate('/honeymoon'); } }}
+                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); openHoneymoon(); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); openHoneymoon(); } }}
                               className="flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full hover:bg-primary/20 transition-colors animate-pulse-subtle cursor-pointer"
                             >
                               <Sparkles className="w-3 h-3" />

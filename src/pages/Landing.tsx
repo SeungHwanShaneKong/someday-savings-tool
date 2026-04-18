@@ -388,6 +388,7 @@ const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: 
 
   return (
     <Card
+      ref={ref}
       className={cn(
         'p-4 transition-all duration-200 hover:shadow-toss hover:scale-[1.02]',
         feature.isAI && 'ai-glow border-primary/20',
@@ -437,4 +438,4 @@ const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: 
       </div>
     </Card>
   );
-}
+});

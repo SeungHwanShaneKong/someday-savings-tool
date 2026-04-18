@@ -19,7 +19,7 @@ interface ChatDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function ChatDrawer({ open, onOpenChange }, ref) {
+export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function ChatDrawer({ open, onOpenChange }, _ref) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -43,7 +43,6 @@ export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function C
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        ref={ref}
         side={isMobile ? 'bottom' : 'left'}
         className={
           isMobile

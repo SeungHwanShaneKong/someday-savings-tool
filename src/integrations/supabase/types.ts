@@ -438,7 +438,6 @@ export type Database = {
         Row: {
           created_at: string
           display_name: string | null
-          gamification_state: Json
           id: string
           updated_at: string
           user_id: string
@@ -446,7 +445,6 @@ export type Database = {
         Insert: {
           created_at?: string
           display_name?: string | null
-          gamification_state?: Json
           id?: string
           updated_at?: string
           user_id: string
@@ -454,86 +452,11 @@ export type Database = {
         Update: {
           created_at?: string
           display_name?: string | null
-          gamification_state?: Json
           id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
-      }
-      badge_definitions: {
-        Row: {
-          id: string
-          slug: string
-          name_ko: string
-          description: string
-          icon_emoji: string
-          category: string
-          rarity: string
-          points_reward: number
-          unlock_rule: Json
-          display_order: number
-          is_active: boolean
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          slug: string
-          name_ko: string
-          description: string
-          icon_emoji: string
-          category: string
-          rarity: string
-          points_reward?: number
-          unlock_rule: Json
-          display_order?: number
-          is_active?: boolean
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          slug?: string
-          name_ko?: string
-          description?: string
-          icon_emoji?: string
-          category?: string
-          rarity?: string
-          points_reward?: number
-          unlock_rule?: Json
-          display_order?: number
-          is_active?: boolean
-          created_at?: string
-        }
-        Relationships: []
-      }
-      user_earned_badges: {
-        Row: {
-          id: string
-          user_id: string
-          badge_id: string
-          earned_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          badge_id: string
-          earned_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          badge_id?: string
-          earned_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_earned_badges_badge_id_fkey"
-            columns: ["badge_id"]
-            isOneToOne: false
-            referencedRelation: "badge_definitions"
-            referencedColumns: ["id"]
-          }
-        ]
       }
       shared_budgets: {
         Row: {
@@ -707,10 +630,6 @@ export type Database = {
       is_budget_collaborator: {
         Args: { p_budget_id: string; p_user_id?: string }
         Returns: boolean
-      }
-      get_cohort_percentile: {
-        Args: { p_user_id: string; p_metric: string }
-        Returns: { percentile: number; cohort_size: number }[]
       }
     }
     Enums: {

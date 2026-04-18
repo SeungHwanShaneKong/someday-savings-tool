@@ -1,1 +1,21 @@
 project_id = "qllsuouxeojhwgonwpqb"
+
+# [CL-SEC-HARDEN-20260418-214623] 함수별 JWT 검증 정책 명시화
+# Supabase 기본값은 `verify_jwt = true`이지만, 인증 전 호출이 필요한 함수는
+# verify_jwt=false + 코드 레벨 5-layer defense로 보호합니다.
+#
+# 보안 원칙:
+#  - 기본은 verify_jwt = true (명시적으로 false 설정한 함수만 예외)
+#  - verify_jwt = false인 함수는 반드시 자체 인증/rate limit/감사 로그 구현
+#  - 프로덕션 배포 전에 각 함수의 verify_jwt 설정을 감사할 것
+
+[functions.dev-create-user]
+# 인증 전 사용자 생성 용도 (로컬 E2E 테스트 전용).
+# 자체 방어:
+#  1) ENVIRONMENT != 'production' 확인 (프로덕션에서는 404)
+#  2) X-Dev-Test-Token 공유 시크릿 헤더 검증
+#  3) IP 기반 rate limit (1분 5회)
+#  4) 이메일 패턴 화이트리스트 (@wedsem-local.dev 한정)
+#  5) 모든 시도 감사 로그
+# 배포 전 반드시 DEV_CREATE_USER_TOKEN secret을 Edge 프로젝트에 설정.
+verify_jwt = false

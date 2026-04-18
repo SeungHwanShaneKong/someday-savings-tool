@@ -30,6 +30,9 @@ import { EXTERNAL_URLS, openExternalLink } from '@/lib/external-links'; // [CL-G
 // [CL-AI-EXTNAV-OVERLAY-20260418-205622] AI 외부 이동 로딩 UX
 import { AIExternalNavigationOverlay } from '@/components/AIExternalNavigationOverlay';
 import { useAIExternalNavigation } from '@/hooks/useAIExternalNavigation';
+// [CL-GAMIFY-INT-20260418-222329] 로그인 streak 노출
+import { StreakFlame } from '@/components/gamification/StreakFlame';
+import { useStreak } from '@/hooks/useStreak';
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -121,6 +124,9 @@ export default function Landing() {
 
   // [CL-AI-EXTNAV-OVERLAY-20260418-205622] AI 외부 카드 이동 대기 UX
   const { overlayProps, startNavigation } = useAIExternalNavigation();
+
+  // [CL-GAMIFY-INT-20260418-222329] 로그인 streak 계산 (인증 시에만 활성화)
+  const streak = useStreak();
 
   // 랜딩 페이지 진입 시 인앱 브라우저 감지 → 다중 탈출 전략 실행
   useEffect(() => {
@@ -374,10 +380,26 @@ export default function Landing() {
             </div>
             <div className="w-px h-8 bg-border" />
             <div className="text-center flex-1">
-              <p className="text-lg sm:text-2xl font-bold text-primary">무료</p>
-              <p className="text-[11px] sm:text-xs text-muted-foreground">
-                평생 비용
-              </p>
+              {/* [CL-GAMIFY-INT-20260418-222329] 로그인 streak 노출 — 로그인 유저만 */}
+              {user && !streak.isLoading && streak.loginStreakDays > 0 ? (
+                <div className="flex flex-col items-center justify-center gap-1">
+                  <StreakFlame
+                    days={streak.loginStreakDays}
+                    variant="login"
+                    size="sm"
+                  />
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
+                    연속 로그인
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-lg sm:text-2xl font-bold text-primary">무료</p>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
+                    평생 비용
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

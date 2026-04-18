@@ -217,9 +217,7 @@ src/
 - **패턴**: ①우승지 자동 선택 + flyTo ②AI 추천 Top 3 자동 비교 추가 ③우승지 배너(썸네일+프로필) 표시
 
 ### [CL-TIMELINE-FALLBACK-20260403] Edge Function 실패 시 로컬 폴백 패턴
-- **문제**: AI 일정 최적화 Edge Function 호출 실패 → 에러 다이얼로그만 표시 (막다른 골목 UX)
-- **교훈**: 외부 AI API 의존 기능은 반드시 로컬 폴백을 준비할 것. 에러 화면 대신 로컬 데이터로 즉시 대안 제공 → "AI 버전 받기" 업그레이드 유도
-- **패턴**: `buildTimelineFallback()` — CHECKLIST_TEMPLATES + PERIOD_MONTH_OFFSETS로 클라이언트 사이드 타임라인 생성. `isFallback` state로 폴백/AI 결과 구분. catch 블록에서 에러 설정 + 폴백 결과 동시 설정
+- **교훈**: 외부 AI API 의존 기능은 반드시 로컬 폴백(`buildTimelineFallback()`: CHECKLIST_TEMPLATES + PERIOD_MONTH_OFFSETS 기반 클라이언트 생성)을 준비. 에러 다이얼로그 대신 로컬 데이터로 즉시 대안 제공 + `isFallback` state로 폴백/AI 결과 구분. catch에서 에러+폴백 동시 설정.
 
 ### [CL-TREE-REDESIGN-20260403] 트리 구조 도입 시 스타일/제어 충돌
 - **교훈**: ①pseudo-element 트리 커넥터는 자식의 `border-l-*` 긴급도 스타일과 충돌 → `ring-*` + `bg-*/5`로 대체. ②부모→자식 일괄 펼치기/접기는 `forceExpand: boolean | null` 패턴(null=개별, 500ms 후 null 리셋으로 개별 제어 복원).
@@ -293,5 +291,10 @@ src/
 - **패턴**: ① 타입 먼저 수정 → TS 컴파일러가 영향 위치 표시 → ② 일괄 수정 → ③ `npm run build` 검증 → ④ 기존 DB는 `CASE WHEN title ILIKE '%X%'` 기반 무손실 매핑 SQL
 
 ### [CL-AI-EXTNAV-OVERLAY-20260418-205622] 외부 도메인 전환 시 AI 로딩 오버레이
-- **교훈**: SPA에서 `window.location.href = externalURL`로 다른 도메인 이동 시 평균 500ms~3s 공백 동안 시각 피드백 부재 → 브랜딩/UX 붕괴. ①400ms 지연 후 navigation(entry 애니메이션 보장) ②풀스크린 portal 오버레이 ③단계별 메시지 로테이션(1.1s 간격) ④`<link rel="preconnect">` 선제 주입(TCP 핸드셰이크 선제 완료) ⑤8초 safety timeout + 토스트 fallback 5종 세트 필수.
-- **패턴**: `useAIExternalNavigation` 훅 + `AIExternalNavigationOverlay`(createPortal) + `Feature.aiLoadingTitle` Opt-in 필드. `pageshow`/`visibilitychange` 이벤트로 bfcache 복원 시 유령 오버레이 방지. z-index는 toast viewport(z-100) 하위인 z-[90] 사용.
+- **교훈**: SPA에서 `window.location.href = externalURL`로 다른 도메인 이동 시 평균 500ms~3s 공백 동안 시각 피드백 부재 → 브랜딩/UX 붕괴. ①400ms 지연 후 navigation(entry 애니메이션 보장) ②풀스크린 portal 오버레이 ③단계별 메시지 로테이션(1.1s 간격) ④`<link rel="preconnect">` 선제 주입 ⑤8초 safety timeout 5종 세트 필수. z-index는 toast viewport(z-100) 하위인 z-[90] 사용.
+
+### [CL-SEC-HARDEN-20260418-214623] 오픈 리디렉트 + 무인증 Edge Function Defense-in-Depth
+- **교훈**: ①`window.location.href = userInput` 패턴은 반드시 origin allowlist + HTTPS-only + URL 파싱 3중 검증. ②service_role 쓰는 Edge Function은 `ENVIRONMENT` 가드 + 공유 시크릿 헤더 + IP rate limit + 이메일 regex + 감사 로그 5층 방어 필수. 빈 문자열/javascript:/data: 페이로드까지 Vitest로 커버.
+
+### [CL-GAMIFY-INT-20260418-222329] 게이미피케이션 Foundation + QA50 테스트 발견
+- **교훈**: ①4개 게이미피케이션 기능은 공용 Foundation(gamification_state JSONB + 2 테이블 + 순수 함수 + 훅 + 컴포넌트) 1회 구축으로 기능 레이어 경량화. Supabase types.ts는 마이그레이션 미적용에도 수동 확장으로 타입-safe 개발 가능(배포 후 regen 동일). Rule-engine은 discriminated union + `_exhaustive: never` 타입체크. ②Vitest + RTL 조합에서 Windows 환경 OOM 빈번 — 해결: `NODE_OPTIONS=--max-old-space-size=4096` + setup.ts에 `afterEach(cleanup)` 추가. ③테스트로 발견된 실제 버그: streak-calc에서 미래 날짜(timezone 오차)를 필터링하지 않아 ahead-looking streak 버그 → `filter((d) => daysBetween(d, today) >= 0)` 추가로 수정.

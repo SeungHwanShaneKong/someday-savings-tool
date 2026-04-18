@@ -1,9 +1,12 @@
 // [CL-AI-HIERARCHY-20260308-163000]
 // [CL-TREE-REDESIGN-20260403] 긴급 항목 뱃지 추가
+// [CL-GAMIFY-INT-20260418-222329] 체크리스트 streak 노출
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import type { ChecklistStats } from '@/hooks/useChecklist';
+import { StreakFlame } from '@/components/gamification/StreakFlame';
+import { useStreak } from '@/hooks/useStreak';
 
 interface ChecklistProgressProps {
   stats: ChecklistStats;
@@ -19,8 +22,23 @@ function getBarColor(percentage: number): string {
 }
 
 export function ChecklistProgress({ stats, overdueCount = 0, urgentCount = 0, soonCount = 0 }: ChecklistProgressProps) {
+  // [CL-GAMIFY-INT-20260418-222329] 체크리스트 완료 연속일 노출
+  const streak = useStreak();
+
   return (
     <div className="bg-card rounded-2xl border border-border p-5 sm:p-6 lg:p-8 shadow-toss-sm animate-fade-up">
+      {/* [CL-GAMIFY-INT-20260418-222329] 체크리스트 streak 배너 (0일이 아닐 때만 노출) */}
+      {!streak.isLoading && streak.checklistStreakDays > 0 && (
+        <div className="flex items-center justify-end mb-3">
+          <StreakFlame
+            days={streak.checklistStreakDays}
+            variant="checklist"
+            size="md"
+            showNextMilestone
+          />
+        </div>
+      )}
+
       {/* Overall progress ring */}
       <div className="flex items-center gap-5 sm:gap-6 lg:gap-8">
         <div

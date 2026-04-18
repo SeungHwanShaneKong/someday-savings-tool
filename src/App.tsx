@@ -30,7 +30,17 @@ const FAQ = lazy(() => import("./pages/FAQ"));
 const Guide = lazy(() => import("./pages/Guide"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+// [CL-PERF-QUERY-20260418-230000] React Query 기본 설정 최적화
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,       // 5분 — 불필요 refetch 차단
+      gcTime: 10 * 60 * 1000,         // 10분 캐시 유지
+      refetchOnWindowFocus: false,     // 탭 전환 시 불필요 refetch 차단
+      retry: 1,
+    },
+  },
+});
 
 // [CL-HONEYMOON-EXTERNAL-20260416-221500] /honeymoon 직접 접속 → 외부 사이트 리다이렉트
 function HoneymoonRedirect() {

@@ -30,7 +30,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { LogoutButton } from '@/components/LogoutButton';
 import { supabase } from '@/integrations/supabase/client';
-import html2canvas from 'html2canvas';
+// [CL-PERF-HTML2CANVAS-20260418-230000] 동적 import로 전환 (99KB 절감)
 import { downloadImage } from '@/lib/download-image';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
 import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
@@ -157,6 +157,8 @@ export default function Summary() {
       const isMobile = window.innerWidth < 768;
       const scale = isMobile ? 2 : 2.5;
       
+      // [CL-PERF-HTML2CANVAS-20260418-230000] 동적 import — 클릭 시에만 99KB 로드
+      const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(clonedElement, {
         backgroundColor: '#ffffff',
         scale,

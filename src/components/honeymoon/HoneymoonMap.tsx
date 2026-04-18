@@ -1,12 +1,14 @@
+// [CL-PERF-DEPS-20260418-230000] 미사용 컴포넌트 — maplibre/react-map-gl 패키지 제거로 import 비활성화
+// 이 파일은 허니문 외부화(CL-HONEYMOON-EXTERNAL-20260416) 이후 사용되지 않음
+// import Map, { Marker, Popup, NavigationControl, Source, Layer, useMap } from 'react-map-gl/maplibre';
+// import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCallback, useState, useMemo, useEffect } from 'react';
-import Map, { Marker, Popup, NavigationControl, Source, Layer, useMap } from 'react-map-gl/maplibre';
 import { cn } from '@/lib/utils';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { MapPin } from 'lucide-react';
 import type { Destination } from '@/lib/honeymoon-destinations';
 import type { MapViewState } from '@/hooks/useHoneymoonMap';
-import 'maplibre-gl/dist/maplibre-gl.css';
 
 /** 인천공항 좌표 (비행 아크 출발점) */
 const ICN_COORDS: [number, number] = [126.45, 37.47];

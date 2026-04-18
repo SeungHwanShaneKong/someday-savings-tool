@@ -1,4 +1,5 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, createContext, useContext, ReactNode } from 'react';
+// [CL-PERF-AUTH-MEMO-20260418-230000] useCallback + useMemo 추가
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
@@ -40,9 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  // [CL-PERF-AUTH-MEMO-20260418-230000] useCallback으로 함수 안정화 — 리렌더링 연쇄 차단
+  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -53,33 +55,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-    
-    return { error };
-  };
 
-  const signIn = async (email: string, password: string) => {
+    return { error };
+  }, []);
+
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    
-    return { error };
-  };
 
-  const signInWithGoogle = async () => {
+    return { error };
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
     const { error } = await lovable.auth.signInWithOAuth('google', {
       redirect_uri: window.location.origin,
     });
-    
-    return { error: error ?? null };
-  };
 
-  const signOut = async () => {
+    return { error: error ?? null };
+  }, []);
+
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-  };
+  }, []);
+
+  // [CL-PERF-AUTH-MEMO-20260418-230000] useMemo로 컨텍스트 객체 안정화
+  const value = useMemo(() => ({
+    user, session, loading, signUp, signIn, signInWithGoogle, signOut,
+  }), [user, session, loading, signUp, signIn, signInWithGoogle, signOut]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

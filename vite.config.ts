@@ -53,10 +53,7 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-slider',
             'lucide-react',
           ],
-          // Map library (MapLibre GL — heavy, 독립적)
-          'vendor-map': [
-            'maplibre-gl',
-          ],
+          // [CL-PERF-DEPS-20260418-230000] vendor-map 제거 (maplibre 미사용)
           // Chart library (Recharts — heavy, 독립적)
           'vendor-chart': [
             'recharts',

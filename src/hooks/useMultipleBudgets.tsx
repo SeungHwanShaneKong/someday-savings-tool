@@ -861,12 +861,19 @@ export function useMultipleBudgets() {
     }
   }, [user?.id]);
 
+  // [CL-PERF-WATERFALL-20260418-230000] 중복 fetchItems 제거 — allBudgetsItems에서 파생
   useEffect(() => {
     if (activeBudgetId) {
-      fetchItems();
+      // allBudgetsItems에 이미 데이터가 있으면 중복 API 호출 제거
+      const cached = allBudgetsItems[activeBudgetId];
+      if (cached && cached.length > 0) {
+        setItems(cached);
+      } else {
+        fetchItems();
+      }
       fetchSnapshots();
     }
-  }, [activeBudgetId, fetchItems, fetchSnapshots]);
+  }, [activeBudgetId, fetchSnapshots]); // fetchItems 의존성 제거로 불필요 실행 방지
 
   return {
     budgets,

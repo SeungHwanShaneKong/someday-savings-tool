@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -382,7 +382,8 @@ export default function Landing() {
 }
 
 /* ─── Feature Card Component ─── */
-function FeatureCard({ feature, onNavigate }: { feature: Feature; onNavigate?: () => void }) {
+// [FIX-20260418-051200] forwardRef 적용 — Landing의 ref 경고 해소
+const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: () => void }>(function FeatureCard({ feature, onNavigate }, ref) {
   const Icon = feature.icon;
 
   return (

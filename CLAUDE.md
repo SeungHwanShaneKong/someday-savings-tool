@@ -221,15 +221,8 @@ src/
 - **교훈**: 외부 AI API 의존 기능은 반드시 로컬 폴백을 준비할 것. 에러 화면 대신 로컬 데이터로 즉시 대안 제공 → "AI 버전 받기" 업그레이드 유도
 - **패턴**: `buildTimelineFallback()` — CHECKLIST_TEMPLATES + PERIOD_MONTH_OFFSETS로 클라이언트 사이드 타임라인 생성. `isFallback` state로 폴백/AI 결과 구분. catch 블록에서 에러 설정 + 폴백 결과 동시 설정
 
-### [CL-TREE-REDESIGN-20260403] CSS 트리 커넥터와 기존 스타일 충돌
-- **문제**: ChecklistItem의 `border-l-4` 긴급도 스타일이 트리 커넥터 `::before`/`::after` pseudo-elements와 시각적으로 충돌
-- **교훈**: CSS pseudo-element 기반 트리 구조 도입 시, 자식 컴포넌트의 border-left 계열 스타일을 ring 또는 background로 대체해야 충돌 방지
-- **패턴**: `border-l-4 border-l-destructive` → `ring-1 ring-destructive/20 bg-destructive/5` (ring으로 대체)
-
-### [CL-TREE-REDESIGN-20260403] forceExpand 트리 제어 패턴
-- **문제**: 전체 펼치기/접기 시 각 Collapsible의 개별 open state와 충돌
-- **교훈**: 부모→자식 일괄 제어는 `forceExpand: boolean | null` 패턴 사용. null = 개별 제어, true/false = 강제. 500ms 후 null 리셋으로 개별 제어 복원
-- **패턴**: useEffect에서 forceExpand 감시 → setIsOpen 동기화. 부모에서 setTimeout(() => setGlobalExpand(null), 500)
+### [CL-TREE-REDESIGN-20260403] 트리 구조 도입 시 스타일/제어 충돌
+- **교훈**: ①pseudo-element 트리 커넥터는 자식의 `border-l-*` 긴급도 스타일과 충돌 → `ring-*` + `bg-*/5`로 대체. ②부모→자식 일괄 펼치기/접기는 `forceExpand: boolean | null` 패턴(null=개별, 500ms 후 null 리셋으로 개별 제어 복원).
 
 ### [CL-WORLDCUP-IMG-ALGO-20260405-140000] 이미지 onError 런타임 방어
 - **문제**: Unsplash URL 404 → `<img>` 태그 깨짐 → 사용자에게 빈 카드 노출
@@ -298,3 +291,7 @@ src/
 ### [CL-CHECKLIST-9PERIOD-20260412-130000] Period 타입 5→9 확장 시 전방위 영향
 - **교훈**: 유니온 타입 확장 리팩토링은 타입 정의/상수 맵/템플릿 배열/분기 로직/테스트/DB 마이그레이션이 동시 일치해야 TS 통과. grep으로 기존 리터럴 전수 조사 후 일괄 치환 필수
 - **패턴**: ① 타입 먼저 수정 → TS 컴파일러가 영향 위치 표시 → ② 일괄 수정 → ③ `npm run build` 검증 → ④ 기존 DB는 `CASE WHEN title ILIKE '%X%'` 기반 무손실 매핑 SQL
+
+### [CL-AI-EXTNAV-OVERLAY-20260418-205622] 외부 도메인 전환 시 AI 로딩 오버레이
+- **교훈**: SPA에서 `window.location.href = externalURL`로 다른 도메인 이동 시 평균 500ms~3s 공백 동안 시각 피드백 부재 → 브랜딩/UX 붕괴. ①400ms 지연 후 navigation(entry 애니메이션 보장) ②풀스크린 portal 오버레이 ③단계별 메시지 로테이션(1.1s 간격) ④`<link rel="preconnect">` 선제 주입(TCP 핸드셰이크 선제 완료) ⑤8초 safety timeout + 토스트 fallback 5종 세트 필수.
+- **패턴**: `useAIExternalNavigation` 훅 + `AIExternalNavigationOverlay`(createPortal) + `Feature.aiLoadingTitle` Opt-in 필드. `pageshow`/`visibilitychange` 이벤트로 bfcache 복원 시 유령 오버레이 방지. z-index는 toast viewport(z-100) 하위인 z-[90] 사용.

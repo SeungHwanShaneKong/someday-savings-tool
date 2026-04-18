@@ -27,6 +27,9 @@ import {
 } from '@/lib/kakao-browser';
 import { useSEO } from '@/hooks/useSEO';
 import { EXTERNAL_URLS, openExternalLink } from '@/lib/external-links'; // [CL-GIFT-CARD-20260418-240000]
+// [CL-AI-EXTNAV-OVERLAY-20260418-205622] AI 외부 이동 로딩 UX
+import { AIExternalNavigationOverlay } from '@/components/AIExternalNavigationOverlay';
+import { useAIExternalNavigation } from '@/hooks/useAIExternalNavigation';
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -38,6 +41,8 @@ interface Feature {
   iconColor: string;
   link?: string;
   externalLink?: string; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
+  // [CL-AI-EXTNAV-OVERLAY-20260418-205622] 존재 시 외부 이동 전 AI 로딩 오버레이 노출
+  aiLoadingTitle?: string;
 }
 
 // [CL-GIFT-CARD-20260418-240000] 6개 카드 2×3 대칭 그리드 + 순서 재배치
@@ -68,6 +73,7 @@ const FEATURES: Feature[] = [
     gradient: 'from-pink-500/10 to-pink-600/5',
     iconColor: 'text-pink-500',
     externalLink: EXTERNAL_URLS.gift,
+    aiLoadingTitle: 'AI가 완벽한 선물을 찾고 있어요', // [CL-AI-EXTNAV-OVERLAY-20260418-205622]
   },
   {
     icon: MapPin,
@@ -77,6 +83,7 @@ const FEATURES: Feature[] = [
     gradient: 'from-amber-500/10 to-amber-600/5',
     iconColor: 'text-amber-500',
     externalLink: EXTERNAL_URLS.honeymoon,
+    aiLoadingTitle: 'AI가 맞춤 여행지를 큐레이션하고 있어요', // [CL-AI-EXTNAV-OVERLAY-20260418-205622]
   },
   {
     icon: Brain,
@@ -112,6 +119,9 @@ export default function Landing() {
   const [showBridgeUI, setShowBridgeUI] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // [CL-AI-EXTNAV-OVERLAY-20260418-205622] AI 외부 카드 이동 대기 UX
+  const { overlayProps, startNavigation } = useAIExternalNavigation();
+
   // 랜딩 페이지 진입 시 인앱 브라우저 감지 → 다중 탈출 전략 실행
   useEffect(() => {
     if (browserInfo.isInAppBrowser) {
@@ -121,6 +131,30 @@ export default function Landing() {
       );
     }
   }, [browserInfo.isInAppBrowser]);
+
+  // [CL-AI-EXTNAV-OVERLAY-20260418-205622] 외부 AI 도메인 preconnect → 실제 이동 지연 200~400ms 단축
+  useEffect(() => {
+    const origins = [EXTERNAL_URLS.gift, EXTERNAL_URLS.honeymoon];
+    const appended: HTMLLinkElement[] = [];
+    origins.forEach((url) => {
+      try {
+        const origin = new URL(url).origin;
+        const link = document.createElement('link');
+        link.rel = 'preconnect';
+        link.href = origin;
+        link.crossOrigin = 'anonymous';
+        document.head.appendChild(link);
+        appended.push(link);
+      } catch {
+        // URL 파싱 실패 시 무시 (안전장치)
+      }
+    });
+    return () => {
+      appended.forEach((link) => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+      });
+    };
+  }, []);
 
   const handleCopyUrl = useCallback(async () => {
     const success = await copyToClipboard(window.location.href);
@@ -293,7 +327,23 @@ export default function Landing() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {FEATURES.map((feature, idx) => (
               <div key={feature.title} className={cn(idx === FEATURES.length - 1 && FEATURES.length % 2 === 1 && 'sm:col-span-2')}>
-                <FeatureCard feature={feature} onNavigate={feature.externalLink ? () => openExternalLink(feature.externalLink!) : feature.link ? () => navigate(feature.link!) : undefined} />
+                <FeatureCard
+                  feature={feature}
+                  onNavigate={
+                    // [CL-AI-EXTNAV-OVERLAY-20260418-205622] 외부 이동 + AI 로딩 Opt-in
+                    feature.externalLink && feature.aiLoadingTitle
+                      ? () =>
+                          startNavigation({
+                            url: feature.externalLink!,
+                            title: feature.aiLoadingTitle!,
+                          })
+                      : feature.externalLink
+                        ? () => openExternalLink(feature.externalLink!)
+                        : feature.link
+                          ? () => navigate(feature.link!)
+                          : undefined
+                  }
+                />
               </div>
             ))}
           </div>
@@ -377,6 +427,9 @@ export default function Landing() {
 
       {/* ─── Footer ─── */}
       <Footer />
+
+      {/* [CL-AI-EXTNAV-OVERLAY-20260418-205622] AI 외부 이동 로딩 오버레이 */}
+      <AIExternalNavigationOverlay {...overlayProps} />
     </div>
   );
 }

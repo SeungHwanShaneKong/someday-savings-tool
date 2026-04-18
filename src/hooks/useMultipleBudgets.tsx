@@ -617,6 +617,24 @@ export function useMultipleBudgets() {
     if (!user) return false;
 
     try {
+      // [CL-RESET-DATALOSS-FIX-20260418-235000] Step 0: 초기화 전 DB에서 최신 데이터 강제 fetch
+      // allBudgetsItems 캐시가 stale할 수 있으므로 DB 직접 조회로 완전성 보장
+      let latestAllItems = allBudgetsItems;
+      const { data: freshItems } = await supabase
+        .from('budget_items')
+        .select('*')
+        .in('budget_id', budgets.map(b => b.id));
+
+      if (freshItems && freshItems.length > 0) {
+        const freshGrouped: Record<string, ExtendedBudgetItem[]> = {};
+        freshItems.forEach(item => {
+          if (!freshGrouped[item.budget_id]) freshGrouped[item.budget_id] = [];
+          freshGrouped[item.budget_id].push(item as ExtendedBudgetItem);
+        });
+        setAllBudgetsItems(freshGrouped);
+        latestAllItems = freshGrouped;
+      }
+
       // Step 1: Create fresh "옵션 1" with default categories FIRST (for snapshot reference)
       const { data: newBudget, error: createError } = await supabase
         .from('budgets')
@@ -626,21 +644,23 @@ export function useMultipleBudgets() {
 
       if (createError) throw createError;
 
-      // Step 2: Create comprehensive backup of ALL old budgets using new budget as reference
+      // [CL-RESET-DATALOSS-FIX-20260418-235000] Step 2: 초기화 전 무조건 백업 — 데이터 유실 방지
+      // 기존: amount>0 || notes || is_custom 일 때만 백업 → is_paid만 체크한 경우 등 유실
+      // 수정: budgets가 1개라도 있으면 무조건 백업 (빈 데이터라도 복원 가능성 보장)
       if (saveSnapshot && budgets.length > 0) {
-        const hasAnyData = Object.values(allBudgetsItems).some(
-          items => items.some(item => item.amount > 0 || item.notes || item.is_custom)
+        const hasAnyItems = Object.values(latestAllItems).some(
+          items => items.length > 0
         );
-        
-        if (hasAnyData) {
+
+        if (hasAnyItems) {
           const snapshotName = `초기화 전 백업 (${new Date().toLocaleString('ko-KR')})`;
-          
-          // Collect all items from all OLD budgets
+
+          // Collect all items from all OLD budgets — latestAllItems 사용 (DB 최신)
           const allItemsData: FullBackupData = {
             budgets: budgets.map(budget => ({
               id: budget.id,
               name: budget.name,
-              items: allBudgetsItems[budget.id] || [],
+              items: latestAllItems[budget.id] || [],
             }))
           };
 

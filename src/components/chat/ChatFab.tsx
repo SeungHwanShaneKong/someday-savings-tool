@@ -33,10 +33,9 @@ export const ChatFab = forwardRef<HTMLButtonElement, ChatFabProps>(function Chat
         'sm:bottom-8 sm:left-6',
         // Style
         'flex items-center gap-2 pl-3.5 pr-4 py-3 sm:py-3.5 rounded-full',
-        'bg-gradient-to-r from-blue-600 to-primary',
-        'text-white font-medium text-sm',
-        'shadow-[0_4px_20px_rgba(0,80,200,0.4)]',
-        'hover:shadow-[0_6px_30px_rgba(0,80,200,0.5)]',
+        'bg-primary text-primary-foreground font-medium text-sm',
+        'shadow-lg shadow-primary/30',
+        'hover:shadow-xl hover:shadow-primary/35',
         'hover:scale-105 active:scale-95',
         'transition-all duration-200 ease-out'
       )}

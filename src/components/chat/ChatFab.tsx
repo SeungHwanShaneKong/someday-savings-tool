@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
@@ -8,11 +9,12 @@ interface ChatFabProps {
 }
 
 /**
+ * [FIX-20260418-031800] forwardRef 적용 — Preview ref 경고 해소
  * Global Q&A FAB — bottom-LEFT
  * CoffeeDonationFab pattern (bottom-RIGHT) reused but mirrored
  * Hidden on /chat page (full-screen chat) and when not authenticated
  */
-export function ChatFab({ onClick }: ChatFabProps) {
+export const ChatFab = forwardRef<HTMLButtonElement, ChatFabProps>(function ChatFab({ onClick }, ref) {
   const location = useLocation();
   const { user } = useAuth();
 
@@ -22,6 +24,7 @@ export function ChatFab({ onClick }: ChatFabProps) {
 
   return (
     <button
+      ref={ref}
       onClick={onClick}
       className={cn(
         'fixed z-40 group',
@@ -43,4 +46,4 @@ export function ChatFab({ onClick }: ChatFabProps) {
       <span className="hidden sm:inline">Q&A</span>
     </button>
   );
-}
+});

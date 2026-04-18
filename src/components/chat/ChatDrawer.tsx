@@ -1,4 +1,5 @@
 // [CL-QA-50-SWEEP-20260408-133000] SheetDescription 추가 — Radix a11y 경고 해소
+import { forwardRef } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -18,7 +19,7 @@ interface ChatDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
+export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function ChatDrawer({ open, onOpenChange }, ref) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -42,6 +43,7 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        ref={ref}
         side={isMobile ? 'bottom' : 'left'}
         className={
           isMobile
@@ -98,4 +100,4 @@ export function ChatDrawer({ open, onOpenChange }: ChatDrawerProps) {
       </SheetContent>
     </Sheet>
   );
-}
+});

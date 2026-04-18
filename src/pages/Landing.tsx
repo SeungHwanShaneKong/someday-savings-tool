@@ -15,6 +15,7 @@ import {
   Brain,
   MapPin,
   MessageCircle,
+  Gift, // [CL-GIFT-CARD-20260418-240000]
 } from 'lucide-react';
 import Footer from '@/components/Footer';
 import type { LucideIcon } from 'lucide-react';
@@ -25,7 +26,7 @@ import {
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
 import { useSEO } from '@/hooks/useSEO';
-import { EXTERNAL_URLS, openHoneymoon } from '@/lib/external-links';
+import { EXTERNAL_URLS, openExternalLink } from '@/lib/external-links'; // [CL-GIFT-CARD-20260418-240000]
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -39,7 +40,7 @@ interface Feature {
   externalLink?: string; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 }
 
-// [CL-LANDING-CONCISE-20260403] 예산요약 저장 & 공유 제거 + 설명 간결화
+// [CL-GIFT-CARD-20260418-240000] 6개 카드 2×3 대칭 그리드 + 순서 재배치
 const FEATURES: Feature[] = [
   {
     icon: Calculator,
@@ -60,13 +61,13 @@ const FEATURES: Feature[] = [
     link: '/checklist',
   },
   {
-    icon: Brain,
-    title: 'AI 비용 인사이트',
-    description: '숨겨진 비용 경고 + 절약 팁 실시간 추천',
+    icon: Gift,
+    title: '선물 추천 AI',
+    description: 'AI 기반 맞춤 선물 추천 + 예산별 큐레이션',
     isAI: true,
-    gradient: 'from-violet-500/10 to-violet-600/5',
-    iconColor: 'text-violet-500',
-    link: '/budget',
+    gradient: 'from-pink-500/10 to-pink-600/5',
+    iconColor: 'text-pink-500',
+    externalLink: EXTERNAL_URLS.gift,
   },
   {
     icon: MapPin,
@@ -75,7 +76,16 @@ const FEATURES: Feature[] = [
     isAI: true,
     gradient: 'from-amber-500/10 to-amber-600/5',
     iconColor: 'text-amber-500',
-    externalLink: EXTERNAL_URLS.honeymoon, // [CL-HONEYMOON-EXTERNAL-20260416-221500]
+    externalLink: EXTERNAL_URLS.honeymoon,
+  },
+  {
+    icon: Brain,
+    title: 'AI 비용 인사이트',
+    description: '숨겨진 비용 경고 + 절약 팁 실시간 추천',
+    isAI: true,
+    gradient: 'from-violet-500/10 to-violet-600/5',
+    iconColor: 'text-violet-500',
+    link: '/budget',
   },
   {
     icon: MessageCircle,
@@ -279,11 +289,11 @@ export default function Landing() {
           <h2 className="text-sm font-semibold text-muted-foreground text-center mb-4 tracking-wider uppercase">
             주요 기능
           </h2>
-          {/* [CL-LANDING-CONCISE-20260403] 5개 카드: 2+2+1(full-width) 레이아웃 */}
+          {/* [CL-GIFT-CARD-20260418-240000] 6개 카드: 2×3 대칭 그리드 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {FEATURES.map((feature, idx) => (
               <div key={feature.title} className={cn(idx === FEATURES.length - 1 && FEATURES.length % 2 === 1 && 'sm:col-span-2')}>
-                <FeatureCard feature={feature} onNavigate={feature.externalLink ? () => openHoneymoon() : feature.link ? () => navigate(feature.link!) : undefined} />
+                <FeatureCard feature={feature} onNavigate={feature.externalLink ? () => openExternalLink(feature.externalLink!) : feature.link ? () => navigate(feature.link!) : undefined} />
               </div>
             ))}
           </div>

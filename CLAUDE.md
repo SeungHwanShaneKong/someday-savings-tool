@@ -75,6 +75,7 @@ src/
 - 테스트: 페이지/컴포넌트는 `renderWithProviders`(MemoryRouter+QueryClient+TooltipProvider). 모든 페이지가 `<Footer/>`(중복 링크명) 렌더 → 링크/버튼 쿼리는 `within()`로 범위 스코핑. useAuth 사용 컴포넌트는 파일 상단 `vi.mock('@/hooks/useAuth', ...)`.
 
 ## Lessons Learned (가장 중요한 교훈 — 재발 방지)
+- **[CL-CF-AUTODEPLOY-20260531]** 라이브 호스팅 진단: `Server: cloudflare` 헤더만으로 "사용자=Cloudflare 사용"이라 **단정 금지** → **NS 레코드**로 실제 DNS 운영처 확인(이 프로젝트는 가비아). Lovable 앱은 Lovable=인증·빌더이고 호스팅은 별개. 커스텀 도메인 SEO 퍼블리시 정답: **Gabia 서브도메인 CNAME→`<user>.github.io`** + `gh api pages -f cname` 등록 → 인증서 자동발급 → `https_enforced=true`. `build`에 프리렌더 통합으로 어느 호스트가 `npm run build`해도 SSG 보장.
 - **[CL-QA100-BTN-20260531]** 테스트 안정화: 멀티fork×대용량heap=Windows IPC/OOM 크래시 → `singleFork`로 해결. 컴포넌트 테스트는 Supabase env `define`+전역 client mock 필수(Footer→FeatureRequestButton이 client import). 페이지마다 Footer가 동명 링크 추가 → `within()` 스코핑. 테스트가 실제 버그 발견(Footer가 `/guide`·`/faq` 슬래시 누락 → 301 hop) 후 교정.
 - **[CL-SSG-PRERENDER-20260531]** CSR SPA를 GitHub Pages 배포 시 빌드-후 Puppeteer 프리렌더가 최저 리스크(실제 브라우저=SSR 폴리필 불필요, createRoot 유지, useSEO JSON-LD 자동 캡처). 디렉터리형 출력+trailing-slash canonical, `404.html` SPA 폴백, sitemap 단일소스화. noscript는 프리렌더 후에도 남으므로 CSR 판별은 본문 마커로.
 - **[CL-GAMIFY-INT-20260418]** 공용 Foundation 1회 구축으로 기능 경량화. Supabase types.ts 수동확장으로 타입-safe(배포 후 regen 동일). Rule-engine은 discriminated union + `_exhaustive:never`. streak-calc 미래날짜 필터(`daysBetween>=0`) 누락 버그 테스트로 발견.

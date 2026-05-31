@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card';
 import { useSEO } from '@/hooks/useSEO';
 import Breadcrumb, { getBreadcrumbJsonLd } from '@/components/Breadcrumb';
 import Footer from '@/components/Footer';
+// [CL-SSG-PRERENDER-20260531] 가이드 허브 — 아티클 레지스트리 링크 (W6)
+import { ARTICLES } from '@/content/articles';
 import {
   Calculator,
   CalendarCheck,
@@ -13,6 +15,8 @@ import {
   Sparkles,
   CheckCircle2,
   ArrowLeft,
+  BookOpen,
+  ChevronRight,
 } from 'lucide-react';
 
 /* ─── Budget Category Data ─── */
@@ -129,7 +133,7 @@ const HOW_TO_STEPS = [
 /* ─── Guide Page ─── */
 export default function Guide() {
   const navigate = useNavigate();
-  const breadcrumbItems = [{ label: '결혼 예산 가이드', href: '/guide' }];
+  const breadcrumbItems = [{ label: '결혼 예산 가이드', href: '/guide/' }];
 
   const jsonLd = useMemo(
     () => [
@@ -155,7 +159,7 @@ export default function Guide() {
     title: '2026 결혼 예산 가이드 - 항목별 비용 총정리 | 웨딩셈',
     description:
       '2026년 결혼 비용 항목별 평균 가격, 비용 절약 팁, 예산 계획 5단계 가이드. 예식장, 스드메, 혼수, 신혼여행까지 총정리.',
-    path: '/guide',
+    path: '/guide/',
     jsonLd,
   });
 
@@ -303,6 +307,36 @@ export default function Guide() {
             </div>
           </section>
 
+          {/* [CL-SSG-PRERENDER-20260531] 주제별 가이드 허브 (W6) */}
+          <section className="mb-10">
+            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-primary" aria-hidden="true" />
+              주제별 심화 가이드
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+              더 깊이 있는 결혼 준비 정보를 주제별로 확인하세요.
+            </p>
+            <div className="space-y-3">
+              {ARTICLES.map((article) => (
+                <Link key={article.slug} to={`/guide/${article.slug}/`} className="block">
+                  <Card className="p-4 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold text-foreground mb-1">
+                          {article.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {article.description}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </section>
+
           {/* CTA Section */}
           <section className="text-center bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 mb-8">
             <div className="w-12 h-12 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-3">
@@ -319,7 +353,7 @@ export default function Guide() {
                 <Link to="/budget">무료로 시작하기</Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link to="/faq">자주 묻는 질문</Link>
+                <Link to="/faq/">자주 묻는 질문</Link>
               </Button>
             </div>
           </section>

@@ -28,6 +28,8 @@ const Chat = lazy(() => import("./pages/Chat"));
 const Admin = lazy(() => import("./pages/Admin"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Guide = lazy(() => import("./pages/Guide"));
+// [CL-SSG-PRERENDER-20260531] 데이터 주도 가이드 아티클 (W6) — /guide/:slug
+const Article = lazy(() => import("./pages/Article"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 // [CL-GAMIFY-INT-20260418-222329] Wedding Prep Passport 프로필 페이지
 const Profile = lazy(() => import("./pages/Profile"));
@@ -76,6 +78,8 @@ function AppRoutes() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/guide" element={<Guide />} />
+          {/* [CL-SSG-PRERENDER-20260531] 가이드 아티클 (W6) */}
+          <Route path="/guide/:slug" element={<Article />} />
           {/* [CL-GAMIFY-INT-20260418-222329] 프로필 페이지 */}
           <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />

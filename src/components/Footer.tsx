@@ -57,8 +57,9 @@ export default function Footer() {
             <nav aria-label="가이드 메뉴">
               <ul className="space-y-2">
                 <li>
+                  {/* [CL-QA100-BTN-20260531] 프리렌더 라우트는 trailing-slash로 (301 hop 방지) */}
                   <Link
-                    to="/guide"
+                    to="/guide/"
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     결혼 예산 가이드
@@ -66,7 +67,7 @@ export default function Footer() {
                 </li>
                 <li>
                   <Link
-                    to="/faq"
+                    to="/faq/"
                     className="text-sm text-muted-foreground hover:text-primary transition-colors"
                   >
                     자주 묻는 질문

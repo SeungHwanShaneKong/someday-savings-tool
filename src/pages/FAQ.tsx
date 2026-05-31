@@ -22,7 +22,7 @@ const FAQ_ITEMS: FAQItem[] = [
   {
     question: '결혼 준비 비용은 평균 얼마인가요?',
     answer:
-      '2026년 기준 한국 평균 결혼 비용은 약 2억~3억 원 수준입니다. 여기에는 예식장, 스드메(스튜디오·드레스·메이크업), 식대, 혼수, 예물, 신혼여행 등이 포함됩니다. 지역, 규모, 개인 취향에 따라 큰 차이가 있으며, 웨딩셈에서 항목별로 정확히 시뮬레이션해볼 수 있습니다.',
+      '2026년 기준 평균 결혼 비용은 신혼집(주거)을 포함하면 약 2억~3억 원이며, 이 금액의 대부분은 신혼집 마련 비용입니다. 주거를 제외한 예식장·스드메·식대·혼수·예물·신혼여행 등 결혼식 관련 비용은 약 2,100만~7,700만 원 수준입니다. 지역·규모·취향에 따라 차이가 크며, 웨딩셈에서 항목별로 정확히 시뮬레이션해볼 수 있습니다.',
   },
   {
     question: '스드메(스튜디오·드레스·메이크업) 비용은 얼마나 드나요?',
@@ -89,7 +89,7 @@ const FAQ_ITEMS: FAQItem[] = [
 /* ─── FAQ Page ─── */
 export default function FAQ() {
   const navigate = useNavigate();
-  const breadcrumbItems = [{ label: '자주 묻는 질문', href: '/faq' }];
+  const breadcrumbItems = [{ label: '자주 묻는 질문', href: '/faq/' }];
 
   // Memoize JSON-LD to prevent unnecessary re-renders
   const jsonLd = useMemo(
@@ -115,7 +115,7 @@ export default function FAQ() {
     title: '결혼 준비 자주 묻는 질문 (FAQ) - 웨딩셈',
     description:
       '결혼 비용 평균, 스드메 비용, 식대 계산, 신혼여행 예산, 예물 예산 등 결혼 준비에 관한 모든 궁금증을 해결하세요. 웨딩셈 FAQ.',
-    path: '/faq',
+    path: '/faq/',
     jsonLd,
   });
 

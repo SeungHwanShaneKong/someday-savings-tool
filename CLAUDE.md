@@ -23,7 +23,7 @@ src/
 ```
 
 ## Commands
-- `npm run dev` — 개발 서버(8080) / `npm run build` — 프로덕션 빌드 / `npm run build:ssg` — 빌드+프리렌더
+- `npm run dev` — 개발 서버(8080) / `npm run build` — **프로덕션 빌드(프리렌더 SSG 포함, Cloudflare/CI 공용)** / `npm run build:csr` — 순수 CSR 빌드
 - `npm run lint` — ESLint / `npm run test` — Vitest(1회) / `npm run test:watch`
 - **테스트 안정화**: `vitest.config.ts`는 `pool:'forks' + singleFork:true`(Windows IPC/OOM 방지) + Supabase env `define` + 전역 client mock. 대용량 `NODE_OPTIONS` heap은 멀티포크와 충돌하므로 사용 금지.
 

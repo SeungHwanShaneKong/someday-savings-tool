@@ -1,0 +1,56 @@
+# [CL-CF-AUTODEPLOY-20260531] Cloudflare Pages 자동배포 (프리렌더 SSG → 라이브 도메인)
+# 라이브 도메인 wedsem.moderninsightspot.com 은 Cloudflare Pages 가 서빙한다.
+# 기존 Direct-Upload 는 git push 로 갱신되지 않으므로, 이 워크플로가 매 push 마다
+# 프리렌더된 dist 를 wrangler 로 해당 Pages 프로젝트에 배포 → 라이브에 SEO 본문 반영.
+#
+# 필요한 리포 시크릿 (Settings ▸ Secrets and variables ▸ Actions):
+#   CLOUDFLARE_API_TOKEN    : Account ▸ Cloudflare Pages ▸ Edit 권한 토큰
+#   CLOUDFLARE_ACCOUNT_ID   : Cloudflare 계정 ID
+#   CLOUDFLARE_PROJECT_NAME : 해당 Pages 프로젝트 이름
+# 위 시크릿이 없으면 배포 단계를 자동으로 건너뛴다(실패 런 방지).
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 시크릿 존재 여부 확인(미설정 시 이후 단계 skip → 노이즈/실패 없음)
+      - name: Check Cloudflare secret
+        id: cf
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CF_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CLOUDFLARE_API_TOKEN 미설정 — Cloudflare 배포를 건너뜁니다. 시크릿 3종 추가 후 재실행하세요."
+          fi
+
+      - name: Install deps
+        if: steps.cf.outputs.enabled == 'true'
+        run: npm install
+
+      # build = vite build + puppeteer chrome 설치 + 프리렌더(자체완결, package.json)
+      - name: Build (prerender SSG)
+        if: steps.cf.outputs.enabled == 'true'
+        run: npm run build
+
+      - name: Deploy prerendered dist to Cloudflare Pages
+        if: steps.cf.outputs.enabled == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=${{ secrets.CLOUDFLARE_PROJECT_NAME }} --branch=main

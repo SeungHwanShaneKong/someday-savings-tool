@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, createContext, useContext, R
 // [CL-PERF-AUTH-MEMO-20260418-230000] useCallback + useMemo 추가
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable/index';
 
 interface AuthContextType {
   user: User | null;
@@ -68,9 +67,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   }, []);
 
+  // [CL-OAUTH-LOVABLE-BROKER-20260613-184200] Lovable 서버 브로커(/~oauth/initiate)는
+  // 정적 호스팅(GitHub Pages)에 백엔드가 없어 404 → Supabase 네이티브 OAuth로 교체.
+  // Supabase가 서버사이드 핸드셰이크를 대행하므로 정적 호스트에서도 동작.
   const signInWithGoogle = useCallback(async () => {
-    const { error } = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth` },
     });
 
     return { error: error ?? null };

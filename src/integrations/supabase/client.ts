@@ -13,5 +13,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    // [CL-OAUTH-LOVABLE-BROKER-20260613-184200] Google OAuth 복귀 시
+    // /auth?code=... 를 자동 소비해 세션 수립(정적 호스팅 안전). PKCE = same-origin verifier.
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   }
 });

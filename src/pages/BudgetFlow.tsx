@@ -31,6 +31,7 @@ import {
   Sparkles,
   Lock,
   Users,
+  UserPlus,
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -113,6 +114,8 @@ export default function BudgetFlow() {
 
   // [CL-COEDIT-E2E-20260620-130000] 개인/우리 워크스페이스 모드 (예산별 공유의 뷰 필터)
   const { mode, setMode, visibleBudgets } = useWorkspace(budgets);
+  // [CL-COEDIT-INVITE-DISCOVER-20260620] '우리' 빈 화면 → '파트너 초대하기': 개인 전환 + 첫 예산 초대 링크 1회 자동 생성 트리거
+  const [autoInvite, setAutoInvite] = useState(false);
   // 모드 전환 시 활성 예산이 현재 모드에 없으면 보정 → 개인↔공동 데이터 누수 0
   useEffect(() => {
     if (activeBudgetId && visibleBudgets.some(b => b.id === activeBudgetId)) return;
@@ -505,16 +508,30 @@ export default function BudgetFlow() {
               <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
                 개인 예산에서 파트너를 초대하면, 여기 '우리'에 나타나 함께 편집할 수 있어요.
               </p>
-              <Button onClick={() => setMode('personal')} variant="outline" className="gap-1.5">
-                <Lock className="w-4 h-4" /> 개인 예산으로 가기
-              </Button>
+              {/* [CL-COEDIT-INVITE-DISCOVER-20260620] 발견성 개선: 빈 화면에서 바로 초대(개인 전환+자동 링크 생성) */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  onClick={() => { setMode('personal'); setAutoInvite(true); }}
+                  className="gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" /> 파트너 초대하기
+                </Button>
+                <Button onClick={() => setMode('personal')} variant="outline" className="gap-1.5">
+                  <Lock className="w-4 h-4" /> 개인 예산으로 가기
+                </Button>
+              </div>
             </div>
           ) : (
           <>
             {/* [CL-COEDIT-E2E-20260620-130000] 협업 관리(활성 예산) — 초대/협업자 */}
             {activeBudget && (
               <div className="mb-4">
-                <CollaboratorManager budgetId={activeBudget.id} isOwner={isOwnerOfActive} />
+                <CollaboratorManager
+                  budgetId={activeBudget.id}
+                  isOwner={isOwnerOfActive}
+                  autoInvite={autoInvite}
+                  onAutoInviteHandled={() => setAutoInvite(false)}
+                />
               </div>
             )}
             {isMobile ? (

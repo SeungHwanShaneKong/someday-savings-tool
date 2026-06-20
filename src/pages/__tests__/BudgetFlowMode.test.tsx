@@ -104,4 +104,18 @@ describe('BudgetFlow 개인/우리 모드 분리', () => {
     expect(screen.getByText('개인옵션')).toBeInTheDocument();
     expect(screen.queryByText('우리옵션')).toBeNull();
   });
+
+  // [CL-COEDIT-INVITE-DISCOVER-20260620] 발견성 개선: 우리 빈 화면의 '파트너 초대하기' 바로가기
+  it('M5 우리 빈 상태 → "파트너 초대하기" 버튼: 클릭 시 개인 모드 전환(빈 상태 해소)', () => {
+    h.budgets = [personal('p1', '개인옵션'), personal('p2', '개인옵션2')]; // 공유 0
+    renderWithProviders(<BudgetFlow />, { route: '/budget' });
+    fireEvent.click(screen.getByRole('button', { name: '우리' }));
+    // 빈 상태에 초대 바로가기 노출
+    const shortcut = screen.getByRole('button', { name: /파트너 초대하기/ });
+    expect(shortcut).toBeInTheDocument();
+    // 클릭 → 개인 전환 → 개인 예산 노출 + 빈 상태 사라짐
+    fireEvent.click(shortcut);
+    expect(screen.getByText('개인옵션')).toBeInTheDocument();
+    expect(screen.queryByText('아직 공동 예산이 없어요')).toBeNull();
+  });
 });

@@ -3,7 +3,7 @@
 // 오너: "파트너 초대" → 초대 링크 발급·복사. 협업자 목록·해제.
 // 협업자(비오너): 목록만 표시(초대/해제 불가 — RLS+UI 이중).
 // ※ 추가형 — BudgetFlow/Summary 등에서 마운트해 사용.
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UserPlus, Copy, Check, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,12 +14,29 @@ interface CollaboratorManagerProps {
   budgetId: string | null;
   /** 현재 사용자가 이 예산의 소유자인지(초대/해제 권한) */
   isOwner: boolean;
+  /** [CL-COEDIT-INVITE-DISCOVER-20260620] 진입 즉시 초대 링크 1회 자동 생성('파트너 초대하기' 바로가기용) */
+  autoInvite?: boolean;
+  /** autoInvite 1회 처리 완료 콜백 — 부모가 플래그를 내린다 */
+  onAutoInviteHandled?: () => void;
 }
 
-export function CollaboratorManager({ budgetId, isOwner }: CollaboratorManagerProps) {
+export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled }: CollaboratorManagerProps) {
   const { collaborators, inviteUrl, busy, createInvite, removeCollaborator } = useCollaboration(budgetId);
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+
+  // [CL-COEDIT-INVITE-DISCOVER-20260620] '파트너 초대하기' 바로가기: 소유자·예산이 준비되면 초대 링크를 1회 자동 생성.
+  // 멱등(409 시 기존 토큰 재노출)·소유자 한정·inviteUrl/busy 가드로 중복 발사 없음. onAutoInviteHandled 로 부모 플래그 해제.
+  useEffect(() => {
+    if (!autoInvite) return;
+    if (isOwner && budgetId && !inviteUrl && !busy) {
+      void createInvite().then((url) => {
+        if (!url) toast({ title: '초대 링크 생성에 실패했어요', variant: 'destructive' });
+      });
+      onAutoInviteHandled?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoInvite, isOwner, budgetId, inviteUrl, busy]);
 
   const handleInvite = async () => {
     const url = await createInvite();

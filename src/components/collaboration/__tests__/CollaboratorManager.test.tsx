@@ -20,6 +20,9 @@ vi.mock('@/integrations/supabase/client', () => {
         Promise.resolve({ data: [], error: null }).then(resolve);
       return b;
     },
+    // [CL-COEDIT-PARTICIPANTS-20260620] refresh 가 get_budget_participants RPC 를 우선 호출하므로 스텁 필수.
+    // 빈 결과 → 협업자 목록 비움(이 스위트는 초대 발급/오너 게이팅/autoInvite 만 검증).
+    rpc: async () => ({ data: [], error: null }),
   };
   return { supabase };
 });

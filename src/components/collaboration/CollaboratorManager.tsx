@@ -18,9 +18,12 @@ interface CollaboratorManagerProps {
   autoInvite?: boolean;
   /** autoInvite 1회 처리 완료 콜백 — 부모가 플래그를 내린다 */
   onAutoInviteHandled?: () => void;
+  /** [CL-COEDIT-COPY-20260620] 개인 예산일 때 "복사하여 공동편집(원본 보존)" 1순위 버튼 노출 */
+  showCopyToCoedit?: boolean;
+  onCopyToCoedit?: () => void;
 }
 
-export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled }: CollaboratorManagerProps) {
+export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit }: CollaboratorManagerProps) {
   const { collaborators, inviteUrl, busy, createInvite, removeCollaborator } = useCollaboration(budgetId);
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -56,6 +59,11 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
     }
   };
 
+  // [CL-COEDIT-PARTICIPANTS-20260620] 나를 제외한 "상대" 참여자(오너 시 협업자들 / 협업자 시 오너+다른협업자).
+  // get_budget_participants RPC 가 display_name 제공 → 실제 이름 표시. 폴백 시 '파트너'.
+  const others = collaborators.filter((c) => !c.isMe);
+  const roleLabel = (role: string) => (role === 'owner' ? '관리자' : role === 'viewer' ? '뷰어' : '편집');
+
   return (
     <Card className="p-4">
       <div className="flex items-center gap-2 mb-3">
@@ -63,23 +71,30 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
         <h3 className="text-sm font-semibold text-foreground">파트너와 공동관리</h3>
       </div>
 
-      {/* 협업자 목록 */}
-      {collaborators.length > 0 ? (
+      {/* 참여자 목록 — 본인 제외, 실제 이름(닉네임) 표시 */}
+      {others.length > 0 ? (
         <ul className="space-y-2 mb-3">
-          {collaborators.map((c) => (
-            <li key={c.user_id} className="flex items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground truncate">👫 파트너 ({c.role})</span>
-              {isOwner && (
-                <button
-                  onClick={() => removeCollaborator(c.user_id)}
-                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                  aria-label="공동관리 해제"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </li>
-          ))}
+          {others.map((c) => {
+            const name = c.display_name?.trim() || '파트너';
+            return (
+              <li key={c.user_id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-muted-foreground truncate">
+                  {c.role === 'owner' ? '👑' : '👫'} {name}
+                  <span className="ml-1 text-[11px] text-muted-foreground/60">· {roleLabel(c.role)}</span>
+                </span>
+                {/* 해제: 오너만, 협업자(오너 row 제외)만 */}
+                {isOwner && c.role !== 'owner' && (
+                  <button
+                    onClick={() => removeCollaborator(c.user_id)}
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                    aria-label={`${name} 공동관리 해제`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="text-xs text-muted-foreground mb-3">
@@ -90,9 +105,27 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
       {/* 초대 (오너만) */}
       {isOwner && (
         <>
-          <Button onClick={handleInvite} disabled={busy || !budgetId} className="w-full gap-2" size="sm">
+          {/* [CL-COEDIT-COPY-20260620] 개인 예산: 원본 보존하고 복사본을 공유(1순위) */}
+          {showCopyToCoedit && (
+            <>
+              <Button onClick={onCopyToCoedit} className="w-full gap-2" size="sm">
+                <Copy className="w-4 h-4" />
+                복사하여 공동편집 (원본 보존)
+              </Button>
+              <p className="text-[11px] text-muted-foreground/70 mt-1.5 mb-2.5">
+                이 개인 예산을 복사해 공동편집본을 만들어요. 원본은 '개인'에 그대로 남아요.
+              </p>
+            </>
+          )}
+          <Button
+            onClick={handleInvite}
+            disabled={busy || !budgetId}
+            className="w-full gap-2"
+            size="sm"
+            variant={showCopyToCoedit ? 'outline' : 'default'}
+          >
             <UserPlus className="w-4 h-4" />
-            {busy ? '링크 생성 중...' : '파트너 초대 링크 만들기'}
+            {busy ? '링크 생성 중...' : showCopyToCoedit ? '이 예산 그대로 공유' : '파트너 초대 링크 만들기'}
           </Button>
 
           {inviteUrl && (
@@ -107,6 +140,7 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
           {inviteUrl && (
             <p className="text-[11px] text-muted-foreground/70 mt-2">
               이 링크를 받은 사람은 구글 로그인 후 이 예산을 함께 편집할 수 있어요. (7일간 유효)
+              <br />💡 카톡 등 앱 안에서 링크가 안 열리면 사파리·크롬 등 외부 브라우저로 열어주세요.
             </p>
           )}
         </>

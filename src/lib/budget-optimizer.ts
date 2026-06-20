@@ -167,6 +167,21 @@ export function generateBudgetInsights(items: BudgetItem[]): BudgetInsight[] {
 }
 
 /**
+ * [CL-COEDIT-QA5-20260620] 표시 인사이트를 최대 max개로 제한.
+ * max 이하면 그대로, 초과면 Fisher-Yates 셔플 후 max개를 랜덤 선택해 매 노출마다 다양한 정보를 제공한다
+ * (정렬 우선순위보다 다양성 우선). 호출부(InsightPanel)는 useMemo(deps=[items])로 감싸 한 뷰 내 안정 유지.
+ */
+export function pickRandomInsights(insights: BudgetInsight[], max = 5): BudgetInsight[] {
+  if (insights.length <= max) return insights;
+  const a = [...insights];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, max);
+}
+
+/**
  * 특정 항목에 대한 빠른 경고 메시지 (인라인 표시용)
  */
 export function getInlineWarning(

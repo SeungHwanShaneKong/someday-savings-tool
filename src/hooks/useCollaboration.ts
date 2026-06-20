@@ -10,6 +10,10 @@ import { useAuth } from '@/hooks/useAuth';
 export interface Collaborator {
   user_id: string;
   role: string;
+  /** [CL-COEDIT-PARTICIPANTS-20260620] get_budget_participants RPC 의 표시명. 폴백 시 undefined → '파트너' 표시 */
+  display_name?: string | null;
+  /** 현재 사용자 본인 여부(목록에서 자기 자신 제외·표기에 사용) */
+  isMe?: boolean;
 }
 
 export interface UseCollaborationResult {
@@ -32,12 +36,33 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
       setCollaborators([]);
       return;
     }
+    // [CL-COEDIT-PARTICIPANTS-20260620] 참여자(오너+협업자) 이름 포함 RPC. 미배포/에러 시 budget_collaborators 폴백('파트너').
+    const { data: participants, error: rpcError } = await supabase.rpc('get_budget_participants', {
+      p_budget_id: budgetId,
+    });
+    if (!rpcError && Array.isArray(participants)) {
+      setCollaborators(
+        participants.map((p) => ({
+          user_id: p.user_id,
+          role: p.role,
+          display_name: p.display_name,
+          isMe: p.user_id === user?.id,
+        })),
+      );
+      return;
+    }
     const { data } = await supabase
       .from('budget_collaborators')
       .select('user_id, role')
       .eq('budget_id', budgetId);
-    setCollaborators((data ?? []) as Collaborator[]);
-  }, [budgetId]);
+    setCollaborators(
+      ((data ?? []) as Array<{ user_id: string; role: string }>).map((r) => ({
+        user_id: r.user_id,
+        role: r.role,
+        isMe: r.user_id === user?.id,
+      })),
+    );
+  }, [budgetId, user?.id]);
 
   useEffect(() => {
     void refresh();

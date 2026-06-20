@@ -40,6 +40,10 @@ function makeChain(opts: ChainOpts = {}) {
 beforeEach(() => {
   h.user = { id: 'owner-1' };
   vi.mocked(supabase.from).mockReset();
+  // [CL-COEDIT-PARTICIPANTS-20260620] refresh 는 get_budget_participants RPC 우선. 본 스위트는 폴백 경로(budget_collaborators)
+  // 인자/필터 정확성을 검증하므로 RPC 미배포(에러)를 기본값으로 강제해 폴백을 탄다.
+  vi.mocked(supabase.rpc).mockReset();
+  vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: 'rpc not deployed' } } as never);
 });
 
 afterEach(() => {
@@ -185,7 +189,7 @@ describe('useCollaboration.refresh — budget_collaborators 정확 로드(INV.A8
     // 정확한 컬럼·필터 — over-fetch/오필터 방지
     expect(col.select).toHaveBeenCalledWith('user_id, role');
     expect(col.eq).toHaveBeenCalledWith('budget_id', 'budget-77');
-    expect(result.current.collaborators[0]).toEqual({ user_id: 'partner-1', role: 'editor' });
+    expect(result.current.collaborators[0]).toMatchObject({ user_id: 'partner-1', role: 'editor' });
   });
 
   it('INV.A9 refresh 가 data:null 을 돌려줘도 빈 배열로 안전 정규화', async () => {

@@ -3,7 +3,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InsightCard } from './InsightCard';
-import { generateBudgetInsights } from '@/lib/budget-optimizer';
+import { generateBudgetInsights, pickRandomInsights } from '@/lib/budget-optimizer';
 import type { ExtendedBudgetItem } from '@/components/BudgetTable';
 
 interface InsightPanelProps {
@@ -26,7 +26,8 @@ export function InsightPanel({ items, className }: InsightPanelProps) {
         amount: item.amount,
       }));
 
-    return generateBudgetInsights(budgetItems);
+    // [CL-COEDIT-QA5-20260620] 한 번에 최대 5개만 노출(초과 시 랜덤 선택 → 다양성). items 변경 시에만 재선택.
+    return pickRandomInsights(generateBudgetInsights(budgetItems), 5);
   }, [items]);
 
   const visibleInsights = insights.filter((i) => !dismissed.has(i.id));

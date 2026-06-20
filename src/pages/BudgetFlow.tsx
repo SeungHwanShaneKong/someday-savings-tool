@@ -129,6 +129,13 @@ export default function BudgetFlow() {
   const realtimeBudgetId = mode === 'shared' ? (activeBudget?.id ?? null) : null;
   useRealtimeBudget(realtimeBudgetId, realtimeApplier);
 
+  // [CL-COEDIT-COPY-20260620] 개인 예산 → 복사본을 만들어 공동편집(원본 보존). 복사본이 active 가 되고 autoInvite 로 초대링크 자동 생성.
+  const handleCopyToCoedit = async () => {
+    if (!activeBudget) return;
+    const copy = await copyBudget(activeBudget.id, `${activeBudget.name} (공동편집)`);
+    if (copy) setAutoInvite(true);
+  };
+
   const handleCreateBudget = async () => {
     const newName = `옵션 ${budgets.length + 1}`;
     await createNewBudget(newName);
@@ -531,6 +538,8 @@ export default function BudgetFlow() {
                   isOwner={isOwnerOfActive}
                   autoInvite={autoInvite}
                   onAutoInviteHandled={() => setAutoInvite(false)}
+                  showCopyToCoedit={isOwnerOfActive && !activeBudget.isShared}
+                  onCopyToCoedit={handleCopyToCoedit}
                 />
               </div>
             )}

@@ -5,9 +5,9 @@
 //  - 미로그인 → 토큰 stash 후 구글 로그인 → OAuth 복귀(/auth) → InviteResumeWatcher 가 /invite/:token 재진입
 //  - 로그인됨 → accept_budget_invitation RPC → 결과 분기(수락/이미멤버/오너/만료/무효)
 // ※ 추가형 — useAuth 코어 무수정. signInWithGoogle 만 호출.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -20,6 +20,13 @@ import {
   safeSessionStorage,
 } from '@/lib/collab/invite-resume';
 import { WORKSPACE_MODE_KEY } from '@/lib/collab/workspace';
+// [CL-COEDIT-INAPP-INVITE-20260620] 인앱브라우저(카톡 등) OAuth 403(disallowed_useragent) 회피 — 외부 브라우저 탈출
+import {
+  getBrowserInfo,
+  openInExternalBrowserWithFallback,
+  copyToClipboard,
+  getAppSpecificGuide,
+} from '@/lib/kakao-browser';
 
 type Phase = 'checking' | 'accepting' | 'error';
 
@@ -31,6 +38,18 @@ export default function AcceptInvite() {
   const [phase, setPhase] = useState<Phase>('checking');
   const [errorMsg, setErrorMsg] = useState('');
   const ranRef = useRef(false);
+  // [CL-COEDIT-INAPP-INVITE-20260620] 인앱브라우저 탈출/브릿지 상태
+  const [browserInfo] = useState(() => getBrowserInfo());
+  const [showBridge, setShowBridge] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleRetryBreakout = useCallback(() => {
+    openInExternalBrowserWithFallback(window.location.href, () => setShowBridge(true));
+  }, []);
+  const handleCopyUrl = useCallback(async () => {
+    const ok = await copyToClipboard(window.location.href);
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
+  }, []);
 
   useSEO({ title: '공동 예산 초대 - 웨딩셈', description: '파트너의 공동 예산 초대를 수락합니다.', path: '/invite' });
 
@@ -50,6 +69,12 @@ export default function AcceptInvite() {
     if (action.kind === 'login-required') {
       // 토큰 보존 후 구글 로그인 → 복귀 시 InviteResumeWatcher 가 재개
       stashInviteToken(action.token, safeSessionStorage(), Date.now());
+      // [CL-COEDIT-INAPP-INVITE-20260620] 카톡 등 인앱브라우저에선 Google OAuth 가 403(disallowed_useragent)로 차단됨.
+      // signInWithGoogle 직접 호출 금지 → 동일 초대 URL 을 외부 브라우저로 탈출(토큰은 URL 에 보존돼 재진입 시 정상 로그인).
+      if (browserInfo.isInAppBrowser) {
+        openInExternalBrowserWithFallback(window.location.href, () => setShowBridge(true));
+        return; // 탈출 중 — 'checking' 유지. 자동 탈출 실패 시 브릿지 UI 노출.
+      }
       void signInWithGoogle();
       return; // 이동 중 — 'checking' 유지
     }
@@ -91,6 +116,46 @@ export default function AcceptInvite() {
       }
     })();
   }, [loading, user, token, signInWithGoogle, navigate, toast]);
+
+  // [CL-COEDIT-INAPP-INVITE-20260620] 인앱브라우저 자동 탈출 실패 시 수동 브릿지 UI (Auth.tsx 패턴 미러)
+  if (showBridge && browserInfo.isInAppBrowser) {
+    const guide = getAppSpecificGuide(browserInfo.detectedApp, browserInfo.isIOS, browserInfo.isAndroid);
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6 py-8 text-center">
+        <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+          <ExternalLink className="w-10 h-10 text-primary" aria-hidden="true" />
+        </div>
+        <h1 className="text-xl font-semibold text-foreground mb-2">외부 브라우저에서 열어주세요</h1>
+        <p className="text-sm text-muted-foreground mb-6 max-w-xs">
+          {browserInfo.detectedApp ? `${browserInfo.detectedApp} 내` : '현재'} 브라우저에서는 Google 로그인이 차단돼요.
+          <br />
+          아래 방법으로 {browserInfo.isIOS ? 'Safari' : 'Chrome'}에서 초대 링크를 열어주세요.
+        </p>
+        <div className="w-full max-w-sm space-y-3 mb-6">
+          <Button onClick={handleRetryBreakout} className="w-full h-12">
+            <ExternalLink className="w-4 h-4 mr-2" /> 외부 브라우저로 열기
+          </Button>
+          <Button variant="outline" onClick={handleCopyUrl} className="w-full h-12 border-2 border-primary/30">
+            {copied ? (
+              <><CheckCircle2 className="w-4 h-4 mr-2 text-primary" /> 복사완료! 브라우저에 붙여넣기</>
+            ) : (
+              <><Copy className="w-4 h-4 mr-2" /> 초대 링크 복사</>
+            )}
+          </Button>
+        </div>
+        <div className="bg-muted/50 rounded-xl p-4 text-left w-full max-w-sm">
+          <p className="text-sm font-medium text-foreground mb-3">
+            📱 {browserInfo.detectedApp ? `${browserInfo.detectedApp}에서` : '직접'} 여는 방법
+          </p>
+          <ol className="text-sm text-muted-foreground space-y-2">
+            {guide.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === 'error') {
     return (

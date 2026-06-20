@@ -35,6 +35,10 @@ function chain(opts: { single?: unknown; list?: unknown } = {}) {
 beforeEach(() => {
   h.user = { id: 'owner-1' };
   vi.mocked(supabase.from).mockReset();
+  // [CL-COEDIT-PARTICIPANTS-20260620] refresh 는 get_budget_participants RPC 우선. 이 스위트는 폴백(budget_collaborators)
+  // 경로를 검증하므로 RPC 미배포(에러)를 기본값으로 강제한다. RPC 성공 경로는 .participants 스위트가 별도 검증.
+  vi.mocked(supabase.rpc).mockReset();
+  vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: 'rpc not deployed' } } as never);
 });
 
 describe('useCollaboration.createInvite (초대 발급 — 멱등 계약)', () => {
@@ -120,7 +124,7 @@ describe('useCollaboration.refresh / removeCollaborator (협업자 목록)', () 
 
     const { result } = renderHook(() => useCollaboration('budget-1'));
     await waitFor(() => expect(result.current.collaborators).toHaveLength(1));
-    expect(result.current.collaborators[0]).toEqual({ user_id: 'u2', role: 'editor' });
+    expect(result.current.collaborators[0]).toMatchObject({ user_id: 'u2', role: 'editor' });
   });
 
   it('IC.7 removeCollaborator → delete 후 refresh 재조회', async () => {

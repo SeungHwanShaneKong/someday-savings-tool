@@ -1006,6 +1006,27 @@ export function useMultipleBudgets() {
     }
   }, [user?.id]);
 
+  // [CL-COEDIT-OWNER-REFRESH-20260620] 탭 복귀(가시성/포커스) 시 예산 재조회 →
+  // 파트너가 초대를 수락해 협업자가 생기면, 오너가 앱으로 돌아왔을 때 해당 예산이 자동으로 '우리'에 반영됨(수동 새로고침 불요).
+  const lastFocusRefetchRef = useRef(0);
+  useEffect(() => {
+    if (!user) return;
+    const maybeRefetch = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastFocusRefetchRef.current < 3000) return; // 쓰로틀: 과도한 재조회 방지
+      lastFocusRefetchRef.current = now;
+      void fetchBudgets();
+    };
+    document.addEventListener('visibilitychange', maybeRefetch);
+    window.addEventListener('focus', maybeRefetch);
+    return () => {
+      document.removeEventListener('visibilitychange', maybeRefetch);
+      window.removeEventListener('focus', maybeRefetch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   // [CL-PERF-WATERFALL-20260418-230000] 중복 fetchItems 제거 — allBudgetsItems에서 파생
   useEffect(() => {
     if (activeBudgetId) {

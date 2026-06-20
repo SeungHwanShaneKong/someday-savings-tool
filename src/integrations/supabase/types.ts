@@ -679,6 +679,14 @@ export type Database = {
     }
     Functions: {
       accept_budget_invitation: { Args: { p_token: string }; Returns: Json }
+      get_budget_participants: {
+        Args: { p_budget_id: string }
+        Returns: {
+          user_id: string
+          role: string
+          display_name: string
+        }[]
+      }
       get_budget_role: {
         Args: { p_budget_id: string; p_user_id?: string }
         Returns: string

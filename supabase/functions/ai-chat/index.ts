@@ -50,6 +50,10 @@ const DAILY_LIMITS: Record<string, number> = {
   budget: 20,
 };
 const DEFAULT_DAILY_LIMIT = 20;
+// [CL-SEC-FEATURE-ALLOWLIST-20260621] 클라가 임의 feature 문자열(qa_2, qa_3 …)을 보내면 매번
+// 0부터 시작하는 새 카운터 + 기본 20한도가 적용돼 qa 5회/일 제한이 무력화됐다(레이트리밋 우회).
+// DAILY_LIMITS 키만 허용해 `?? DEFAULT_DAILY_LIMIT` 와 `SYSTEM_PROMPTS[feature] || qa` 폴백을 봉쇄.
+const ALLOWED_FEATURES = new Set(Object.keys(DAILY_LIMITS));
 
 function getSeoulResetAt(): string {
   // 다음 00:00 KST(UTC+9)를 ISO 문자열로 계산
@@ -100,9 +104,9 @@ Deno.serve(async (req: Request) => {
       context?: Record<string, unknown>;
     };
 
-    if (!feature || !messages?.length) {
+    if (!feature || !ALLOWED_FEATURES.has(feature) || !messages?.length) {
       return new Response(
-        JSON.stringify({ error: 'feature와 messages가 필요합니다' }),
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

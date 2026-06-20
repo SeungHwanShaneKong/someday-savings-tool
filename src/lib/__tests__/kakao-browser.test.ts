@@ -18,14 +18,24 @@ function setUA(ua: string) {
   });
 }
 
+// [CL-SEC-INTENT-20260621] 전역 복원용 원본 보관(싱글포크 누수 방지)
+const ORIGINAL_LOCATION = window.location;
+
 // Helper: reset location.href mock
+// [CL-SEC-INTENT-20260621] sanitizeBreakoutUrl 가 origin/pathname 을 참조하므로 초기 URL 을 파싱해 채운다.
 function mockLocation(initial = 'https://example.com/') {
   let current = initial;
   const setter = vi.fn((v: string) => { current = v; });
+  const u = new URL(initial);
   Object.defineProperty(window, 'location', {
     configurable: true,
     writable: true,
     value: {
+      origin: u.origin,
+      protocol: u.protocol,
+      host: u.host,
+      pathname: u.pathname,
+      search: u.search,
       get href() { return current; },
       set href(v: string) { setter(v); },
     },
@@ -44,6 +54,8 @@ const WEBVIEW_UA = 'Mozilla/5.0 (Linux; Android 13) wv)';
 afterEach(() => {
   vi.restoreAllMocks();
   setUA(NORMAL_UA);
+  // [CL-SEC-INTENT-20260621] window.location 복원 — origin 누수로 타 스위트(redirectTo 등)가 깨지지 않도록.
+  Object.defineProperty(window, 'location', { configurable: true, value: ORIGINAL_LOCATION });
 });
 
 // ─── KB.1–KB.8: getBrowserInfo() browser detection ───
@@ -127,8 +139,9 @@ describe('KB: openInExternalBrowser()', () => {
 
   it('KB.11 Android in-app → returns true, fires intent:// URL', () => {
     setUA(KAKAO_ANDROID_UA);
+    // [CL-SEC-INTENT-20260621] 동일 origin URL(외부 탈출은 항상 우리 앱) — sanitize 가 타 origin 은 폴백.
     const setter = mockLocation();
-    const result = openInExternalBrowser('https://test.com/path');
+    const result = openInExternalBrowser('https://example.com/path');
     expect(result).toBe(true);
     const called = setter.mock.calls[0][0] as string;
     expect(called).toMatch(/^intent:\/\//);
@@ -138,11 +151,11 @@ describe('KB: openInExternalBrowser()', () => {
   it('KB.12 iOS KakaoTalk → returns true, fires kakaotalk:// scheme', () => {
     setUA(KAKAO_IOS_UA);
     const setter = mockLocation();
-    const result = openInExternalBrowser('https://test.com/');
+    const result = openInExternalBrowser('https://example.com/');
     expect(result).toBe(true);
     const called = setter.mock.calls[0][0] as string;
     expect(called).toMatch(/^kakaotalk:\/\/web\/openExternal/);
-    expect(called).toContain(encodeURIComponent('https://test.com/'));
+    expect(called).toContain(encodeURIComponent('https://example.com/'));
   });
 
   it('KB.13 iOS non-KakaoTalk in-app → returns true, fires x-safari-https:// scheme', () => {
@@ -154,7 +167,7 @@ describe('KB: openInExternalBrowser()', () => {
       writable: true,
     });
     const setter = mockLocation();
-    const result = openInExternalBrowser('https://test.com/page');
+    const result = openInExternalBrowser('https://example.com/page');
     expect(result).toBe(true);
     const called = setter.mock.calls[0][0] as string;
     expect(called).toMatch(/^x-safari-https:\/\//);

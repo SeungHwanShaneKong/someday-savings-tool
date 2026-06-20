@@ -96,24 +96,58 @@ export function isKakaoTalkInAppBrowser(): boolean {
 }
 
 /**
+ * [CL-SEC-INTENT-20260621] 외부 탈출 URL 안전화 — intent:// 인젝션·오픈 리다이렉트 차단.
+ *
+ * 탈출 대상은 언제나 "우리 앱의 현재 페이지"다(Auth/Landing/AcceptInvite 모두 window.location.href 전달).
+ * 공격자가 보낸 동일 도메인 링크의 fragment(#...)에 '#Intent;...'를 심으면 Android intent: 파서가
+ * 첫 '#' 를 Intent 블록 시작으로 해석해 임의 Intent(package/component/extras)를 주입할 수 있다.
+ * 방어:
+ *  - 동일 origin 이 아니면 우리 origin+pathname 으로 폴백(타 사이트로 못 내보냄)
+ *  - URL fragment 제거(조기 '#Intent;' 종료 인젝션 원천 차단)
+ *  - 쿼리스트링은 보존(초대 토큰 등 정상 파라미터)
+ */
+export function sanitizeBreakoutUrl(raw?: string): string {
+  try {
+    const u = new URL(raw || window.location.href);
+    if (u.origin !== window.location.origin) {
+      return window.location.origin + window.location.pathname;
+    }
+    u.hash = '';
+    return u.toString();
+  } catch {
+    return window.location.origin + window.location.pathname;
+  }
+}
+
+/**
+ * [CL-SEC-INTENT-20260621] Android intent:// URL 을 파싱된 구성요소(host/path/query)로 안전 구성.
+ * 정규식 prefix 제거가 아니라 컴포넌트만 사용 → 입력에 '#' 가 있어도 결과의 '#Intent;' 는 정확히 1개.
+ * 원본 URL 은 S.browser_fallback_url 로 전달(크롬 미설치 시 폴백).
+ */
+function buildAndroidIntentUrl(safeUrl: string): string {
+  const u = new URL(safeUrl);
+  const stripped = u.host + u.pathname + u.search; // sanitize 가 fragment 를 제거했으므로 '#' 없음
+  return `intent://${stripped}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(safeUrl)};end`;
+}
+
+/**
  * 외부 브라우저로 현재 페이지 열기 (동기 - 즉시 1회 시도)
  * 
  * @param url 열려는 URL (기본값: 현재 페이지)
  * @returns 리다이렉트 시도 여부 (실제 성공은 비동기로만 확인 가능)
  */
 export function openInExternalBrowser(url?: string): boolean {
-  const targetUrl = url || window.location.href;
+  const targetUrl = sanitizeBreakoutUrl(url);
   const { isAndroid, isIOS, isInAppBrowser: isIAB } = getBrowserInfo();
-  
+
   if (!isIAB) {
     return false;
   }
 
   try {
     if (isAndroid) {
-      // Android: intent 스킴으로 Chrome 강제 호출
-      const intentUrl = `intent://${targetUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end`;
-      window.location.href = intentUrl;
+      // Android: intent 스킴으로 Chrome 강제 호출 ([CL-SEC-INTENT-20260621] 파싱 구성요소로 빌드 → '#' 주입 차단)
+      window.location.href = buildAndroidIntentUrl(targetUrl);
       return true;
     }
     
@@ -159,15 +193,17 @@ export function openInExternalBrowserWithFallback(
   onFallback: () => void
 ): void {
   const info = getBrowserInfo();
-  
+
   if (!info.isInAppBrowser) {
     return;
   }
 
+  // [CL-SEC-INTENT-20260621] 외부 탈출 대상은 항상 우리 앱 URL — origin 검증 + fragment 제거(intent 주입 차단)
+  const safeUrl = sanitizeBreakoutUrl(url);
+
   // Android는 intent 스킴 한 번으로 충분
   if (info.isAndroid) {
-    const intentUrl = `intent://${url.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end`;
-    window.location.href = intentUrl;
+    window.location.href = buildAndroidIntentUrl(safeUrl);
     // Android intent가 실패하면 800ms 후 폴백
     setTimeout(onFallback, 800);
     return;
@@ -182,14 +218,14 @@ export function openInExternalBrowserWithFallback(
 
   // 1단계: 카카오톡 전용 스킴
   if (/KAKAOTALK/i.test(navigator.userAgent)) {
-    window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`;
+    window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(safeUrl)}`;
     // 카카오톡 스킴이 실패하면 800ms 후 2단계로
-    setTimeout(() => attemptSafariScheme(url, onFallback), 800);
+    setTimeout(() => attemptSafariScheme(safeUrl, onFallback), 800);
     return;
   }
 
   // 2단계부터 시작 (카카오톡이 아닌 경우)
-  attemptSafariScheme(url, onFallback);
+  attemptSafariScheme(safeUrl, onFallback);
 }
 
 /**

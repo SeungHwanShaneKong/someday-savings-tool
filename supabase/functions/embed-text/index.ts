@@ -3,6 +3,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
+// [CL-SEC-EMBED-ADMIN-20260621] 관리자 검증(RAG 오염 차단). crawl-wedding-data 와 동일 패턴.
+import { verifyUserToken } from '../_shared/jwt.ts';
+import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
 const openai = new OpenAI({
   apiKey: Deno.env.get('OPENAI_API_KEY')!,
@@ -38,13 +41,24 @@ serve(async (req) => {
       );
     }
 
+    // [CL-SEC-EMBED-ADMIN-20260621] 관리자 전용 게이트.
+    // 과거: getUser() 만 통과 → 임의 로그인 사용자가 service_role 로 knowledge_embeddings 에
+    //   임의 텍스트를 upsert → rag-query 가 전체 사용자의 GPT 시스템 프롬프트에 그대로 주입
+    //   (저장형 프롬프트 인젝션/RAG 오염 + 무제한 OpenAI 비용). 이제 JWT 검증 + MAIN 프로젝트 admin 확인.
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
+    const userId = await verifyUserToken(supabase, token);
+    if (!userId) {
       return new Response(
         JSON.stringify({ error: '유효하지 않은 토큰입니다' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const isAdmin = await checkAdminOnMainProject(userId, token);
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ error: '관리자 권한이 필요합니다' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

@@ -20,17 +20,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # [CL-SEC-DEP-PIN-20260621] pnpm + frozen-lockfile.
+      # 과거: `npm install` 은 pnpm-lock.yaml 을 못 읽어 매 배포마다 ^범위를 공개 레지스트리에서
+      #   재해석(무결성 핀 없음) → 라이브 번들에 임의 in-range/하이재킹 버전 유입 가능(공급망 노출).
+      # 이제: 커밋된 락파일을 그대로 강제(드리프트 시 빌드 실패). 버전은 package.json packageManager 로 고정.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
 
-      - run: npm install
+      - run: pnpm install --frozen-lockfile
 
       # [CL-SSG-PRERENDER-20260531] Puppeteer Chromium 설치 (프리렌더 SSG용)
       - run: npx puppeteer browsers install chrome
 
       # vite build + Puppeteer 프리렌더(본문/canonical/JSON-LD 정적화 + 404 폴백 + sitemap)
-      - run: npm run build:ssg
+      - run: pnpm run build:ssg
 
       - uses: actions/upload-pages-artifact@v3
         with:

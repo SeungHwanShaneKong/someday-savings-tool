@@ -20,6 +20,8 @@ const DAILY_LIMITS: Record<string, number> = {
   budget: 20,
 };
 const DEFAULT_DAILY_LIMIT = 20;
+// [CL-SEC-FEATURE-ALLOWLIST-20260621] feature 화이트리스트(레이트리밋 우회 차단) — ai-chat 과 동일.
+const ALLOWED_FEATURES = new Set(Object.keys(DAILY_LIMITS));
 
 function getSeoulResetAt(): string {
   const now = new Date();
@@ -91,6 +93,14 @@ serve(async (req) => {
     if (!question?.trim()) {
       return new Response(
         JSON.stringify({ error: '질문이 필요합니다' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-SEC-FEATURE-ALLOWLIST-20260621] 알 수 없는 feature 차단(레이트리밋 우회 방지)
+    if (!ALLOWED_FEATURES.has(feature)) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -6,6 +6,8 @@ import { verifyUserToken } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
+// [CL-SEC-AIQUOTA-20260621] 비용 남용 방지 일일 한도
+import { checkDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
 
 const SYSTEM_PROMPT = `당신은 한국 결혼 준비 일정 최적화 전문 AI 플래너입니다.
 
@@ -102,6 +104,25 @@ serve(async (req: Request) => {
       );
     }
 
+    // [CL-SEC-AIQUOTA-20260621] 입력 크기 상한(토큰 비용 증폭 방지)
+    if (typeof wedding_date !== 'string' || wedding_date.length > 32 || completed_items.length > 500) {
+      await logFunctionCall(supabase, 'timeline-optimizer', startTime, 400, userId, '입력 크기 초과');
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-SEC-AIQUOTA-20260621] 일일 한도(일정 최적화 10회/일)
+    const quota = await checkDailyLimit(supabase, userId, 'timeline', 10);
+    if (!quota.allowed) {
+      await logFunctionCall(supabase, 'timeline-optimizer', startTime, 429, userId, '일일 한도 초과');
+      return new Response(
+        JSON.stringify({ error: dailyLimitMessage('일정 최적화', quota.limit), remaining: 0, limit: quota.limit }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Calculate D-day
     const weddingDateObj = new Date(wedding_date);
     const today = new Date();
@@ -152,6 +173,19 @@ serve(async (req: Request) => {
     const { timeline } = parsed;
 
     await logFunctionCall(supabase, 'timeline-optimizer', startTime, 200, userId);
+
+    // [CL-SEC-AIQUOTA-20260621] 일일 한도 카운트용 기록
+    try {
+      await supabase.from('ai_conversations').insert({
+        user_id: userId,
+        feature: 'timeline',
+        messages: [
+          { role: 'user', content: userPrompt },
+          { role: 'assistant', content: '[timeline]' },
+        ],
+        metadata: { dday_count },
+      });
+    } catch (_e) { /* 카운트 실패는 응답을 막지 않음 */ }
 
     return new Response(
       JSON.stringify({ timeline, dday_count }),

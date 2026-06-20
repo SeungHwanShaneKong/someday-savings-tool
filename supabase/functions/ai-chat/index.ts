@@ -111,6 +111,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // [CL-SEC-AICHAT-SANITIZE-20260621] 클라가 보낸 messages 를 신뢰하지 않는다:
+    // (1) system/tool 역할 주입을 제거(가드레일 오버라이드·탈옥 차단) — user/assistant 만 허용
+    // (2) 최근 12턴으로 제한 + 총/단일 길이 상한(토큰 비용 증폭 방지). embed-text(100개 제한)와 일관.
+    const safeMessages = (messages as ChatMessage[]).filter(
+      (m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim().length > 0,
+    ).slice(-12);
+    if (safeMessages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const totalLen = safeMessages.reduce((n, m) => n + m.content.length, 0) + (context ? JSON.stringify(context).length : 0);
+    if (totalLen > 16000 || safeMessages.some((m) => m.content.length > 8000)) {
+      return new Response(
+        JSON.stringify({ error: '입력이 너무 깁니다. 질문을 줄여주세요.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // [CL-AI-CHAT-LIMIT5-20260408-100500] Feature-scoped rate limit
     // feature 컬럼으로 필터링하여 qa 5회/일, 나머지 20회/일 (feature 간 카운트 격리)
     const limit = DAILY_LIMITS[feature] ?? DEFAULT_DAILY_LIMIT;
@@ -149,7 +169,7 @@ Deno.serve(async (req: Request) => {
 
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: systemPrompt + contextNote },
-      ...messages,
+      ...safeMessages,
     ];
 
     // Call OpenAI GPT
@@ -163,7 +183,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from('ai_conversations').insert({
         user_id: userId,
         feature,
-        messages: [...messages, { role: 'assistant', content: reply }],
+        messages: [...safeMessages, { role: 'assistant', content: reply }],
         metadata: context ? { context } : null,
       });
     } catch (saveError) {

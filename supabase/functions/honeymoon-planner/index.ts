@@ -10,6 +10,8 @@ import { verifyUserToken } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
+// [CL-SEC-AIQUOTA-20260621] 비용 남용 방지 일일 한도
+import { checkDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
 
 // [CL-TOP100-DESTINATIONS-20260325] 후보 정보 인터페이스
 interface CandidateInfo {
@@ -140,6 +142,24 @@ serve(async (req) => {
       );
     }
 
+    // [CL-SEC-AIQUOTA-20260621] 입력 크기 상한(토큰 비용 증폭 방지)
+    if (typeof dominantStyle !== 'string' || dominantStyle.length > 100 ||
+        (candidates !== undefined && (!Array.isArray(candidates) || candidates.length > 200))) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-SEC-AIQUOTA-20260621] 일일 한도(신혼여행 큐레이션 10회/일)
+    const quota = await checkDailyLimit(supabase, userId, 'honeymoon-curate', 10);
+    if (!quota.allowed) {
+      return new Response(
+        JSON.stringify({ error: dailyLimitMessage('신혼여행 추천', quota.limit), remaining: 0, limit: quota.limit }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // [CL-TOP100-DESTINATIONS-20260325] 동적 시스템 프롬프트
     const systemPrompt = buildCurateSystemPrompt(candidates);
 
@@ -170,6 +190,19 @@ serve(async (req) => {
       200,
       userId
     );
+
+    // [CL-SEC-AIQUOTA-20260621] 일일 한도 카운트용 기록(OpenAI 호출 1회 = 1행)
+    try {
+      await supabase.from('ai_conversations').insert({
+        user_id: userId,
+        feature: 'honeymoon-curate',
+        messages: [
+          { role: 'user', content: curateUserPrompt },
+          { role: 'assistant', content: '[curation]' },
+        ],
+        metadata: { dominantStyle, budgetMin, budgetMax },
+      });
+    } catch (_e) { /* 카운트 실패는 응답을 막지 않음 */ }
 
     if (!parsedCuration || !parsedCuration.recommendations) {
       return new Response(

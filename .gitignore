@@ -49,3 +49,7 @@ playwright/.cache/
 # Supabase migration dumps (민감 데이터 — 절대 커밋 금지)
 supabase_dump/
 *.dump.sql
+
+# [CL-SEC-LOCKFILE-20260621] 단일 패키지매니저(pnpm)만 사용 — bun 락파일 금지(stale private-registry drift 방지)
+bun.lock
+bun.lockb

@@ -9,6 +9,8 @@ import {
   SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { FileText, RefreshCw, AlertTriangle, Clock, Tag } from 'lucide-react';
+// [CL-SEC-SEOXSS-20260621] LLM 생성 HTML 무삭제 렌더 → 저장형 XSS 차단(허용 태그만, 전 속성 제거)
+import DOMPurify from 'dompurify';
 
 // ── 타입 (useSEOAmplifier 호환) ──
 export interface SEOContent {
@@ -177,7 +179,12 @@ export function SEOAmplifierPanel({ content, loading, error, onGenerate }: SEOAm
             <h3 className="text-sm sm:text-base font-semibold mb-3">본문 미리보기</h3>
             <div
               className="prose prose-sm dark:prose-invert max-w-none p-4 rounded-lg bg-muted/30 border border-border/50 overflow-auto max-h-96"
-              dangerouslySetInnerHTML={{ __html: content.body_html }}
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(content.body_html, {
+                  ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'br', 'blockquote'],
+                  ALLOWED_ATTR: [],
+                }),
+              }}
             />
           </Card>
         </div>

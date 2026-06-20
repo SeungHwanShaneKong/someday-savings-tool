@@ -6,6 +6,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { verifyUserToken } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
+// [CL-SEC-AIQUOTA-20260621] 비용 남용 방지 일일 한도
+import { checkDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
 
 interface NegotiateRequest {
   category: string;
@@ -110,6 +112,24 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'category와 amount가 필요합니다' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-SEC-AIQUOTA-20260621] 입력 크기 상한(토큰 비용 증폭 방지)
+    if (typeof category !== 'string' || category.length > 200 ||
+        typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0 || amount > 1e12) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-SEC-AIQUOTA-20260621] 일일 한도(협상 코치 20회/일) — ai_conversations(feature='negotiate') 집계
+    const quota = await checkDailyLimit(supabase, userId, 'negotiate', 20);
+    if (!quota.allowed) {
+      return new Response(
+        JSON.stringify({ error: dailyLimitMessage('협상 코치', quota.limit), remaining: 0, limit: quota.limit }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

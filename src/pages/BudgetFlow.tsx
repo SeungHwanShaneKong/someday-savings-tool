@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
 import { BudgetTableMobile } from '@/components/BudgetTableMobile';
@@ -63,6 +64,8 @@ import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
 export default function BudgetFlow() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  // [CL-SEC-ADMIN-GATE-20260621] 운영자 이메일 하드코딩 제거 → user_roles RLS 기반 isAdmin(번들에 PII 미노출)
+  const { isAdmin } = useAdmin();
 
   useSEO({
     title: '예산 관리 - 웨딩셈',
@@ -309,7 +312,7 @@ export default function BudgetFlow() {
                 <span className="hidden sm:inline">요약 보기</span>
                 <span className="sm:hidden">요약</span>
               </Button>
-              {!authLoading && user?.email === 'seunghwan.kong@gmail.com' && (
+              {isAdmin && (
                 <Button
                   onClick={() => navigate('/admin')}
                   variant="outline"

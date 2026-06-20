@@ -78,19 +78,23 @@ ALTER TABLE public.ai_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.budget_insights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.crawl_jobs ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
+-- RLS Policies — [CL-COEDIT-DBMOVE-20260620] 멱등: 20260228000000 가 동일 정책 선생성 가능 → DROP 후 재생성
+DROP POLICY IF EXISTS "Anyone reads templates" ON public.checklist_templates;
 CREATE POLICY "Anyone reads templates"
   ON public.checklist_templates FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users manage own checklist items" ON public.user_checklist_items;
 CREATE POLICY "Users manage own checklist items"
   ON public.user_checklist_items FOR ALL
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users manage own conversations" ON public.ai_conversations;
 CREATE POLICY "Users manage own conversations"
   ON public.ai_conversations FOR ALL
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users view own budget insights" ON public.budget_insights;
 CREATE POLICY "Users view own budget insights"
   ON public.budget_insights FOR ALL
   USING (
@@ -100,6 +104,7 @@ CREATE POLICY "Users view own budget insights"
     )
   );
 
+DROP POLICY IF EXISTS "Admin manages crawl jobs" ON public.crawl_jobs;
 CREATE POLICY "Admin manages crawl jobs"
   ON public.crawl_jobs FOR ALL
   USING (public.has_role(auth.uid(), 'admin'));

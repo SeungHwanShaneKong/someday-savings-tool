@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'; // [CL-HOME-FIX-20260315-120000]
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'; // [CL-HOME-FIX-20260315-120000]
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
@@ -6,6 +6,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Budget } from './useBudget';
 import { ExtendedBudgetItem } from '@/components/BudgetTable';
 import { useVersionRecovery } from './useVersionRecovery';
+// [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 — 충돌 refs/applier 배선
+import { type PendingOp, upsertById } from '@/lib/collab/conflict-resolution';
+import type { RealtimeApplier, ItemRow } from './useRealtimeBudget';
 
 // Snapshot data can be either:
 // - Legacy: ExtendedBudgetItem[] (single budget)
@@ -43,6 +46,17 @@ export function useMultipleBudgets() {
   const isCreatingRef = useRef(false);
   const hasFetchedRef = useRef(false);
 
+  // [CL-COEDIT-E2E-20260620-130000] 충돌 제로(field-level LWW) 배선용 refs
+  //  - itemsRef         : 최신 items 스냅샷(롤백/getLocal용, 렌더마다 동기화)
+  //  - pendingWritesRef : itemId→PendingOp(내 낙관적 쓰기 — 실시간 에코 억제)
+  //  - localUpdatedAtRef: itemId→서버 updated_at 기지값(단조 게이트)
+  //  - editingColumnsRef: itemId→입력 중 컬럼(원격 머지에서 버퍼 보호; 기본 빈셋)
+  const itemsRef = useRef<ExtendedBudgetItem[]>([]);
+  itemsRef.current = items;
+  const pendingWritesRef = useRef<Map<string, PendingOp>>(new Map());
+  const localUpdatedAtRef = useRef<Map<string, string>>(new Map());
+  const editingColumnsRef = useRef<Map<string, Set<string>>>(new Map());
+
   // [CL-HOME-FIX-20260315-120000] setter 래핑 — sessionStorage 동기화
   const setActiveBudgetId = useCallback((id: string | null) => {
     setActiveBudgetIdRaw(id);
@@ -60,15 +74,49 @@ export function useMultipleBudgets() {
     if (!user) return;
 
     try {
-      const { data: existingBudgets, error: fetchError } = await supabase
+      // [CL-COEDIT-E2E-20260620-130000] owned ∪ shared 로딩 + isShared 주입 (비파괴: 협업 0이면 owned만)
+      const { data: ownedRaw, error: fetchError } = await supabase
         .from('budgets')
         .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false }); // 최근 편집순
-
+        .eq('user_id', user.id);
       if (fetchError) throw fetchError;
+      const owned = (ownedRaw ?? []) as Budget[];
+      const ownedIdSet = new Set(owned.map(b => b.id));
 
-      if (existingBudgets && existingBudgets.length > 0) {
+      // 내가 협업자로 연결된(남이 공유해 준) 예산 id
+      const { data: memRows } = await supabase
+        .from('budget_collaborators')
+        .select('budget_id')
+        .eq('user_id', user.id);
+      const memberOfIds = [...new Set((memRows ?? []).map((r: { budget_id: string }) => r.budget_id))]
+        .filter(id => !ownedIdSet.has(id));
+
+      // 내 소유 예산 중 협업자가 있는 것(= 공동 예산)
+      let sharedOwnedIds = new Set<string>();
+      if (owned.length > 0) {
+        const { data: collabRows } = await supabase
+          .from('budget_collaborators')
+          .select('budget_id')
+          .in('budget_id', owned.map(b => b.id));
+        sharedOwnedIds = new Set((collabRows ?? []).map((r: { budget_id: string }) => r.budget_id));
+      }
+
+      // 남이 공유해 준 예산 본문
+      let sharedFromOthers: Budget[] = [];
+      if (memberOfIds.length > 0) {
+        const { data: sharedRows } = await supabase
+          .from('budgets')
+          .select('*')
+          .in('id', memberOfIds);
+        sharedFromOthers = (sharedRows ?? []) as Budget[];
+      }
+
+      const existingBudgets: Budget[] = [
+        ...owned.map(b => ({ ...b, isShared: sharedOwnedIds.has(b.id) })),
+        ...sharedFromOthers.map(b => ({ ...b, isShared: true })),
+      ].sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0));
+
+      if (existingBudgets.length > 0) {
         setBudgets(existingBudgets);
 
         // [CL-HOME-FIX-20260315-120000] sessionStorage 저장값이 유효하면 유지, 아니면 첫 번째(최근 편집)
@@ -333,36 +381,76 @@ export function useMultipleBudgets() {
   };
 
   // Update item
+  // [CL-COEDIT-E2E-20260620-130000] 낙관적 + 충돌 제로 배선
+  //  1) 즉시 낙관적 반영(입력 반응성) → 2) pending 등록(에코 억제)
+  //  3) .select() 로 서버 updated_at ACK 수신(단조 게이트·에코 일치) → 4) 실패 시 낙관적 롤백
+  // 비파괴: 단독사용자(공유 0)는 pending/ACK가 부수효과 없이 흐르고 최종 상태 동일.
   const updateItem = async (itemId: string, updates: Partial<ExtendedBudgetItem>) => {
+    // 롤백용 직전 스냅샷
+    const prevItem = itemsRef.current.find(i => i.id === itemId);
+
+    // 1) 낙관적 로컬 반영
+    setItems(prev =>
+      prev.map(item => (item.id === itemId ? { ...item, ...updates } : item))
+    );
+    if (activeBudgetId) {
+      setAllBudgetsItems(prev => ({
+        ...prev,
+        [activeBudgetId]: (prev[activeBudgetId] || []).map(item =>
+          item.id === itemId ? { ...item, ...updates } : item
+        ),
+      }));
+    }
+
+    // 2) pending 등록 — 이 쓰기가 건드린 컬럼(실시간 자기에코 억제용)
+    pendingWritesRef.current.set(itemId, { columns: new Set(Object.keys(updates)) });
+
     try {
-      const { error } = await supabase
+      // 3) .select().single() — 트리거가 찍은 서버 updated_at 수신
+      const { data, error } = await supabase
         .from('budget_items')
         .update(updates)
-        .eq('id', itemId);
+        .eq('id', itemId)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      setItems(prev => 
-        prev.map(item => 
-          item.id === itemId ? { ...item, ...updates } : item
-        )
-      );
-      
-      // Also update allBudgetsItems for real-time comparison dashboard sync
-      if (activeBudgetId) {
-        setAllBudgetsItems(prev => ({
-          ...prev,
-          [activeBudgetId]: (prev[activeBudgetId] || []).map(item =>
-            item.id === itemId ? { ...item, ...updates } : item
+      const serverUpdatedAt = (data as { updated_at?: string } | null)?.updated_at;
+      if (serverUpdatedAt) {
+        localUpdatedAtRef.current.set(itemId, serverUpdatedAt); // 단조 게이트 기지값
+        const p = pendingWritesRef.current.get(itemId);
+        if (p) p.ackedUpdatedAt = serverUpdatedAt;               // 에코 ack 일치
+        setItems(prev =>
+          prev.map(item =>
+            item.id === itemId ? ({ ...item, updated_at: serverUpdatedAt }) : item
           )
-        }));
-        // [CL-HOME-FIX-20260315-120000] budget updated_at 갱신 → 최근 편집 옵션 우선 표시
+        );
+      }
+
+      // 4) budget updated_at 갱신 → 최근 편집 옵션 우선 표시
+      // (트리거가 budget_items→budgets 로 bubble 하지 않으므로 유지해야 정렬 비파괴.
+      //  실시간은 budget_items 만 구독 → 이 budgets 쓰기는 항목 에코를 만들지 않음.)
+      if (activeBudgetId) {
         supabase.from('budgets')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', activeBudgetId)
           .then();
       }
     } catch (error: any) {
+      // 4') 낙관적 롤백 — 직전 값 복원
+      if (prevItem) {
+        setItems(prev => prev.map(item => (item.id === itemId ? prevItem : item)));
+        if (activeBudgetId) {
+          setAllBudgetsItems(prev => ({
+            ...prev,
+            [activeBudgetId]: (prev[activeBudgetId] || []).map(item =>
+              item.id === itemId ? prevItem : item
+            ),
+          }));
+        }
+      }
+      pendingWritesRef.current.delete(itemId);
       toast({
         title: '저장 중 오류가 발생했어요',
         description: error.message,
@@ -370,6 +458,43 @@ export function useMultipleBudgets() {
       });
     }
   };
+
+  // [CL-COEDIT-E2E-20260620-130000] 실시간 머지 applier — useRealtimeBudget 에 주입.
+  //  resolveRealtimeEvent(순수)가 에코/stale 가드 + 필드 머지를 끝낸 'merged row' 를 onUpsert 로 전달.
+  //  pending/knownUpdatedAt 은 동일 Map 참조를 그대로 노출(in-place 변이라 항상 최신).
+  const EMPTY_COLS = useMemo(() => new Set<string>(), []);
+  const realtimeApplier: RealtimeApplier = useMemo(() => ({
+    getLocal: (id: string) => {
+      const found = itemsRef.current.find(i => i.id === id);
+      return found ? (found as unknown as ItemRow) : undefined;
+    },
+    pending: pendingWritesRef.current,
+    knownUpdatedAt: localUpdatedAtRef.current,
+    editingColumns: (id: string) => editingColumnsRef.current.get(id) ?? EMPTY_COLS,
+    onUpsert: (row: ItemRow) => {
+      setItems(prev => upsertById(prev as unknown as ItemRow[], row) as unknown as ExtendedBudgetItem[]);
+      if (activeBudgetId) {
+        setAllBudgetsItems(prev => ({
+          ...prev,
+          [activeBudgetId]: upsertById((prev[activeBudgetId] || []) as unknown as ItemRow[], row) as unknown as ExtendedBudgetItem[],
+        }));
+      }
+    },
+    onDelete: (id: string) => {
+      setItems(prev => prev.filter(i => i.id !== id));
+      if (activeBudgetId) {
+        setAllBudgetsItems(prev => ({
+          ...prev,
+          [activeBudgetId]: (prev[activeBudgetId] || []).filter(i => i.id !== id),
+        }));
+      }
+      localUpdatedAtRef.current.delete(id);
+      pendingWritesRef.current.delete(id);
+    },
+    setKnownUpdatedAt: (id: string, updatedAt: string) => {
+      localUpdatedAtRef.current.set(id, updatedAt);
+    },
+  }), [activeBudgetId, EMPTY_COLS]);
 
   // Update amount with optional unit price and quantity
   const updateAmount = async (
@@ -916,6 +1041,9 @@ export function useMultipleBudgets() {
     getTotal,
     getBudgetsForComparison,
     refetch: fetchBudgets,
+    // [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 applier(우리 모드에서 useRealtimeBudget 에 주입)
+    realtimeApplier,
+    editingColumnsRef,
     // New snapshot/reset functions
     snapshots,
     createSnapshot,

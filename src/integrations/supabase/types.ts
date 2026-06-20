@@ -44,6 +44,52 @@ export type Database = {
         }
         Relationships: []
       }
+      badge_definitions: {
+        // [CL-DBSWITCH-VERIFY-20260620] types.ts 수동 복원 — gamify_foundation 마이그레이션 반영(런타임 무영향, 타입 전용).
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          display_order: number
+          icon_emoji: string
+          id: string
+          is_active: boolean
+          name_ko: string
+          points_reward: number
+          rarity: string
+          slug: string
+          unlock_rule: Json
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description: string
+          display_order?: number
+          icon_emoji: string
+          id?: string
+          is_active?: boolean
+          name_ko: string
+          points_reward?: number
+          rarity: string
+          slug: string
+          unlock_rule: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          icon_emoji?: string
+          id?: string
+          is_active?: boolean
+          name_ko?: string
+          points_reward?: number
+          rarity?: string
+          slug?: string
+          unlock_rule?: Json
+        }
+        Relationships: []
+      }
       budget_collaborators: {
         Row: {
           budget_id: string
@@ -438,6 +484,8 @@ export type Database = {
         Row: {
           created_at: string
           display_name: string | null
+          // [CL-DBSWITCH-VERIFY-20260620] gamify_foundation: profiles.gamification_state JSONB NOT NULL DEFAULT '{}'
+          gamification_state: Json
           id: string
           updated_at: string
           user_id: string
@@ -445,6 +493,7 @@ export type Database = {
         Insert: {
           created_at?: string
           display_name?: string | null
+          gamification_state?: Json
           id?: string
           updated_at?: string
           user_id: string
@@ -452,6 +501,7 @@ export type Database = {
         Update: {
           created_at?: string
           display_name?: string | null
+          gamification_state?: Json
           id?: string
           updated_at?: string
           user_id?: string
@@ -568,6 +618,36 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_earned_badges: {
+        // [CL-DBSWITCH-VERIFY-20260620] types.ts 수동 복원 — gamify_foundation 마이그레이션 반영(타입 전용).
+        Row: {
+          badge_id: string
+          earned_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          earned_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          earned_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_earned_badges_badge_id_fkey"
+            columns: ["badge_id"]
+            isOneToOne: false
+            referencedRelation: "badge_definitions"
             referencedColumns: ["id"]
           },
         ]

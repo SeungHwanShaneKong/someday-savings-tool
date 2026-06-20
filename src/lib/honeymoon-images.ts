@@ -11,7 +11,7 @@ export type TravelStyle = 'relaxation' | 'adventure' | 'culture' | 'luxury';
 
 export interface WorldCupImage {
   id: string;
-  url: string;          // Unsplash CDN 800w (빈 문자열이면 그래디언트 카드)
+  url: string;          // 사진 CDN URL (Unsplash 또는 Wikimedia 등; 빈 문자열이면 그래디언트 카드)
   thumbUrl: string;     // Unsplash CDN 100w (blur placeholder)
   label: string;        // 한국어 오버레이 라벨
   subLabel: string;     // 위치 설명
@@ -209,17 +209,17 @@ export function generateRandomWorldCupImages(count = 16): WorldCupImage[] {
   });
 
   // [CL-WORLDCUP-DEDUP-20260405-163500] URL 중복 방지 가드
-  // 다른 destination이 동일 Unsplash photo를 사용할 경우 → 그래디언트 카드로 전환
-  const usedPhotoIds = new Set<string>();
+  // [CL-COVERAGE50-FIX-20260620] dedup 키 일반화: Unsplash 면 photoId, 그 외 CDN(Wikimedia 등)이면 전체 url.
+  //   기존엔 photoId 정규식에 안 걸리는 비-Unsplash 동일 URL 충돌을 못 잡아 중복 이미지가 노출될 수 있었음.
+  const usedKeys = new Set<string>();
   return rawImages.map(img => {
     if (!img.url) return img; // 이미 그래디언트 카드
 
     const photoMatch = img.url.match(/photo-([a-zA-Z0-9_-]+)\?/);
-    const photoId = photoMatch?.[1];
-    if (!photoId) return img;
+    const dedupKey = photoMatch?.[1] ?? img.url; // Unsplash → photoId, 그 외 → 전체 url
 
-    if (usedPhotoIds.has(photoId)) {
-      // 중복 photo 감지 → 그래디언트 카드로 전환
+    if (usedKeys.has(dedupKey)) {
+      // 중복 감지 → 그래디언트 카드로 전환
       const dest = DESTINATIONS.find(dd => dd.id === img.destinationId);
       return {
         ...img,
@@ -232,7 +232,7 @@ export function generateRandomWorldCupImages(count = 16): WorldCupImage[] {
       };
     }
 
-    usedPhotoIds.add(photoId);
+    usedKeys.add(dedupKey);
     return img;
   });
 }

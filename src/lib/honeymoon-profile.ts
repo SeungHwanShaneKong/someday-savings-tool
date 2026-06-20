@@ -276,10 +276,13 @@ export function preFilterCandidates(
     });
 
     // 월드컵 상위 진출자 부스팅 (AI 후보에 반드시 포함)
+    // [CL-COVERAGE50-FIX-20260620] 사용자의 월드컵 선택은 자연 매칭점수(≤1.0)보다 강한 시그널
+    // (lesson CL-WORLDCUP-IMG-ALGO) → 고정 슬롯으로 1.0 초과 부여해 champion>finalist>SF 순서를 항상 보장.
+    // (이전 Math.max(score,0.99) 방식은 자연점수 1.0 여행지에 champion 이 1위를 빼앗기는 버그가 있었음.)
     if (ranking) {
-      if (d.id === ranking.champion) score = Math.max(score, 0.99);
-      else if (d.id === ranking.finalist) score = Math.max(score, 0.95);
-      else if (ranking.semiFinalists.includes(d.id)) score = Math.max(score, 0.90);
+      if (d.id === ranking.champion) score = 1.3;
+      else if (d.id === ranking.finalist) score = 1.2;
+      else if (ranking.semiFinalists.includes(d.id)) score = 1.1;
       else if (wcIds.has(d.id)) score += 0.15;
     }
 

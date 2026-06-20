@@ -57,6 +57,59 @@ afterEach(() => {
   cleanup();
 });
 
+// [CL-ONBOARDING-20260619-222424] jsdom localStorage 가 불완전(opaque origin) → 인메모리 폴리필.
+// 컴포넌트는 try/catch 로 견디지만 테스트가 직접 호출(removeItem/clear)하므로 완전한 Storage 보장.
+class MemoryStorage {
+  private store = new Map<string, string>();
+  get length() {
+    return this.store.size;
+  }
+  clear() {
+    this.store.clear();
+  }
+  getItem(key: string) {
+    return this.store.has(key) ? (this.store.get(key) as string) : null;
+  }
+  setItem(key: string, value: string) {
+    this.store.set(key, String(value));
+  }
+  removeItem(key: string) {
+    this.store.delete(key);
+  }
+  key(index: number) {
+    return Array.from(this.store.keys())[index] ?? null;
+  }
+}
+for (const target of [window, globalThis]) {
+  Object.defineProperty(target, "localStorage", {
+    value: new MemoryStorage(),
+    writable: true,
+    configurable: true,
+  });
+}
+
+// [CL-ONBOARDING-20260619-222424] embla-carousel 은 ResizeObserver/IntersectionObserver 필요 — jsdom 미제공 → 스텁
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  globalThis.IntersectionObserver = class {
+    root = null;
+    rootMargin = "";
+    thresholds = [];
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
+}
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({

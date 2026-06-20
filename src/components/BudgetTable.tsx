@@ -33,6 +33,8 @@ export interface ExtendedBudgetItem {
   custom_name?: string | null;
   is_custom?: boolean;
   cost_split?: CostSplitType;
+  // [CL-COEDIT-E2E-20260620-130000] 서버 소유 타임스탬프(트리거) — 실시간 LWW 게이트용(additive·optional)
+  updated_at?: string;
 }
 
 export const COST_SPLIT_OPTIONS: {
@@ -168,6 +170,8 @@ export function BudgetTable({
   const isComposingRef = useRef<{
     [key: string]: boolean;
   }>({});
+  // [CL-COEDIT-QA200-FIX-20260620] IME 합성 중 발생한 blur 의 보류 커밋(originalNotes 보관) — compositionEnd 에서 flush.
+  const pendingNotesBlurRef = useRef<{ [key: string]: string }>({});
 
   // DnD sensors
   const sensors = useSensors(useSensor(PointerSensor, {
@@ -200,7 +204,7 @@ export function BudgetTable({
       [itemId]: value
     }));
   };
-  const handleNotesBlur = (itemId: string, originalNotes: string | null) => {
+  const commitNotes = (itemId: string, originalNotes: string | null) => {
     const newNotes = tempNotes[itemId];
     if (newNotes !== undefined && newNotes !== (originalNotes || '')) {
       onNotesChange(itemId, newNotes);
@@ -213,6 +217,16 @@ export function BudgetTable({
       return updated;
     });
   };
+  const handleNotesBlur = (itemId: string, originalNotes: string | null) => {
+    // [CL-COEDIT-QA200-FIX-20260620] IME 안전: 한글 합성 진행 중(compositionEnd 미수신)의 blur 는
+    // 미완성 조합을 즉시 커밋하지 않고 보류한다 → compositionEnd 에서 최종 조합값으로 커밋
+    // (데이터 유실 0 · 미완성 조합 서버/파트너 전파 0). 이전엔 isComposingRef 가 dead 였음.
+    if (isComposingRef.current[itemId]) {
+      pendingNotesBlurRef.current[itemId] = originalNotes ?? '';
+      return;
+    }
+    commitNotes(itemId, originalNotes);
+  };
   const handleNotesFocus = (itemId: string, currentNotes: string | null) => {
     setTempNotes(prev => ({
       ...prev,
@@ -224,6 +238,12 @@ export function BudgetTable({
   };
   const handleCompositionEnd = (itemId: string) => {
     isComposingRef.current[itemId] = false;
+    // [CL-COEDIT-QA200-FIX-20260620] 합성 중 blur 가 보류됐다면 지금 최종 조합값으로 커밋.
+    if (itemId in pendingNotesBlurRef.current) {
+      const orig = pendingNotesBlurRef.current[itemId];
+      delete pendingNotesBlurRef.current[itemId];
+      commitNotes(itemId, orig);
+    }
   };
   const getItem = (categoryId: string, subCategoryId: string) => {
     return items.find(item => item.category === categoryId && item.sub_category === subCategoryId);

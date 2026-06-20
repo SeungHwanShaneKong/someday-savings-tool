@@ -9,6 +9,10 @@ import { usePageTracking } from "@/hooks/usePageTracking";
 import { AdSenseLayout } from "@/components/AdSenseLayout";
 import { MobileDesktopNotice } from "@/components/MobileDesktopNotice";
 import { UpdateNotice } from "@/components/UpdateNotice";
+// [CL-ONBOARDING-20260619-222424] 첫 방문 기능 투어 캐러셀
+import { OnboardingCarousel } from "@/components/onboarding/OnboardingCarousel";
+// [CL-COEDIT-E2E-20260620-130000] OAuth 복귀 후 초대 재개 워처
+import { InviteResumeWatcher } from "@/components/collaboration/InviteResumeWatcher";
 import { ChatFab } from "@/components/chat/ChatFab";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -33,6 +37,10 @@ const Article = lazy(() => import("./pages/Article"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 // [CL-GAMIFY-INT-20260418-222329] Wedding Prep Passport 프로필 페이지
 const Profile = lazy(() => import("./pages/Profile"));
+// [CL-ADSENSE-20260619-234411] 정책/정보 페이지(개인정보·약관·소개·문의) — AdSense 필수
+const StaticPage = lazy(() => import("./pages/StaticPage"));
+// [CL-COEDIT-E2E-20260620-130000] 공동 예산 초대 수락 페이지
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 
 // [CL-PERF-QUERY-20260418-230000] React Query 기본 설정 최적화
 const queryClient = new QueryClient({
@@ -65,6 +73,8 @@ function AppRoutes() {
     <>
       <MobileDesktopNotice />
       <UpdateNotice />
+      <OnboardingCarousel />
+      <InviteResumeWatcher />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -82,6 +92,13 @@ function AppRoutes() {
           <Route path="/guide/:slug" element={<Article />} />
           {/* [CL-GAMIFY-INT-20260418-222329] 프로필 페이지 */}
           <Route path="/profile" element={<Profile />} />
+          {/* [CL-ADSENSE-20260619-234411] 정책/정보 페이지 — 프리렌더 trailing-slash canonical */}
+          <Route path="/privacy" element={<StaticPage pageKey="privacy" />} />
+          <Route path="/terms" element={<StaticPage pageKey="terms" />} />
+          <Route path="/about" element={<StaticPage pageKey="about" />} />
+          <Route path="/contact" element={<StaticPage pageKey="contact" />} />
+          {/* [CL-COEDIT-E2E-20260620-130000] 공동 예산 초대 수락 (auth·동적 — 비프리렌더) */}
+          <Route path="/invite/:token" element={<AcceptInvite />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

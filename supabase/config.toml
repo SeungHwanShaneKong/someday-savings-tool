@@ -1,4 +1,5 @@
-project_id = "qllsuouxeojhwgonwpqb"
+# [CL-DBSWITCH-20260620] Edge+DB 통합 — CLI 기본 타깃을 자가 소유 메인 프로젝트로.
+project_id = "pnfjwsugsdyzyahrants"
 
 # [CL-SEC-HARDEN-20260418-214623] 함수별 JWT 검증 정책 명시화
 # Supabase 기본값은 `verify_jwt = true`이지만, 인증 전 호출이 필요한 함수는

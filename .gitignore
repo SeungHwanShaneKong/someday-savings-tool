@@ -36,3 +36,16 @@ supabase/.temp/
 
 # Windows artifacts
 nul
+
+# TypeScript incremental build cache (tsc -b) — 절대 커밋 금지
+*.tsbuildinfo
+
+# Playwright E2E artifacts
+e2e/.report/
+e2e/.artifacts/
+test-results/
+playwright/.cache/
+
+# Supabase migration dumps (민감 데이터 — 절대 커밋 금지)
+supabase_dump/
+*.dump.sql

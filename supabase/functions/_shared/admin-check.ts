@@ -2,7 +2,8 @@
 //
 // Problem: Edge Functions run on project qllsuouxeojhwgonwpqb, but admin
 // roles (user_roles table + has_role RPC) live on the MAIN project
-// (tnboeqtdimyxpjzsraro). Calling supabase.rpc('has_role') on the Edge
+// (pnfjwsugsdyzyahrants — 구 tnboeqtdimyxpjzsraro, [CL-DBSWITCH-20260620] 이전).
+// Calling supabase.rpc('has_role') on the Edge
 // project always returns null → 403 for every user.
 //
 // Solution: Create a Supabase client pointing to the MAIN project and

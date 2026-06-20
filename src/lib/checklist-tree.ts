@@ -43,8 +43,12 @@ export interface CategoryGroup {
 export function groupItemsByCategory(items: ChecklistItem[]): CategoryGroup[] {
   const map = new Map<string, ChecklistItem[]>();
 
+  // [CL-COVERAGE50-FIX-20260620] 미등록 category_link 도 null/'' 과 동일하게 'general' 로 폴백 → 데이터 유실 0.
+  //   (이전엔 미등록 키로 버킷에 담기지만 emit 루프가 CATEGORY_GROUP_ORDER 만 순회해 출력에서 사라졌음.)
+  const VALID_KEYS = new Set<string>(CATEGORY_GROUP_ORDER);
   for (const item of items) {
-    const key = item.category_link || 'general';
+    const raw = item.category_link || 'general';
+    const key = VALID_KEYS.has(raw) ? raw : 'general';
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(item);
   }

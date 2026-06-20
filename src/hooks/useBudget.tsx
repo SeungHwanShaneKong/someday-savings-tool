@@ -21,6 +21,8 @@ export interface Budget {
   wedding_date: string | null;
   created_at: string;
   updated_at: string;
+  /** [CL-COEDIT-E2E-20260620-130000] 공동(우리) 예산 여부 — 협업자가 있거나 내가 협업자. 로더가 주입(개인=false). */
+  isShared?: boolean;
 }
 
 export function useBudget() {

@@ -34,6 +34,20 @@ const ROUTES = [
   { path: '/guide/sdm-checklist/',      marker: '스드메 견적 항목별 체크리스트',    jsonLdType: 'Article' },
   { path: '/guide/budget-10million/',   marker: '예산 1,000만원으로 결혼 준비하기', jsonLdType: 'Article' },
   { path: '/guide/wedding-prep-order/', marker: '결혼 준비 순서 완벽 가이드',       jsonLdType: 'Article' },
+  // [CL-ADSENSE-20260619-234411] 심화 아티클 8편 추가 (콘텐츠 확장)
+  { path: '/guide/wedding-venue-types/', marker: '예식장 유형별 비용 완벽 비교',     jsonLdType: 'Article' },
+  { path: '/guide/small-wedding/',       marker: '스몰웨딩 완벽 가이드',             jsonLdType: 'Article' },
+  { path: '/guide/main-snap-dvd/',       marker: '본식 스냅·영상 완벽 가이드',       jsonLdType: 'Article' },
+  { path: '/guide/invitation-guide/',    marker: '청첩장 준비 완벽 가이드',          jsonLdType: 'Article' },
+  { path: '/guide/yedan-yemul/',         marker: '예단·예물·함 완벽 가이드',         jsonLdType: 'Article' },
+  { path: '/guide/newlywed-home/',       marker: '신혼집 비용·대출 완벽 가이드',     jsonLdType: 'Article' },
+  { path: '/guide/honsu-appliances/',    marker: '혼수 가전·가구 완벽 가이드',       jsonLdType: 'Article' },
+  { path: '/guide/wedding-gift-money/',  marker: '축의금·하객수 완벽 가이드',        jsonLdType: 'Article' },
+  // [CL-ADSENSE-20260619-234411] 정책/정보 페이지 (AdSense 필수)
+  { path: '/privacy/',                  marker: '개인정보처리방침',                 jsonLdType: null },
+  { path: '/terms/',                    marker: '이용약관',                         jsonLdType: null },
+  { path: '/about/',                    marker: '웨딩셈 소개',                       jsonLdType: null },
+  { path: '/contact/',                  marker: '문의하기',                         jsonLdType: null },
 ];
 
 // 프리렌더 중 abort 할 외부 도메인 (광고/애널리틱스) — 태그는 DOM에 남아 유저 런타임엔 정상 로드

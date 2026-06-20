@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
@@ -29,6 +29,8 @@ import {
   Shield,
   ClipboardList,
   Sparkles,
+  Lock,
+  Users,
 } from 'lucide-react';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -52,6 +54,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { VersionHistorySheet } from '@/components/VersionHistorySheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+// [CL-COEDIT-E2E-20260620-130000] 개인/우리 모드 + 협업 관리 + 실시간 동기화
+import { useWorkspace } from '@/hooks/useWorkspace';
+import { CollaboratorManager } from '@/components/collaboration/CollaboratorManager';
+import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
@@ -82,6 +88,8 @@ export default function BudgetFlow() {
     deleteItem,
     getTotal,
     getBudgetsForComparison,
+    // [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 applier
+    realtimeApplier,
     // New snapshot/reset functions
     snapshots,
     resetBudget,
@@ -102,6 +110,21 @@ export default function BudgetFlow() {
   const [isResetting, setIsResetting] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [showDonation, setShowDonation] = useState(false);
+
+  // [CL-COEDIT-E2E-20260620-130000] 개인/우리 워크스페이스 모드 (예산별 공유의 뷰 필터)
+  const { mode, setMode, visibleBudgets } = useWorkspace(budgets);
+  // 모드 전환 시 활성 예산이 현재 모드에 없으면 보정 → 개인↔공동 데이터 누수 0
+  useEffect(() => {
+    if (activeBudgetId && visibleBudgets.some(b => b.id === activeBudgetId)) return;
+    setActiveBudgetId(visibleBudgets[0]?.id ?? null);
+  }, [mode, visibleBudgets, activeBudgetId, setActiveBudgetId]);
+  const activeBudget = visibleBudgets.find(b => b.id === activeBudgetId) ?? null;
+  const isOwnerOfActive = !!activeBudget && activeBudget.user_id === user?.id;
+
+  // [CL-COEDIT-E2E-20260620-130000] 실시간 구독 = '우리' 모드 활성 예산에서만.
+  // 개인 모드(또는 활성 예산 없음) → null → 구독 안 함 = 개인↔공동 완전 분리(개인 예산 절대 비동기화).
+  const realtimeBudgetId = mode === 'shared' ? (activeBudget?.id ?? null) : null;
+  useRealtimeBudget(realtimeBudgetId, realtimeApplier);
 
   const handleCreateBudget = async () => {
     const newName = `옵션 ${budgets.length + 1}`;
@@ -298,8 +321,32 @@ export default function BudgetFlow() {
       {viewMode === 'table' && (
         <div className="bg-secondary/50 border-b border-border overflow-x-hidden">
           <div className="max-w-6xl mx-auto px-3 sm:px-4">
-            <div className="flex items-center gap-1.5 sm:gap-2 py-2 sm:py-3 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
-              {budgets.map((budget) => (
+            {/* [CL-COEDIT-E2E-20260620-130000] 개인/우리 모드 토글 */}
+          <div className="flex items-center gap-2 pt-2 sm:pt-3">
+            <div className="flex items-center bg-muted rounded-lg p-1">
+              <Button
+                variant={mode === 'personal' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setMode('personal')}
+                className="gap-1 h-8"
+              >
+                <Lock className="h-3.5 w-3.5" /> 개인
+              </Button>
+              <Button
+                variant={mode === 'shared' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setMode('shared')}
+                className="gap-1 h-8"
+              >
+                <Users className="h-3.5 w-3.5" /> 우리
+              </Button>
+            </div>
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              {mode === 'personal' ? '나만 보는 예산' : '파트너와 함께 보는 예산'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2 py-2 sm:py-3 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
+              {visibleBudgets.map((budget) => (
                 <div
                   key={budget.id}
                   className={`
@@ -448,7 +495,28 @@ export default function BudgetFlow() {
         )}
 
         {viewMode === 'table' ? (
+          mode === 'shared' && visibleBudgets.length === 0 ? (
+            /* [CL-COEDIT-E2E-20260620-130000] 우리 모드 빈 상태 */
+            <div className="text-center py-16 px-6">
+              <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Users className="w-8 h-8 text-primary" aria-hidden="true" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground mb-2">아직 공동 예산이 없어요</h2>
+              <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+                개인 예산에서 파트너를 초대하면, 여기 '우리'에 나타나 함께 편집할 수 있어요.
+              </p>
+              <Button onClick={() => setMode('personal')} variant="outline" className="gap-1.5">
+                <Lock className="w-4 h-4" /> 개인 예산으로 가기
+              </Button>
+            </div>
+          ) : (
           <>
+            {/* [CL-COEDIT-E2E-20260620-130000] 협업 관리(활성 예산) — 초대/협업자 */}
+            {activeBudget && (
+              <div className="mb-4">
+                <CollaboratorManager budgetId={activeBudget.id} isOwner={isOwnerOfActive} />
+              </div>
+            )}
             {isMobile ? (
               <BudgetTableMobile
                 items={items}
@@ -495,6 +563,7 @@ export default function BudgetFlow() {
               </>
             )}
           </>
+          )
         ) : (
           <BudgetComparisonDashboard budgets={getBudgetsForComparison()} />
         )}

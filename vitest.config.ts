@@ -7,9 +7,9 @@ export default defineConfig({
   // [CL-QA100-BTN-20260531] Supabase 클라이언트가 모듈 로드 시 createClient(env) 를 호출하므로
   // vite.config 의 define 폴백을 테스트 환경에도 동일 주입 (없으면 "supabaseUrl is required" 크래시).
   define: {
-    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("https://tnboeqtdimyxpjzsraro.supabase.co"),
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("https://pnfjwsugsdyzyahrants.supabase.co"),
     "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify("test-anon-key"),
-    "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify("tnboeqtdimyxpjzsraro"),
+    "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify("pnfjwsugsdyzyahrants"),
   },
   test: {
     environment: "jsdom",

@@ -1,0 +1,14 @@
+{
+  "//": "[CL-COEDIT-E2E-20260620-130000] e2e 전용 tsconfig — 루트 tsconfig 가 참조하지 않으므로 앱 typecheck(tsc)/vitest 와 격리. @playwright/test 설치 후 타입 해소.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "types": ["@playwright/test", "node"]
+  },
+  "include": ["**/*.ts"]
+}

@@ -84,6 +84,21 @@ export default function Footer() {
 
         {/* Divider */}
         <div className="border-t border-border/50 pt-6">
+          {/* [CL-ADSENSE-20260619-234411] 법적 고지 링크 (AdSense 필수) */}
+          <nav aria-label="정책 및 정보" className="flex flex-wrap justify-center gap-x-4 gap-y-2 mb-5">
+            <Link to="/privacy/" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              개인정보처리방침
+            </Link>
+            <Link to="/terms/" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              이용약관
+            </Link>
+            <Link to="/about/" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              소개
+            </Link>
+            <Link to="/contact/" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              문의
+            </Link>
+          </nav>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">웨딩셈</span>

@@ -14,10 +14,12 @@ export default defineConfig(({ mode }) => ({
   },
   define: {
     // Fallback: ensure Supabase env vars are always available
+    // [CL-DBSWITCH-20260620] 메인 DB 전환: Lovable 관리(tnboeqtdimyxpjzsraro) → 자가 소유(pnfjwsugsdyzyahrants).
+    // 구 유저 UUID·구글 신원(auth.identities) 보존 이전 완료 후 전환. anon 키는 공개라 클라 코드에 안전.
     ...(process.env.VITE_SUPABASE_URL ? {} : {
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify("https://tnboeqtdimyxpjzsraro.supabase.co"),
-      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRuYm9lcXRkaW15eHBqenNyYXJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyMzE4MDcsImV4cCI6MjA4NDgwNzgwN30.vW3bVRKZ91key-JpysigzC96qa96DqqFE47CLs6Nhj0"),
-      'import.meta.env.VITE_SUPABASE_PROJECT_ID': JSON.stringify("tnboeqtdimyxpjzsraro"),
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify("https://pnfjwsugsdyzyahrants.supabase.co"),
+      'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBuZmp3c3Vnc2R5enlhaHJhbnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MzA2NTAsImV4cCI6MjA5NzUwNjY1MH0.Lk6BGwhOEee251lyBYloa6FScU_Xu-pjkJFrU4CkItU"),
+      'import.meta.env.VITE_SUPABASE_PROJECT_ID': JSON.stringify("pnfjwsugsdyzyahrants"),
     }),
   },
   build: {

@@ -55,10 +55,17 @@ export const AVERAGE_COSTS: Record<string, Record<string, AverageCostData>> = {
 
 export const SOURCE_TEXT = '출처: 2025년 전국 기준 AI 조사 결과';
 
+// [CL-COVERAGE50-FIX-20260620] 프로토타입 체인 누수 차단 — bracket 접근은 'toString'/'valueOf' 등
+// 상속 멤버를 truthy 로 반환해 `|| null` 가드를 우회한다. own-property 만 인정해 없는 키는 항상 null.
+const hasOwn = (o: object, k: string): boolean =>
+  Object.prototype.hasOwnProperty.call(o, k);
+
 export const getAverageCost = (categoryId: string, subCategoryId: string): AverageCostData | null => {
-  return AVERAGE_COSTS[categoryId]?.[subCategoryId] || null;
+  if (!hasOwn(AVERAGE_COSTS, categoryId)) return null;
+  const cat = AVERAGE_COSTS[categoryId];
+  return hasOwn(cat, subCategoryId) ? cat[subCategoryId] : null;
 };
 
 export const hasAverageCost = (categoryId: string, subCategoryId: string): boolean => {
-  return !!AVERAGE_COSTS[categoryId]?.[subCategoryId];
+  return hasOwn(AVERAGE_COSTS, categoryId) && hasOwn(AVERAGE_COSTS[categoryId], subCategoryId);
 };

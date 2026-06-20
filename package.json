@@ -13,7 +13,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report e2e/.report"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -73,6 +76,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.61.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
@@ -89,6 +93,7 @@
     "lovable-tagger": "^1.1.13",
     "postcss": "^8.5.6",
     "puppeteer": "^25.1.0",
+    "supabase": "^2.107.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",

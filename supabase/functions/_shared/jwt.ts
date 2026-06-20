@@ -4,8 +4,10 @@
 // allowing attackers to forge any user identity.
 //
 // REPLACED WITH: verifyUserToken() — verifies the JWT by calling getUser()
-// on the MAIN Supabase project (tnboeqtdimyxpjzsraro), which properly
+// on the MAIN Supabase project (pnfjwsugsdyzyahrants — 구 tnboeqtdimyxpjzsraro,
+// [CL-DBSWITCH-20260620] 자가 소유 프로젝트로 이전), which properly
 // validates the token signature server-side.
+// ⚠️ 의존 시크릿: MAIN_SUPABASE_URL / MAIN_SUPABASE_ANON_KEY 를 새 프로젝트 값으로 설정해야 동작.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 

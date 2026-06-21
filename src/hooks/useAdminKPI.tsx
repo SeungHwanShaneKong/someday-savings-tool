@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
-import { withCumulativeSignups } from '@/lib/kpi-definitions'; // [CL-ADMIN-SIGNUP-TREND-20260622]
+import { withCumulativeSignups, firstTrendBucketStart } from '@/lib/kpi-definitions'; // [CL-ADMIN-SIGNUP-TREND-20260622]
 import { calculateImpact, type ImpactSummary, type BudgetForImpact } from '@/lib/impact-calculator';
 
 // 관리자 user_id — 모든 KPI 계산에서 제외
@@ -89,6 +89,8 @@ export function useAdminKPI(): UseAdminKPIResult {
 
       const startISO = startDate.toISOString();
       const endISO = endDate.toISOString();
+      // [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 누적 baseline 컷오프를 첫 일별 버킷 시작과 정렬(경계 갭 제거)
+      const cumulativeBaselineISO = firstTrendBucketStart(endDate, periodDays).toISOString();
       const prevStartISO = prevStart.toISOString();
       const prevEndISO = prevEnd.toISOString();
 
@@ -137,7 +139,8 @@ export function useAdminKPI(): UseAdminKPIResult {
           () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: true })
         ),
         // [CL-ADMIN-SIGNUP-TREND-20260622] 윈도우 이전 누적 가입자 수 = 진짜 누적의 baseline(소형 profiles 테이블, head count)
-        supabase.from('profiles').select('user_id', { count: 'exact', head: true }).neq('user_id', ADMIN_USER_ID).lt('created_at', startISO).then(r => r.count ?? 0),
+        // [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 컷오프=첫 일별 버킷 시작(startISO 아님) → 경계 갭(첫 부분일 가입 누락) 제거
+        supabase.from('profiles').select('user_id', { count: 'exact', head: true }).neq('user_id', ADMIN_USER_ID).lt('created_at', cumulativeBaselineISO).then(r => r.count ?? 0),
       ]);
 
       const todayPV = todayPVRes;

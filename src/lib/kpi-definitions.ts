@@ -1,5 +1,6 @@
 // KPI 정의, 임계값, 데모 데이터
 // 15개 핵심 지표의 메타데이터와 상태 배지 판별 로직
+import { startOfDay, subDays } from 'date-fns';
 
 export type KPIStatus = '정상' | '주의' | '위험' | '참고';
 
@@ -92,6 +93,15 @@ export function withCumulativeSignups(points: TrendDataPoint[], baseline = 0): T
     acc += p.signups ?? 0;
     return { ...p, cumulativeSignups: acc };
   });
+}
+
+// [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 누적 가입자 baseline 컷오프 = 첫 일별 트렌드 버킷의 시작(startOfDay).
+//   트렌드 루프 첫 버킷 = startOfDay(subDays(endDate, dayCount-1)), dayCount = min(periodDays, 90).
+//   baseline(<이 시점)과 일별 버킷(>=이 시점)이 동일 경계를 공유하게 만들어, 시각 보존 startISO 와의
+//   경계 갭(첫 부분-캘린더-일의 신규 가입자가 baseline·버킷 양쪽에서 누락되던 결함)을 제거한다.
+export function firstTrendBucketStart(endDate: Date, periodDays: number): Date {
+  const dayCount = Math.min(periodDays, 90);
+  return startOfDay(subDays(endDate, dayCount - 1));
 }
 
 export interface TopPage {

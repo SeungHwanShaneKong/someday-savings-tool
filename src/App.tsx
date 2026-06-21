@@ -13,6 +13,8 @@ import { UpdateNotice } from "@/components/UpdateNotice";
 import { OnboardingCarousel } from "@/components/onboarding/OnboardingCarousel";
 // [CL-COEDIT-E2E-20260620-130000] OAuth 복귀 후 초대 재개 워처
 import { InviteResumeWatcher } from "@/components/collaboration/InviteResumeWatcher";
+// [CL-FEEDBACK-DAILY-20260621] 하루 1회 은은한 피드백 권유(토스트→모달)
+import { FeatureRequestPrompt } from "@/components/FeatureRequestPrompt";
 import { ChatFab } from "@/components/chat/ChatFab";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import LoadingSpinner from "@/components/LoadingSpinner";
@@ -77,6 +79,7 @@ function AppRoutes() {
       <UpdateNotice />
       <OnboardingCarousel />
       <InviteResumeWatcher />
+      <FeatureRequestPrompt />
       <AppErrorBoundary>
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>

@@ -1,5 +1,6 @@
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { cn } from '@/lib/utils';
+import { useCountUp } from '@/hooks/useCountUp'; // [CL-ANIM-UPGRADE-20260621-150000]
 
 interface FloatingTotalBarProps {
   total: number;
@@ -7,6 +8,8 @@ interface FloatingTotalBarProps {
 }
 
 export function FloatingTotalBar({ total, className }: FloatingTotalBarProps) {
+  // [CL-ANIM-UPGRADE-20260621-150000] 총액 카운트업(≤500ms) — reduced-motion 시 즉시 최종값
+  const animatedTotal = useCountUp(total);
   return (
     <div 
       className={cn(
@@ -18,7 +21,7 @@ export function FloatingTotalBar({ total, className }: FloatingTotalBarProps) {
         <div className="flex items-center justify-between">
           <span className="text-caption text-muted-foreground">총 예상 비용</span>
           <span className="text-heading text-primary animate-number">
-            {formatKoreanWon(total)}
+            {formatKoreanWon(animatedTotal)}
           </span>
         </div>
       </div>

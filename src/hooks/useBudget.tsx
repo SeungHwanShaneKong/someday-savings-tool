@@ -23,6 +23,8 @@ export interface Budget {
   updated_at: string;
   /** [CL-COEDIT-E2E-20260620-130000] 공동(우리) 예산 여부 — 협업자가 있거나 내가 협업자. 로더가 주입(개인=false). */
   isShared?: boolean;
+  /** [CL-COEDIT-OPTADD-20260621] 영구 공유 의도 컬럼(생성 시 모드로 태깅). isShared = is_shared OR 협업자 유무. */
+  is_shared?: boolean;
 }
 
 export function useBudget() {

@@ -29,6 +29,16 @@ export interface BudgetSnapshot {
 // [CL-HOME-FIX-20260315-120000] sessionStorage 키 — 네비게이션 간 activeBudgetId 유지
 const ACTIVE_BUDGET_KEY = 'wedding_active_budget_id';
 
+// [CL-AUDIT-ISSHARED-DEGRADE-20260622] Postgres undefined_column(42703) 판별.
+//   budgets.is_shared 마이그레이션이 아직 적용되지 않은 환경에서도 예산 생성이 죽지 않도록
+//   감지 후 is_shared 없이 재시도(우아한 degrade). 배포 순서(마이그 선적용)는 별도 게이트로 권고하되,
+//   순서가 어긋나도 신규 사용자 백지/옵션추가 마비를 방지하는 방어선.
+function isMissingIsSharedColumn(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; message?: string };
+  return e.code === '42703' || /is_shared/i.test(e.message ?? '');
+}
+
 export function useMultipleBudgets() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -41,6 +51,16 @@ export function useMultipleBudgets() {
   const [allBudgetsItems, setAllBudgetsItems] = useState<Record<string, ExtendedBudgetItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [snapshots, setSnapshots] = useState<BudgetSnapshot[]>([]);
+
+  // [CL-ANIM-UPGRADE-20260621-150000] 앰비언트 저장 상태 — "저장 중…/저장됨 ✓"(침묵 해소).
+  //  매 항목 플래시(노이즈) 대신 단일 조용한 신뢰 신호. updateItem 한 곳에만 배선.
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const inFlightRef = useRef(0);
+  // [CL-AUDIT-SAVESTATE-20260622] 에러-스티키: 한 배치(동시 저장 묶음)에 한 번이라도 실패하면
+  //   나중에 성공한 저장이 'saved'로 덮어쓰지 못하게 한다(거짓 "저장됨 ✓" 방지).
+  const errorSeenRef = useRef(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
 
   // [CL-HOME-FIX-20260315-120000] 가드 ref — 중복 fetch/생성 방지
   const isCreatingRef = useRef(false);
@@ -112,7 +132,8 @@ export function useMultipleBudgets() {
       }
 
       const existingBudgets: Budget[] = [
-        ...owned.map(b => ({ ...b, isShared: sharedOwnedIds.has(b.id) })),
+        // [CL-COEDIT-OPTADD-20260621] isShared = 영구 의도 컬럼(is_shared) OR 협업자 유무 (기존 우리예산 비파괴)
+        ...owned.map(b => ({ ...b, isShared: (b.is_shared ?? false) || sharedOwnedIds.has(b.id) })),
         ...sharedFromOthers.map(b => ({ ...b, isShared: true })),
       ].sort((a, b) => (a.updated_at < b.updated_at ? 1 : a.updated_at > b.updated_at ? -1 : 0));
 
@@ -182,15 +203,26 @@ export function useMultipleBudgets() {
   }, [activeBudgetId, toast]);
 
   // Create a new budget
-  const createNewBudget = async (name: string) => {
+  // [CL-COEDIT-OPTADD-20260621] opts.shared = 현재 워크스페이스 모드('우리'면 true) → 생성 옵션이 같은 탭에 귀속
+  const createNewBudget = async (name: string, opts?: { shared?: boolean }) => {
     if (!user) return null;
 
+    const shared = opts?.shared ?? false;
     try {
-      const { data: newBudget, error: createError } = await supabase
+      let { data: newBudget, error: createError } = await supabase
         .from('budgets')
-        .insert({ user_id: user.id, name })
+        .insert({ user_id: user.id, name, is_shared: shared })
         .select()
         .single();
+
+      // [CL-AUDIT-ISSHARED-DEGRADE-20260622] 컬럼 미배포(42703) → is_shared 없이 재시도(생성 마비 방지)
+      if (createError && isMissingIsSharedColumn(createError)) {
+        ({ data: newBudget, error: createError } = await supabase
+          .from('budgets')
+          .insert({ user_id: user.id, name })
+          .select()
+          .single());
+      }
 
       if (createError) throw createError;
 
@@ -218,8 +250,9 @@ export function useMultipleBudgets() {
         .insert(initialItems)
         .select();
 
-      setBudgets(prev => [...prev, newBudget]);
-      
+      // [CL-COEDIT-OPTADD-20260621] isShared 즉시 주입 → 생성 직후 올바른 탭(개인/우리)에 표시(refetch 전 누수 0)
+      setBudgets(prev => [...prev, { ...newBudget, isShared: shared }]);
+
       // Also update allBudgetsItems for immediate comparison dashboard update
       if (insertedItems) {
         setAllBudgetsItems(prev => ({
@@ -242,9 +275,11 @@ export function useMultipleBudgets() {
   };
 
   // Copy an existing budget to create a new one
-  const copyBudget = async (sourceBudgetId: string, newName: string) => {
+  // [CL-COEDIT-OPTADD-20260621] opts.shared = 현재 모드 → 복사본도 같은 탭에 귀속
+  const copyBudget = async (sourceBudgetId: string, newName: string, opts?: { shared?: boolean }) => {
     if (!user) return null;
 
+    const shared = opts?.shared ?? false;
     try {
       // First get all items from the source budget
       const { data: sourceItems, error: fetchError } = await supabase
@@ -255,11 +290,20 @@ export function useMultipleBudgets() {
       if (fetchError) throw fetchError;
 
       // Create the new budget
-      const { data: newBudget, error: createError } = await supabase
+      let { data: newBudget, error: createError } = await supabase
         .from('budgets')
-        .insert({ user_id: user.id, name: newName })
+        .insert({ user_id: user.id, name: newName, is_shared: shared })
         .select()
         .single();
+
+      // [CL-AUDIT-ISSHARED-DEGRADE-20260622] 컬럼 미배포(42703) → is_shared 없이 재시도(복사 마비 방지)
+      if (createError && isMissingIsSharedColumn(createError)) {
+        ({ data: newBudget, error: createError } = await supabase
+          .from('budgets')
+          .insert({ user_id: user.id, name: newName })
+          .select()
+          .single());
+      }
 
       if (createError) throw createError;
 
@@ -295,7 +339,8 @@ export function useMultipleBudgets() {
         }
       }
 
-      setBudgets(prev => [...prev, newBudget]);
+      // [CL-COEDIT-OPTADD-20260621] isShared 즉시 주입 → 복사본이 현재 탭에 표시
+      setBudgets(prev => [...prev, { ...newBudget, isShared: shared }]);
       setActiveBudgetId(newBudget.id);
 
       toast({
@@ -405,6 +450,13 @@ export function useMultipleBudgets() {
     // 2) pending 등록 — 이 쓰기가 건드린 컬럼(실시간 자기에코 억제용)
     pendingWritesRef.current.set(itemId, { columns: new Set(Object.keys(updates)) });
 
+    // [CL-ANIM-UPGRADE-20260621-150000] 저장 인디케이터: 진행 시작
+    // [CL-AUDIT-SAVESTATE-20260622] 새 배치 시작(0→1)에서 에러 플래그 리셋
+    if (inFlightRef.current === 0) errorSeenRef.current = false;
+    inFlightRef.current += 1;
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    setSaveState('saving');
+
     try {
       // 3) .select().single() — 트리거가 찍은 서버 updated_at 수신
       const { data, error } = await supabase
@@ -437,7 +489,24 @@ export function useMultipleBudgets() {
           .eq('id', activeBudgetId)
           .then();
       }
+
+      // [CL-ANIM-UPGRADE-20260621-150000] 저장 인디케이터: 마지막 in-flight ACK 시 결정
+      // [CL-AUDIT-SAVESTATE-20260622] 배치 중 한 번이라도 실패했으면 'error' 유지(거짓 'saved' 방지)
+      inFlightRef.current = Math.max(0, inFlightRef.current - 1);
+      if (inFlightRef.current === 0) {
+        setSaveState(errorSeenRef.current ? 'error' : 'saved');
+        savedTimerRef.current = setTimeout(() => setSaveState('idle'), errorSeenRef.current ? 2400 : 1800);
+      }
     } catch (error: any) {
+      // [CL-ANIM-UPGRADE-20260621-150000] 저장 인디케이터: 실패
+      // [CL-AUDIT-SAVESTATE-20260622] 에러 플래그 세팅 + 배치 종료 시에만 'error' 확정(중간 성공이 덮지 못함)
+      errorSeenRef.current = true;
+      inFlightRef.current = Math.max(0, inFlightRef.current - 1);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      if (inFlightRef.current === 0) {
+        setSaveState('error');
+        savedTimerRef.current = setTimeout(() => setSaveState('idle'), 2400);
+      }
       // 4') 낙관적 롤백 — 직전 값 복원
       if (prevItem) {
         setItems(prev => prev.map(item => (item.id === itemId ? prevItem : item)));
@@ -1043,6 +1112,8 @@ export function useMultipleBudgets() {
     setActiveBudgetId,
     items,
     loading,
+    // [CL-ANIM-UPGRADE-20260621-150000] 앰비언트 저장 상태
+    saveState,
     createNewBudget,
     copyBudget,
     renameBudget,

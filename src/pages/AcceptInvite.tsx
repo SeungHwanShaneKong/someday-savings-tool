@@ -92,6 +92,8 @@ export default function AcceptInvite() {
           case 'already_member':
             toast({ title: '공동 예산에 참여했어요! 👫', description: '이제 파트너와 함께 편집할 수 있어요.' });
             try { localStorage.setItem(WORKSPACE_MODE_KEY, 'shared'); } catch { /* noop */ }
+            // [CL-COEDIT-NICK-20260621] 닉네임 권유는 /budget 진입 후 BudgetFlow(우리 모드)에서 인-컨텍스트로 노출
+            //   (수락 흐름을 막지 않음 → 더 단순·자연스러움).
             navigate('/budget', { replace: true });
             break;
           case 'owner':

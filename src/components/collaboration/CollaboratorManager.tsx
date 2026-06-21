@@ -8,7 +8,7 @@ import { UserPlus, Copy, Check, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useCollaboration } from '@/hooks/useCollaboration';
+import { useCollaboration, type UseCollaborationResult } from '@/hooks/useCollaboration';
 
 interface CollaboratorManagerProps {
   budgetId: string | null;
@@ -21,10 +21,15 @@ interface CollaboratorManagerProps {
   /** [CL-COEDIT-COPY-20260620] 개인 예산일 때 "복사하여 공동편집(원본 보존)" 1순위 버튼 노출 */
   showCopyToCoedit?: boolean;
   onCopyToCoedit?: () => void;
+  /** [CL-AUDIT-RPC-DEDUP-20260622] 상위에서 단일 useCollaboration 을 주입(중복 get_budget_participants RPC 제거).
+   *  주어지면 내부 훅은 budgetId=null 로 호출돼 RPC 를 발사하지 않는다(훅 규칙 준수). 미주입 시 기존대로 자체 조회. */
+  external?: UseCollaborationResult;
 }
 
-export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit }: CollaboratorManagerProps) {
-  const { collaborators, inviteUrl, busy, createInvite, removeCollaborator } = useCollaboration(budgetId);
+export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit, external }: CollaboratorManagerProps) {
+  // external 주입 시 내부 훅은 null 로 비활성(RPC 0). 미주입 시 자체 조회(독립 사용·테스트 호환).
+  const internal = useCollaboration(external ? null : budgetId);
+  const { collaborators, inviteUrl, busy, createInvite, removeCollaborator } = external ?? internal;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 

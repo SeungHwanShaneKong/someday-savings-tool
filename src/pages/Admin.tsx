@@ -314,6 +314,25 @@ export default function Admin() {
           <section className="space-y-4">
             <h2 className="text-base sm:text-lg font-bold leading-relaxed">📈 Analytics Insights</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* [CL-ADMIN-CHART-ORDER-20260621] 활성 사용자 추이 — 페이지뷰 추이 바로 위로 이동 */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">활성 사용자 추이 (DAU / WAU / MAU)</h3>
+                <div className="h-56 sm:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip contentStyle={chartTooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: '13px' }} />
+                      <Line type="monotone" dataKey="dau" name="DAU" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="wau" name="WAU" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="mau" name="MAU" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
               {/* 페이지뷰 추이 */}
               <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">페이지뷰 추이</h3>
@@ -508,26 +527,8 @@ export default function Admin() {
             <h2 className="text-base sm:text-lg font-bold leading-relaxed">📈 Historical Trend</h2>
 
             <div className="grid md:grid-cols-2 gap-4 sm:gap-5">
-              {/* 차트 1: 활성 사용자 추이 */}
-              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
-                <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">활성 사용자 추이 (DAU / WAU / MAU)</h3>
-                <div className="h-56 sm:h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <RechartsTooltip contentStyle={chartTooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: '13px' }} />
-                      <Line type="monotone" dataKey="dau" name="DAU" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="wau" name="WAU" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                      <Line type="monotone" dataKey="mau" name="MAU" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-
-              {/* 차트 2: 온보딩 전환 추이 */}
+              {/* [CL-ADMIN-CHART-ORDER-20260621] 활성 사용자 추이는 Analytics Insights(페이지뷰 위)로 이동 */}
+              {/* 온보딩 전환 추이 */}
               <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
                 <h3 className="text-base sm:text-lg font-semibold mb-4 leading-relaxed">온보딩 전환 추이 (가입 / 생성 / 입력)</h3>
                 <div className="h-56 sm:h-64">

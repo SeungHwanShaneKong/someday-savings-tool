@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { BadgeDefinition } from '@/lib/gamification/types';
+import { CelebrationBurst } from '@/components/ui/celebration-burst'; // [CL-ANIM-UPGRADE-20260621-150000]
 
 interface BadgeUnlockModalProps {
   open: boolean;
@@ -49,11 +50,26 @@ export function BadgeUnlockModal({
   if (!badge) return null;
   const rarity = RARITY_HERO[badge.rarity];
 
+  // [CL-ANIM-UPGRADE-20260621-150000] 레어리티별 축하 파티클 강도/색
+  const isLegendary = badge.rarity === 'legendary';
+  const burstColors = isLegendary
+    ? ['bg-amber-400', 'bg-yellow-300', 'bg-amber-500', 'bg-orange-300']
+    : undefined;
+  const burstCount = isLegendary ? 18 : badge.rarity === 'rare' ? 14 : 10;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-sm text-center sm:max-w-md">
         <DialogHeader className="items-center space-y-4 pt-4">
           <div className="relative">
+            {/* [CL-ANIM-UPGRADE-20260621-150000] 언락 순간 파티클 분사 (배지별 재분사: key) */}
+            <CelebrationBurst
+              key={badge.id}
+              active={open}
+              count={burstCount}
+              radius={isLegendary ? 84 : 68}
+              colors={burstColors}
+            />
             <div
               className={cn(
                 'absolute inset-0 rounded-full blur-3xl',

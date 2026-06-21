@@ -7,6 +7,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
 import { BudgetTable } from '@/components/BudgetTable';
 import { BudgetTableMobile } from '@/components/BudgetTableMobile';
+import { SaveStatusIndicator } from '@/components/budget/SaveStatusIndicator';
 import { BudgetComparisonDashboard } from '@/components/BudgetComparisonDashboard';
 import { InsightPanel } from '@/components/budget/InsightPanel';
 import { WeddingCountdown } from '@/components/WeddingCountdown';
@@ -34,7 +35,6 @@ import {
   Users,
   UserPlus,
 } from 'lucide-react';
-import { formatKoreanWon } from '@/lib/budget-categories';
 import { LogoutButton } from '@/components/LogoutButton';
 import {
   AlertDialog,
@@ -56,9 +56,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { VersionHistorySheet } from '@/components/VersionHistorySheet';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { AnimatedWon } from '@/components/budget/AnimatedWon'; // [CL-AUDIT-COUNTUP-ISOLATE-20260622] 카운트업 리프 격리
 // [CL-COEDIT-E2E-20260620-130000] 개인/우리 모드 + 협업 관리 + 실시간 동기화
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { CollaboratorManager } from '@/components/collaboration/CollaboratorManager';
+// [CL-COEDIT-NICK-20260621] 파트너 이름 표출 + 닉네임 권유
+import { useCollaboration } from '@/hooks/useCollaboration';
+import { NicknameDialog } from '@/components/collaboration/NicknameDialog';
 import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
 
 export default function BudgetFlow() {
@@ -92,6 +96,8 @@ export default function BudgetFlow() {
     deleteItem,
     getTotal,
     getBudgetsForComparison,
+    // [CL-ANIM-UPGRADE-20260621-150000] 앰비언트 저장 상태
+    saveState,
     // [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 applier
     realtimeApplier,
     // New snapshot/reset functions
@@ -132,6 +138,25 @@ export default function BudgetFlow() {
   const realtimeBudgetId = mode === 'shared' ? (activeBudget?.id ?? null) : null;
   useRealtimeBudget(realtimeBudgetId, realtimeApplier);
 
+  // [CL-COEDIT-NICK-20260621] 활성 예산의 참여자 → 파트너 이름 표출 + 소유자 닉네임 1회 권유.
+  // [CL-AUDIT-RPC-DEDUP-20260622] activeBudget 기준 단일 useCollaboration → CollaboratorManager 에 주입(중복 RPC 제거).
+  const collaboration = useCollaboration(activeBudget?.id ?? null);
+  const participants = collaboration.collaborators;
+  const meParticipant = participants.find(p => p.isMe);
+  // [CL-AUDIT-NICK-EFFECT-20260622] effect 의존성을 원시값으로 축소 → 매 렌더 재실행 방지(meParticipant 는 매 렌더 신규 객체)
+  const meUserId = meParticipant?.user_id;
+  const meDisplayName = meParticipant?.display_name?.trim() || '';
+  const partnerName = participants.find(p => !p.isMe && p.display_name?.trim())?.display_name?.trim() || null;
+  const [ownNickOpen, setOwnNickOpen] = useState(false);
+  useEffect(() => {
+    if (mode !== 'shared' || !user || !meUserId) return;
+    if (meDisplayName) return; // 이미 닉네임 있음
+    const guard = `nick_prompt_${user.id}`;
+    try { if (localStorage.getItem(guard)) return; } catch { /* noop */ }
+    try { localStorage.setItem(guard, '1'); } catch { /* noop */ }
+    setOwnNickOpen(true);
+  }, [mode, user, meUserId, meDisplayName]);
+
   // [CL-COEDIT-COPY-20260620] 개인 예산 → 복사본을 만들어 공동편집(원본 보존). 복사본이 active 가 되고 autoInvite 로 초대링크 자동 생성.
   const handleCopyToCoedit = async () => {
     if (!activeBudget) return;
@@ -139,16 +164,17 @@ export default function BudgetFlow() {
     if (copy) setAutoInvite(true);
   };
 
+  // [CL-COEDIT-OPTADD-20260621] 현재 탭(개인/우리)에 귀속되도록 mode 전달 + 탭 내 번호
   const handleCreateBudget = async () => {
-    const newName = `옵션 ${budgets.length + 1}`;
-    await createNewBudget(newName);
+    const newName = `옵션 ${visibleBudgets.length + 1}`;
+    await createNewBudget(newName, { shared: mode === 'shared' });
   };
 
   const handleCopyBudget = async (sourceBudgetId: string) => {
     const sourceBudget = budgets.find(b => b.id === sourceBudgetId);
     if (sourceBudget) {
       const newName = `${sourceBudget.name} (복사본)`;
-      await copyBudget(sourceBudgetId, newName);
+      await copyBudget(sourceBudgetId, newName, { shared: mode === 'shared' });
     }
   };
 
@@ -355,7 +381,12 @@ export default function BudgetFlow() {
               </Button>
             </div>
             <span className="text-xs text-muted-foreground hidden sm:inline">
-              {mode === 'personal' ? '나만 보는 예산' : '파트너와 함께 보는 예산'}
+              {/* [CL-COEDIT-NICK-20260621] 파트너 닉네임 표출(미상 시 '파트너' 폴백) */}
+              {mode === 'personal'
+                ? '나만 보는 예산'
+                : partnerName
+                  ? `${partnerName}님과 함께 보는 예산`
+                  : '파트너와 함께 보는 예산'}
             </span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 py-2 sm:py-3 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
@@ -456,13 +487,14 @@ export default function BudgetFlow() {
                     <Plus className="h-4 w-4 mr-2" />
                     새 옵션 추가
                   </DropdownMenuItem>
-                  {budgets.length > 0 && (
+                  {/* [CL-COEDIT-OPTADD-20260621] 복사 목록 = 현재 탭(visibleBudgets)만 — 다른 탭 예산 노출/복사 차단 */}
+                  {visibleBudgets.length > 0 && (
                     <>
                       <DropdownMenuSeparator />
                       <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
                         기존 옵션 복사
                       </div>
-                      {budgets.map(budget => (
+                      {visibleBudgets.map(budget => (
                         <DropdownMenuItem 
                           key={budget.id}
                           onClick={() => handleCopyBudget(budget.id)}
@@ -543,9 +575,15 @@ export default function BudgetFlow() {
                   onAutoInviteHandled={() => setAutoInvite(false)}
                   showCopyToCoedit={isOwnerOfActive && !activeBudget.isShared}
                   onCopyToCoedit={handleCopyToCoedit}
+                  /* [CL-AUDIT-RPC-DEDUP-20260622] 상위 단일 useCollaboration 주입 → 중복 RPC 제거 */
+                  external={collaboration}
                 />
               </div>
             )}
+            {/* [CL-ANIM-UPGRADE-20260621-150000] 앰비언트 저장 상태 — 표 편집 침묵 해소 */}
+            <div className="flex justify-end mb-2 pr-1">
+              <SaveStatusIndicator state={saveState} />
+            </div>
             {isMobile ? (
               <BudgetTableMobile
                 items={items}
@@ -577,8 +615,9 @@ export default function BudgetFlow() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">현재 예산 총액</p>
+                      {/* [CL-AUDIT-COUNTUP-ISOLATE-20260622] 카운트업 리프 — 페이지/테이블 리렌더 비전파 */}
                       <p className="text-3xl font-bold text-primary">
-                        {formatKoreanWon(getTotal())}
+                        <AnimatedWon value={getTotal()} />
                       </p>
                     </div>
                     <div className="text-right">
@@ -601,6 +640,17 @@ export default function BudgetFlow() {
       {/* Coffee Donation */}
       <CoffeeDonationFab onClick={() => setShowDonation(true)} />
       <CoffeeDonationModal open={showDonation} onOpenChange={setShowDonation} />
+
+      {/* [CL-COEDIT-NICK-20260621] 소유자 닉네임 권유 — 상대에게 '파트너' 대신 이름 표시 */}
+      {user && (
+        <NicknameDialog
+          open={ownNickOpen}
+          onOpenChange={setOwnNickOpen}
+          userId={user.id}
+          initialValue={meParticipant?.display_name}
+          onSaved={() => { void collaboration.refresh(); }}
+        />
+      )}
     </div>
   );
 }

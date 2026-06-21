@@ -84,6 +84,8 @@ export default function Checklist() {
   const [newItemPeriod, setNewItemPeriod] = useState<ChecklistPeriod>(
     activePeriod || 'D-12~10m'
   );
+  // [CL-ANIM-UPGRADE-20260621-150000] 빈 값 Enter 시 입력창 흔들림(넛지)
+  const [shakeAdd, setShakeAdd] = useState(false);
 
   // Budget link state
   const [budgetLinkOpen, setBudgetLinkOpen] = useState(false);
@@ -211,8 +213,14 @@ export default function Checklist() {
               value={newItemTitle}
               onChange={(e) => setNewItemTitle(e.target.value)}
               placeholder="할 일을 입력하세요"
-              className="h-10"
-              onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+              className={`h-10 ${shakeAdd ? 'animate-shake' : ''}`}
+              onAnimationEnd={() => setShakeAdd(false)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                // [CL-ANIM-UPGRADE-20260621-150000] 빈 값이면 흔들어 입력 유도, 아니면 추가
+                if (newItemTitle.trim()) handleAddItem();
+                else setShakeAdd(true);
+              }}
             />
             <Select
               value={newItemPeriod}

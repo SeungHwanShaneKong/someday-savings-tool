@@ -1,12 +1,16 @@
 // [CL-AI-HIERARCHY-20260308-163000]
 // [CL-TREE-REDESIGN-20260403] 긴급 항목 뱃지 추가
 // [CL-GAMIFY-INT-20260418-222329] 체크리스트 streak 노출
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import type { ChecklistStats } from '@/hooks/useChecklist';
 import { StreakFlame } from '@/components/gamification/StreakFlame';
 import { useStreak } from '@/hooks/useStreak';
+// [CL-ANIM-UPGRADE-20260621-150000] 완료 축하(시그니처)
+import { CelebrationBurst } from '@/components/ui/celebration-burst';
+import { toastCelebrate } from '@/lib/toast';
 
 interface ChecklistProgressProps {
   stats: ChecklistStats;
@@ -25,6 +29,21 @@ export function ChecklistProgress({ stats, overdueCount = 0, urgentCount = 0, so
   // [CL-GAMIFY-INT-20260418-222329] 체크리스트 완료 연속일 노출
   const streak = useStreak();
 
+  // [CL-ANIM-UPGRADE-20260621-150000] 전체 100% 도달(상승엣지)에만 1회 축하 — 희소한 성취.
+  // 구간별 완료는 기존 PraiseModal/스트릭이 담당(버스트 피로 방지).
+  const [celebrate, setCelebrate] = useState(false);
+  const prevPctRef = useRef(stats.percentage);
+  useEffect(() => {
+    const prev = prevPctRef.current;
+    if (prev < 100 && stats.percentage === 100 && stats.total > 0) {
+      setCelebrate(true);
+      toastCelebrate('모든 준비를 완료했어요!', {
+        description: `${stats.total}개 항목을 전부 체크했어요 🎊`,
+      });
+    }
+    prevPctRef.current = stats.percentage;
+  }, [stats.percentage, stats.total]);
+
   return (
     <div className="bg-card rounded-2xl border border-border p-5 sm:p-6 lg:p-8 shadow-toss-sm animate-fade-up">
       {/* [CL-GAMIFY-INT-20260418-222329] 체크리스트 streak 배너 (0일이 아닐 때만 노출) */}
@@ -42,13 +61,18 @@ export function ChecklistProgress({ stats, overdueCount = 0, urgentCount = 0, so
       {/* Overall progress ring */}
       <div className="flex items-center gap-5 sm:gap-6 lg:gap-8">
         <div
-          className="relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 flex-shrink-0"
+          className={cn(
+            'relative w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 flex-shrink-0',
+            celebrate && 'animate-ring-glow'
+          )}
           role="progressbar"
           aria-valuenow={stats.percentage}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label={`전체 진행률 ${stats.percentage}퍼센트`}
         >
+          {/* [CL-ANIM-UPGRADE-20260621-150000] 전체 완료 시 1회 파티클 분사 */}
+          <CelebrationBurst active={celebrate} radius={72} onDone={() => setCelebrate(false)} />
           <svg className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 -rotate-90" viewBox="0 0 80 80" aria-hidden="true">
             <circle
               cx="40"

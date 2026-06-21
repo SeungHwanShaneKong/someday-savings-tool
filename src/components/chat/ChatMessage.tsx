@@ -23,7 +23,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <div
-      className={cn('flex gap-2.5', isUser ? 'justify-end' : 'justify-start')}
+      // [CL-ANIM-UPGRADE-20260621-150000] 메시지 입장 — 은은한 fade+slide-up
+      className={cn('flex gap-2.5 animate-chat-in', isUser ? 'justify-end' : 'justify-start')}
     >
       {!isUser && (
         <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">

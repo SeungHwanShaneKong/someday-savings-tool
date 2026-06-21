@@ -497,3 +497,28 @@ describe('useMultipleBudgets isShared 주입 (I21~23)', () => {
     expect(result.current.activeBudgetId).toBe('shared-new');
   });
 });
+
+// [CL-COEDIT-OPTADD-20260621] 영구 is_shared 귀속 — '옵션 추가' 탭 충돌 수정의 데이터 계약.
+//  isShared = is_shared(영구 의도) OR 협업자 유무. 협업자 0이어도 is_shared=true 면 '우리' 탭 귀속.
+describe('useMultipleBudgets is_shared 영구 귀속 (옵션추가 탭 충돌 수정)', () => {
+  it('is_shared=true + 협업자 0 → isShared=true (우리 탭에 귀속)', async () => {
+    installFrom({ budgets: [mkBudget({ is_shared: true })], collaborators: [] });
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.budgets.find(b => b.id === 'b1')?.isShared).toBe(true);
+  });
+
+  it('is_shared=false + 협업자 0 → isShared=false (개인 탭)', async () => {
+    installFrom({ budgets: [mkBudget({ is_shared: false })], collaborators: [] });
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.budgets.find(b => b.id === 'b1')?.isShared).toBe(false);
+  });
+
+  it('is_shared=false 이지만 협업자 있음 → isShared=true (기존 우리예산 비파괴)', async () => {
+    installFrom({ budgets: [mkBudget({ is_shared: false })], collaborators: [{ budget_id: 'b1' }] });
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.budgets.find(b => b.id === 'b1')?.isShared).toBe(true);
+  });
+});

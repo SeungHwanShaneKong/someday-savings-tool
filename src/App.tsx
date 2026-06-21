@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,31 +16,33 @@ import { InviteResumeWatcher } from "@/components/collaboration/InviteResumeWatc
 import { ChatFab } from "@/components/chat/ChatFab";
 import { ChatDrawer } from "@/components/chat/ChatDrawer";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { lazyWithRetry } from "@/lib/lazyWithRetry"; // [CL-QUALITY-CHUNK-20260621] 청크 로드 실패 복구
+import { AppErrorBoundary } from "@/components/AppErrorBoundary"; // [CL-QUALITY-ERRBOUND-20260621] 전역 경계
 import { EXTERNAL_URLS } from "@/lib/external-links"; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 
 /* ─── Static import: Landing (첫 화면 LCP 최적화) ─── */
 import Landing from "./pages/Landing";
 
-/* ─── Lazy imports: 코드 분할로 초기 번들 크기 최소화 ─── */
-const Auth = lazy(() => import("./pages/Auth"));
-const BudgetFlow = lazy(() => import("./pages/BudgetFlow"));
-const Summary = lazy(() => import("./pages/Summary"));
-const SharedBudget = lazy(() => import("./pages/SharedBudget"));
-const Checklist = lazy(() => import("./pages/Checklist"));
+/* ─── Lazy imports: 코드 분할(초기 번들 최소화) + [CL-QUALITY-CHUNK-20260621] 재배포 청크404 복구 래퍼 ─── */
+const Auth = lazyWithRetry(() => import("./pages/Auth"), { routeId: "Auth" });
+const BudgetFlow = lazyWithRetry(() => import("./pages/BudgetFlow"), { routeId: "BudgetFlow" });
+const Summary = lazyWithRetry(() => import("./pages/Summary"), { routeId: "Summary" });
+const SharedBudget = lazyWithRetry(() => import("./pages/SharedBudget"), { routeId: "SharedBudget" });
+const Checklist = lazyWithRetry(() => import("./pages/Checklist"), { routeId: "Checklist" });
 // [CL-HONEYMOON-EXTERNAL-20260416-221500] Honeymoon lazy import 제거 → 외부 리다이렉트
-const Chat = lazy(() => import("./pages/Chat"));
-const Admin = lazy(() => import("./pages/Admin"));
-const FAQ = lazy(() => import("./pages/FAQ"));
-const Guide = lazy(() => import("./pages/Guide"));
+const Chat = lazyWithRetry(() => import("./pages/Chat"), { routeId: "Chat" });
+const Admin = lazyWithRetry(() => import("./pages/Admin"), { routeId: "Admin" });
+const FAQ = lazyWithRetry(() => import("./pages/FAQ"), { routeId: "FAQ" });
+const Guide = lazyWithRetry(() => import("./pages/Guide"), { routeId: "Guide" });
 // [CL-SSG-PRERENDER-20260531] 데이터 주도 가이드 아티클 (W6) — /guide/:slug
-const Article = lazy(() => import("./pages/Article"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const Article = lazyWithRetry(() => import("./pages/Article"), { routeId: "Article" });
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"), { routeId: "NotFound" });
 // [CL-GAMIFY-INT-20260418-222329] Wedding Prep Passport 프로필 페이지
-const Profile = lazy(() => import("./pages/Profile"));
+const Profile = lazyWithRetry(() => import("./pages/Profile"), { routeId: "Profile" });
 // [CL-ADSENSE-20260619-234411] 정책/정보 페이지(개인정보·약관·소개·문의) — AdSense 필수
-const StaticPage = lazy(() => import("./pages/StaticPage"));
+const StaticPage = lazyWithRetry(() => import("./pages/StaticPage"), { routeId: "StaticPage" });
 // [CL-COEDIT-E2E-20260620-130000] 공동 예산 초대 수락 페이지
-const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
+const AcceptInvite = lazyWithRetry(() => import("./pages/AcceptInvite"), { routeId: "AcceptInvite" });
 
 // [CL-PERF-QUERY-20260418-230000] React Query 기본 설정 최적화
 const queryClient = new QueryClient({
@@ -75,6 +77,7 @@ function AppRoutes() {
       <UpdateNotice />
       <OnboardingCarousel />
       <InviteResumeWatcher />
+      <AppErrorBoundary>
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -102,6 +105,7 @@ function AppRoutes() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
+      </AppErrorBoundary>
       {/* Global Q&A FAB — visible on all pages except /, /auth, /chat */}
       <ChatFab onClick={() => setChatOpen(true)} />
       <ChatDrawer open={chatOpen} onOpenChange={setChatOpen} />

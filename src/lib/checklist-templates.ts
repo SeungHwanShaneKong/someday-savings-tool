@@ -427,8 +427,14 @@ export function calculateDueDate(
   const ratio = totalInPeriod > 1 ? (sortOrder - 1) / (totalInPeriod - 1) : 0.5;
   const monthOffset = offset.start - ratio * (offset.start - offset.end);
 
+  // [CL-QUALITY-DATE-20260621] setMonth day-overflow 방지: 월말(29~31일) 결혼이 짧은 달로 롤포워드되어
+  // due date 가 의도한 이전 달이 아닌 결혼과 같은 달로 붕괴하던 버그. day=1 로 내린 뒤 월 이동, 대상 월 마지막날로 clamp.
   const dueDate = new Date(wedding);
+  const targetDay = dueDate.getDate();
+  dueDate.setDate(1);
   dueDate.setMonth(dueDate.getMonth() - Math.round(monthOffset));
+  const lastDay = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate();
+  dueDate.setDate(Math.min(targetDay, lastDay));
 
   return dueDate.toISOString().split('T')[0];
 }

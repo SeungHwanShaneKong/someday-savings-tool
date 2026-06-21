@@ -1,5 +1,5 @@
 // [CL-INSIGHT-CHECK-20260315-160000] dismissing 중간 상태 + collapsing 래퍼
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InsightCard } from './InsightCard';
@@ -33,12 +33,17 @@ export function InsightPanel({ items, className }: InsightPanelProps) {
   const visibleInsights = insights.filter((i) => !dismissed.has(i.id));
   const activeCount = visibleInsights.filter((i) => !dismissing.has(i.id)).length;
 
+  // [CL-QUALITY-TIMER-20260621] 다중 in-flight dismiss 타이머를 추적해 언마운트 시 일괄 정리(고아 setState 방지)
+  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  useEffect(() => () => { timersRef.current.forEach(clearTimeout); timersRef.current.clear(); }, []);
+
   const handleDismiss = useCallback((id: string) => {
     // Phase 1: 카드 퇴장 애니메이션 시작
     setDismissing((prev) => new Set([...prev, id]));
 
-    // Phase 2: 애니메이션 완료 후 DOM에서 제거
-    setTimeout(() => {
+    // Phase 2: 애니메이션 완료 후 DOM에서 제거 (타이머 id 추적 → 언마운트 시 취소)
+    const tid = setTimeout(() => {
+      timersRef.current.delete(tid);
       setDismissed((prev) => new Set([...prev, id]));
       setDismissing((prev) => {
         const next = new Set(prev);
@@ -46,6 +51,7 @@ export function InsightPanel({ items, className }: InsightPanelProps) {
         return next;
       });
     }, 650);
+    timersRef.current.add(tid);
   }, []);
 
   if (activeCount === 0 && visibleInsights.length === 0) return null;

@@ -6,6 +6,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
+// [CL-QUALITY-REDIRECT-20260621] 외부 이동 origin allowlist 검증(open-redirect/javascript: 스킴 차단) — external-links 통제 일원화
+import { isAllowedExternalUrl } from '@/lib/external-links';
 
 const NAV_DELAY_MS = 400;
 const SAFETY_TIMEOUT_MS = 8000;
@@ -49,6 +51,17 @@ export function useAIExternalNavigation(): UseAIExternalNavigationResult {
     ({ url, title: nextTitle }: StartNavigationOptions) => {
       // 중복 클릭 가드 (ref로 stale closure 회피)
       if (isActiveRef.current) return;
+
+      // [CL-QUALITY-REDIRECT-20260621] origin allowlist 검증 — 허용 외 url·javascript:/data: 스킴을
+      // location.href 에 대입하기 전에 차단(open-redirect/self-origin XSS 방지). 통제는 external-links 로 일원화.
+      if (!isAllowedExternalUrl(url)) {
+        toast({
+          title: '이동할 수 없는 링크예요',
+          description: '허용되지 않은 외부 주소입니다',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       isActiveRef.current = true;
       setIsActive(true);

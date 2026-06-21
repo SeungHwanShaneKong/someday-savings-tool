@@ -16,21 +16,26 @@ interface CountdownValues {
   isPast: boolean;
 }
 
-function calculateCountdown(targetDate: Date): CountdownValues {
+// [CL-QUALITY-DDAY-20260621] D-day 는 raw 24h 주기가 아니라 "오늘 0시 ~ 결혼일 0시"의 달력 일수다.
+// (이전 Math.floor(diff/24h) 는 결혼 전날 저녁부터 당일까지 하루 적게 'D-0일'로 표시하는 off-by-one 버그)
+// export: 단위 테스트용(다른 호출처 없음, 비파괴).
+export function calculateCountdown(targetDate: Date): CountdownValues {
   const now = new Date();
   const diff = targetDate.getTime() - now.getTime();
-  
+
+  // 두 끝점을 로컬 자정으로 정규화해 달력 일수 계산. Math.round 로 DST 부동소수 잡음 방어.
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTarget = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+  const calendarDays = Math.round((startOfTarget.getTime() - startOfToday.getTime()) / 86400000);
+
   if (diff <= 0) {
-    // Calculate days passed
-    const daysPassed = Math.floor(Math.abs(diff) / (1000 * 60 * 60 * 24));
-    return { days: daysPassed, hours: 0, minutes: 0, isPast: true };
+    return { days: Math.abs(calendarDays), hours: 0, minutes: 0, isPast: true };
   }
-  
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  
-  return { days, hours, minutes, isPast: false };
+
+  return { days: calendarDays, hours, minutes, isPast: false };
 }
 
 export function WeddingCountdown() {

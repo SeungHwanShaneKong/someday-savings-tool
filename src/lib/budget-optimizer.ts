@@ -166,16 +166,44 @@ export function generateBudgetInsights(items: BudgetItem[]): BudgetInsight[] {
   return insights;
 }
 
+// [CL-QUALITY-DETERMINISM-20260621] 입력 결정론적 PRNG(같은 인사이트 집합 → 항상 같은 5개·순서).
+// 이전 Math.random 셔플은 편집/ACK 재렌더(items 참조가 커밋당 ~2회 변경)마다 노출 인사이트가 무작위 재배치돼
+// 시각 깜빡임 + 낭비 연산을 유발. cyrb53 해시 → mulberry32 시드로 "다양성(예산별로 다름)"은 유지하되 재렌더 안정화.
+function cyrb53(str: string, seed = 0): number {
+  let h1 = 0xdeadbeef ^ seed;
+  let h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+function mulberry32(a: number): () => number {
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
- * [CL-COEDIT-QA5-20260620] 표시 인사이트를 최대 max개로 제한.
- * max 이하면 그대로, 초과면 Fisher-Yates 셔플 후 max개를 랜덤 선택해 매 노출마다 다양한 정보를 제공한다
- * (정렬 우선순위보다 다양성 우선). 호출부(InsightPanel)는 useMemo(deps=[items])로 감싸 한 뷰 내 안정 유지.
+ * [CL-COEDIT-QA5-20260620 / CL-QUALITY-DETERMINISM-20260621] 표시 인사이트를 최대 max개로 제한.
+ * max 이하면 원본 그대로, 초과면 인사이트 id 들로 시드한 결정론적 Fisher-Yates 셔플 후 max개 선택
+ * (같은 입력 → 항상 같은 결과: 재렌더 안정 + 예산별 다양성 유지). 불변성·부분집합·중복0 보장.
  */
 export function pickRandomInsights(insights: BudgetInsight[], max = 5): BudgetInsight[] {
   if (insights.length <= max) return insights;
+  const rand = mulberry32(cyrb53(insights.map((i) => i.id).join('|')));
   const a = [...insights];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a.slice(0, max);

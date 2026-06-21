@@ -1,5 +1,5 @@
 // [CL-INSIGHT-CHECK-20260315-160000] 인사이트 체크 버튼 + 파티클 업그레이드
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Check, CircleCheck } from 'lucide-react';
 import type { BudgetInsight, InsightType } from '@/lib/budget-optimizer';
@@ -30,14 +30,17 @@ const PARTICLES = [
 export function InsightCard({ insight, onDismiss, isDismissing }: InsightCardProps) {
   const [isChecked, setIsChecked] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  // [CL-QUALITY-TIMER-20260621] 언마운트 시 고아 타이머/부모 setState 방지
+  const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (dismissTimer.current) clearTimeout(dismissTimer.current); }, []);
 
   const handleCheck = useCallback(() => {
     if (!onDismiss || isChecked) return;
     setIsChecked(true);
     setShowParticles(true);
 
-    // 400ms 후 부모에 dismiss 알림 (버튼 애니메이션 완료 후)
-    setTimeout(() => {
+    // 400ms 후 부모에 dismiss 알림 (버튼 애니메이션 완료 후) — ref 저장으로 언마운트 시 취소 가능
+    dismissTimer.current = setTimeout(() => {
       onDismiss(insight.id);
     }, 400);
   }, [onDismiss, insight.id, isChecked]);

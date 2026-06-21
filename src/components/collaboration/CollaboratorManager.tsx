@@ -3,7 +3,7 @@
 // 오너: "파트너 초대" → 초대 링크 발급·복사. 협업자 목록·해제.
 // 협업자(비오너): 목록만 표시(초대/해제 불가 — RLS+UI 이중).
 // ※ 추가형 — BudgetFlow/Summary 등에서 마운트해 사용.
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserPlus, Copy, Check, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -48,12 +48,17 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
     }
   };
 
+  // [CL-QUALITY-TIMER-20260621] '복사됨' 배지 타이머 — 언마운트/연속클릭 시 정리(고아 setState·조기복귀 방지)
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+
   const handleCopy = async () => {
     if (!inviteUrl) return;
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({ title: '복사에 실패했어요', description: '링크를 길게 눌러 직접 복사해주세요.', variant: 'destructive' });
     }

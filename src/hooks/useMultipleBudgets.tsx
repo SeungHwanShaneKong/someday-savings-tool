@@ -818,23 +818,19 @@ export function useMultipleBudgets() {
         }
       }
 
-      // [CL-FK-BUDGET-DELETE-20260412-124100] Step 2.5: Unlink checklist items from all budgets (FK constraint)
-      for (const budget of budgets) {
-        await supabase
-          .from('user_checklist_items')
-          .update({ budget_id: null })
-          .eq('budget_id', budget.id);
-      }
-
-      // Step 3: Delete all OLD budget items
-      for (const budget of budgets) {
-        await supabase.from('budget_items').delete().eq('budget_id', budget.id);
-      }
-
-      // Step 4: Delete all OLD budgets
-      for (const budget of budgets) {
-        await supabase.from('budgets').delete().eq('id', budget.id);
-      }
+      // [CL-FK-BUDGET-DELETE-20260412 / CL-QUALITY-PERF-20260621] FK 순서(unlink→items→budgets) 유지하되
+      // 각 단계 내부는 병렬, budgets 삭제는 단일 .in() 배치로 — 3N 순차 왕복 → 3 배치(초기화 체감속도 개선).
+      const budgetIds = budgets.map((b) => b.id);
+      // Step 2.5: Unlink checklist items (FK constraint) — 병렬
+      await Promise.all(
+        budgetIds.map((id) =>
+          supabase.from('user_checklist_items').update({ budget_id: null }).eq('budget_id', id),
+        ),
+      );
+      // Step 3: Delete all OLD budget items — 병렬
+      await Promise.all(budgetIds.map((id) => supabase.from('budget_items').delete().eq('budget_id', id)));
+      // Step 4: Delete all OLD budgets — 단일 .in() 배치
+      await supabase.from('budgets').delete().in('id', budgetIds);
 
       // Step 5: Initialize new budget with empty items for all categories in correct order
       const initialItems: Omit<ExtendedBudgetItem, 'id'>[] = [];

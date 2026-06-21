@@ -64,9 +64,9 @@ jobs:
   crawl-web:
     name: Crawl Web Sources
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.skip_edge_function != 'true' }}
     needs: crawl-documents
-    # Run even if crawl-documents was skipped
+    # [CL-CRAWL-CI-FIX-20260621] crawl-documents 가 skip/실패해도 실행(always). 이전엔 if 키가 중복
+    #   선언돼(위 한 줄 + 이 줄) YAML 무효 → 워크플로가 모든 트리거에서 0초 실패했음. 중복 제거.
     if: ${{ always() && github.event.inputs.skip_edge_function != 'true' }}
     timeout-minutes: 5
 

@@ -27,7 +27,9 @@ serve(async (req) => {
 
   // Auth check (admin only or cron)
   const authHeader = req.headers.get('Authorization');
-  const isCron = req.headers.get('X-Cron-Secret') === Deno.env.get('CRON_SECRET');
+  // [CL-SEC-CRON-IaC-20260621] CRON_SECRET 미설정 시 cron 우회 차단(설정 누락 방어). 설정+일치일 때만 cron.
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  const isCron = !!cronSecret && req.headers.get('X-Cron-Secret') === cronSecret;
 
   if (!isCron) {
     if (!authHeader) {

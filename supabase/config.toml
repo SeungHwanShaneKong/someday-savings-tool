@@ -20,3 +20,10 @@ project_id = "pnfjwsugsdyzyahrants"
 #  5) 모든 시도 감사 로그
 # 배포 전 반드시 DEV_CREATE_USER_TOKEN secret을 Edge 프로젝트에 설정.
 verify_jwt = false
+
+# [CL-SEC-CRON-IaC-20260621] crawl-wedding-data: GitHub Actions cron 이 Bearer JWT 없이
+# X-Cron-Secret + apikey 로 호출하므로 게이트웨이 JWT 검증 비활성(IaC 명시 — 재배포 드리프트 제거).
+# 코드 레벨 방어: CRON_SECRET 설정+일치 시에만 cron 경로 진입(미설정 시 차단), 비-cron 은
+# verifyUserToken + checkAdminOnMainProject(관리자 전용). CRON_SECRET 은 ≥32바이트 엔트로피 권장.
+[functions.crawl-wedding-data]
+verify_jwt = false

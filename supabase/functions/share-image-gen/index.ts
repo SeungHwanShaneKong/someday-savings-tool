@@ -37,6 +37,17 @@ function formatManWon(amount: number): string {
   return `${man.toLocaleString('ko-KR')}만원`;
 }
 
+// [CL-SEC-SHARECARD-20260621] 사용자 제어 문자열을 card_html 에 보간하기 전 HTML 엔티티 이스케이프
+// (현재 소비자 0인 잠복 싱크 — 향후 카드 미리보기/OG 렌더 PR 시 저장형 XSS 전이 차단).
+function escHtml(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── 상위 N개 카테고리 추출 (금액 기준 내림차순) ──
 function topCategories(categories: ShareCategory[], n: number): ShareCategory[] {
   return [...categories]
@@ -57,7 +68,7 @@ function generateCardHtml(
     .map(
       (cat, i) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:${i < top5.length - 1 ? '1px solid rgba(255,255,255,0.15)' : 'none'};">
-        <span style="font-size:18px;color:#fce4ec;">${cat.name}</span>
+        <span style="font-size:18px;color:#fce4ec;">${escHtml(cat.name)}</span>
         <span style="font-size:18px;font-weight:700;color:#fff;">${formatManWon(cat.amount)}</span>
       </div>`
     )
@@ -71,7 +82,7 @@ function generateCardHtml(
     : '';
 
   const dateSection = weddingDate
-    ? `<div style="margin-top:8px;font-size:14px;color:#f8bbd0;">&#128210; 예식일: ${weddingDate}</div>`
+    ? `<div style="margin-top:8px;font-size:14px;color:#f8bbd0;">&#128210; 예식일: ${escHtml(weddingDate)}</div>`
     : '';
 
   return `<div style="width:1200px;height:630px;background:linear-gradient(135deg,#e91e63 0%,#ad1457 50%,#880e4f 100%);font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;padding:48px 56px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;">
@@ -161,6 +172,19 @@ serve(async (req) => {
     if (!total_budget || !categories || !Array.isArray(categories) || categories.length === 0) {
       return new Response(
         JSON.stringify({ error: 'total_budget와 categories(배열)가 필요합니다' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // [CL-SEC-SHARECARD-20260621] 입력 경계 봉인(크기/형식) — 토큰 비용/잠복 XSS 표면 축소
+    if (
+      categories.length > 50 ||
+      categories.some((c) => typeof c?.name !== 'string' || c.name.length > 80) ||
+      typeof total_budget !== 'number' || !Number.isFinite(total_budget) ||
+      (wedding_date != null && !/^\d{4}-\d{2}-\d{2}$/.test(String(wedding_date)))
+    ) {
+      return new Response(
+        JSON.stringify({ error: '유효하지 않은 요청입니다' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

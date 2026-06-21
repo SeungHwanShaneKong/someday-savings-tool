@@ -4,7 +4,7 @@
 //  ② handleNext 의 낙관적 setCurrent + embla select 합산으로 도트가 2칸씩 튀고 마지막 슬라이드를 스킵하던 버그
 import { test, expect } from '@playwright/test';
 
-const CANON = 'https://wedsem.moderninsightspot.com';
+const CANON = 'https://moderninsightspot.com';
 const MOBILE = { width: 375, height: 812 };
 
 const SLIDE_TITLES = [

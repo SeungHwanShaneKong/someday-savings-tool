@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
+import { SITE_ORIGIN } from '@/config/site';
 
 interface BreadcrumbItem {
   label: string;
@@ -10,7 +11,7 @@ interface BreadcrumbProps {
   items: BreadcrumbItem[];
 }
 
-const BASE_DOMAIN = 'https://wedsem.moderninsightspot.com';
+const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
 
 /**
  * Breadcrumb 컴포넌트 — 시각적 breadcrumb + BreadcrumbList JSON-LD 생성

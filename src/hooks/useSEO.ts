@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { SITE_ORIGIN } from '@/config/site';
 
 interface SEOConfig {
   title: string;
@@ -7,7 +8,7 @@ interface SEOConfig {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
 
-const BASE_DOMAIN = 'https://wedsem.moderninsightspot.com';
+const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
 const DEFAULT_TITLE = '웨딩셈 - 결혼 예산 계산기, 결혼 비용 계산기';
 const DEFAULT_DESCRIPTION =
   '결혼 준비의 시작, 결혼 예산 관리부터 결혼 체크 리스트까지 스마트하게! 결혼 비용, 웨딩 예산 계산기 \'웨딩셈\'으로 복잡한 결혼 비용을 항목별로 깔끔하게 정리하세요.';

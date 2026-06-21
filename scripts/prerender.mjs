@@ -18,7 +18,7 @@ import puppeteer from 'puppeteer';
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
-const BASE_DOMAIN = 'https://wedsem.moderninsightspot.com';
+const BASE_DOMAIN = 'https://moderninsightspot.com'; // [CL-DOMAIN-PROMOTE-20260621] apex 승격(src/config/site.ts 와 동일 유지)
 const DIST = path.join(process.cwd(), 'dist');
 const PORT = 4178;
 const NAV_TIMEOUT = 45000;

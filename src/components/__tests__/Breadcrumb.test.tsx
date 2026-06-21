@@ -33,7 +33,7 @@ describe('Breadcrumb — 링크/구조화데이터', () => {
     expect(jsonLd['@type']).toBe('BreadcrumbList');
     const list = jsonLd.itemListElement as Array<{ position: number; name: string; item?: string }>;
     expect(list).toHaveLength(3);
-    expect(list[0]).toMatchObject({ position: 1, name: '홈', item: 'https://wedsem.moderninsightspot.com/' });
+    expect(list[0]).toMatchObject({ position: 1, name: '홈', item: 'https://moderninsightspot.com/' });
     expect(list[2]).toMatchObject({ position: 3, name: '2026 결혼 평균 비용 분석' });
   });
 });

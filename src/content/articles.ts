@@ -8,7 +8,9 @@
  * 되도록 설계. 본문 수치는 Guide.tsx / FAQ.tsx 와 정합을 유지한다.
  */
 
-const BASE_DOMAIN = 'https://wedsem.moderninsightspot.com';
+import { SITE_ORIGIN } from '@/config/site';
+
+const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
 
 /* ─── 콘텐츠 블록 모델 ─── */
 export type ArticleBlock =

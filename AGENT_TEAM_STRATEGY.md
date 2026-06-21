@@ -2,7 +2,7 @@
 
 > **Mission**: 웨딩셈을 'AI 결혼 예산 코치'로 진화시켜 DAU 10,000명 달성
 > **Repo**: https://github.com/shanek-ops/wedding-budget-buddy
-> **Live**: https://wedsem.moderninsightspot.com/
+> **Live**: https://moderninsightspot.com/ (apex 승격, [CL-DOMAIN-PROMOTE-20260621]; wedsem.moderninsightspot.com → 301)
 > **Tech**: React 18.3 · TypeScript 5.8 · Vite 5.4 · Supabase 2.91 · Tailwind 3.4 · shadcn/ui
 > **작성일**: 2026-02-28 · **근거**: 전체 소스코드 전수검토 (89 TSX + 14 TS + 24 Migration)
 

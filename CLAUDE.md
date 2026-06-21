@@ -8,7 +8,7 @@
 - **DB/Auth**: Supabase (PostgreSQL, RLS) + Supabase Auth (email/password + Google OAuth)
 - **AI**: OpenAI API (Supabase Edge Functions, Deno)
 - **Testing**: Vitest + React Testing Library
-- **배포**: GitHub Pages + Puppeteer 프리렌더 SSG (`scripts/prerender.mjs`)
+- **배포**: GitHub Pages + Puppeteer 프리렌더 SSG (`scripts/prerender.mjs`). 정식 도메인 = apex `moderninsightspot.com`.
 
 ## Project Structure
 ```
@@ -17,18 +17,20 @@ src/
 ├── components/      # ui/(shadcn) · budget/ · chat/ · checklist/ · gamification/ · Footer/Breadcrumb 등
 ├── hooks/           # useAuth, useMultipleBudgets, useChecklist, useAIChat, useSEO, useStreak 등
 ├── lib/             # 유틸·상수 (budget-categories, external-links, kakao-browser, checklist-* 등)
+├── config/          # site.ts (SITE_ORIGIN 단일소스) — SEO/canonical 절대URL 전용
 ├── content/         # articles.ts (SEO 아티클 레지스트리)
 ├── integrations/    # supabase/(client·types) · lovable/
 └── test/            # setup.ts(전역 Supabase mock·cleanup) · test-utils.tsx(renderWithProviders)
 ```
 
 ## Commands
-- `npm run dev` — 개발 서버(8080) / `npm run build` — **프로덕션 빌드(프리렌더 SSG 포함, Cloudflare/CI 공용)** / `npm run build:csr` — 순수 CSR 빌드
+- `npm run dev` — 개발 서버(8080) / `npm run build` — **프로덕션 빌드(프리렌더 SSG 포함)** / `npm run build:csr` — 순수 CSR 빌드
 - `npm run lint` — ESLint / `npm run test` — Vitest(1회) / `npm run test:watch`
 - **테스트 안정화**: `vitest.config.ts`는 `pool:'forks' + singleFork:true`(Windows IPC/OOM 방지) + Supabase env `define` + 전역 client mock. 대용량 `NODE_OPTIONS` heap은 멀티포크와 충돌하므로 사용 금지.
+- **검증 오라클**: `tsc -b --noEmit`(⚠️ bare `tsc --noEmit`는 이 repo에서 가짜그린) · `vitest run`(3회) · `pnpm run build:ssg` · dist grep. **PM=pnpm**(npm은 `link:` 실패).
 
 ## Work Rules (필수 준수)
-- **25인 MECE 에이전트 거버넌스**: `.claude/agents/`의 실제 호출 가능한 서브에이전트 25인 풀 상시 운영(아래 섹션). 모든 업무마다 최적 **11인 TF** 편성, 반드시 **S-1 Supervisor/PM** 포함(목표 이탈 방지·실시간 코칭).
+- **25인 MECE 에이전트 거버넌스**: `.claude/agents/`의 실제 호출 가능한 서브에이전트 25인 풀 상시 운영(아래 섹션). 모든 업무마다 최적 **11인 TF** 편성, 반드시 **S-1 Supervisor/PM** 포함(목표 이탈 방지·실시간 코칭). PM=메인 스레드.
 - **더 나은 방안 제시(S-6)**: 사용자 명령을 그대로 추종하지 말고, 항상 더 나은 대안·리스크·최적화를 선제 분석·제시 후 협의·실행.
 - **Advanced Harness 2.0**: 기본 Agentic Harness보다 10배 정밀한 계획(아래 섹션). 전체 코드 의존성 완전 파악 후 구체 실행.
 - **병렬 실행(지속)**: 상호 독립적이고 이슈 없는 작업은 순차가 아닌 **병렬**로 완료(서브에이전트 동시 투입·단일 메시지 다중 도구 호출).
@@ -37,13 +39,13 @@ src/
 - **LSP 우선**: TypeScript LSP로 타입 에러·미사용 변수·import 오류 사전 감지.
 - **추적성(Revert)**: 모든 생성/수정 코드에 고유 ID + 초 단위 timestamp 주석(`[CL-<NAME>-YYYYMMDD-HHMMSS]`).
 - **CLI/MCP/Skill 자율 활용**: "안 된다" 전에 CLI·MCP·Skill을 직접 조작해 임무 완수.
-- **데이터 풍성화**: 실제 데이터 최우선. 없을 때만 Mock을 실제 운영 유사·기존 대비 50배 이상 확장.
+- **데이터 풍성화**: 실제 데이터 최우선. 없을 때만 Mock을 실제 운영 유사·기존 대비 50배 이상 확장(격리·`is_synthetic`·분포검증).
 - **3회 검증 + 10 시나리오**: 수정 후 서로 다른 시나리오 3회 검증, 전체 완료 전 MECE 10 시나리오로 최종 검수. 정상일 때만 완료.
 - **이슈 투명성**: [발생 원인 - 기술적 내용 - 해결책] 정리 후 직접 실행·해결.
-- **진척 보고**: 5% 간격으로 진행률 + 플랜 토큰 잔량(%) 출력.
+- **진척 보고**: 페이즈 게이트(`[n/N] 단계`) + 컨텍스트 여유 3단 신호(충분/주의/임박).
 - **알림(지속)**: 계획된 모든 작업 완료 시에만 사운드 알림(종료 15초 후 추가 액션 없으면 2회 연속).
 - **언어**: 모든 보고는 최상급 한국어. **3줄 요약**으로 마감.
-- **GitHub**: 즉시 push 금지 — 사용자가 명시할 때만 반영.
+- **GitHub**: 즉시 push 금지 — 사용자가 명시할 때만 반영. DB 마이그레이션·Edge 배포·DNS·대시보드 = 사용자 실행.
 - **완료 메시지**: 모든 검증 완료 시 출력 → `행복해! 참으로 감사한 삶이다! 작업 완료! + 작업에 소요된 시간 OO시간 OO분 OO초`
 
 ## 25인 MECE 에이전트 풀 (`.claude/agents/`, 항상 활성)
@@ -66,32 +68,23 @@ src/
 4. **Agentic 10x Plan**: 전체 코드 기반 구체 계획(기본 대비 10배 정밀, 파일·패턴·검증까지 명시).
 5. **Harness 선구축**: 검증 테스트·하네스 사전 구축(예: `renderWithProviders`, 프리렌더 self-verify).
 6. **병렬 Surgical 구현**: Side-effect Zero. 독립 작업은 서브에이전트 병렬 투입, 공용 토대는 먼저 단일 구축 후 분기.
-7. **3x Verification + 10 시나리오**: 서로 다른 3회 → 실패 시 4 회귀. 최종 MECE 10 시나리오 검수.
+7. **3x Verification + 10 시나리오**: 서로 다른 3회 → 실패 시 4 회귀. 최종 MECE 10 시나리오 검수. **생성≠검증**(독립 skeptical-verifier).
 
 ## Conventions
 - Path alias `@/*` → `./src/*` / 한국어 UI / 함수형 컴포넌트 + 훅
 - Tailwind HSL 변수 + 다크모드(class 전략) / 수동 청크 분할: vendor(React/Radix), vendor-chart(Recharts)
 - Supabase 마이그레이션 `supabase/migrations/` / 프리렌더 라우트는 trailing-slash canonical(`/guide/`), 앱 라우트는 슬래시 없음(`/budget`)
+- **도메인**: SEO 절대URL은 `src/config/site.ts`(`SITE_ORIGIN`) 단일소스. 런타임(OAuth·초대·탈출)은 `window.location.origin`(호스트 무관).
 - 테스트: 페이지/컴포넌트는 `renderWithProviders`(MemoryRouter+QueryClient+TooltipProvider). 모든 페이지가 `<Footer/>`(중복 링크명) 렌더 → 링크/버튼 쿼리는 `within()`로 범위 스코핑. useAuth 사용 컴포넌트는 파일 상단 `vi.mock('@/hooks/useAuth', ...)`.
 
-## Lessons Learned (가장 중요한 교훈 — 재발 방지)
-- **[CL-COEDIT-E2E-20260620]** 신랑·신부 공동편집 = **"워크스페이스 = 예산별 공유의 뷰 필터"**(새 사일로 금지): 협업자 0=개인, 있으면=우리. 모드 토글=보기필터, 실시간/충돌은 우리 모드에서만 → 개인 예산 절대 비동기화(완전 분리). 충돌해결은 **field-level LWW**(셀=item.id×column; 다른필드 둘다 보존, 같은셀 서버 `updated_at` LWW) + 3중 에코억제(pending ack·단조게이트·값동일). `updateItem`은 낙관적+`.select().single()` ACK+롤백. **입력 안 뺏김은 BudgetTable의 로컬 temp 버퍼**(`editingCell`/`tempValue`/`tempNotes`, blur 커밋)로 이미 보장 → `editingColumnsRef` 추가배선 불요. **클라 `budgets.update({updated_at})` 유지**(budget_items→budgets bubble 트리거 없음 → 제거 시 "최근 편집 우선" 정렬 회귀; 실시간은 budget_items만 구독해 항목 에코 0). **드리프트**: `budget_collaborators`·`budget_invitations`·accept RPC는 라이브에 이미 존재 → 개인모드·초대생성은 마이그레이션 없이 작동, 단 협업자 RLS·REPLICA IDENTITY·정확한 accept RPC는 마이그레이션 필요(`CREATE OR REPLACE`가 옛 RPC 교체). **초대는 멱등 필수**: `budget_invitations` UNIQUE → 재발급 시 `POST→409` → `createInvite`는 충돌 시 기존 토큰 조회·재노출(아니면 "다시 누르면 실패 토스트" UX버그 — E2E가 발견). **dev서버**: 의존성 제거(`@lovable.dev/cloud-auth-js`) 후 `node_modules/.vite` 캐시 잔존 → "error while updating dependencies" ENOENT → **`.vite` 캐시 삭제+재기동**(빌드는 정상=코드무관). **Playwright E2E**: `e2e/`는 `src/` 밖이라 앱 `tsc`/vitest와 격리(오라클 무영향), dev로그인=Auth.tsx DEV 바이패스(`import.meta.env.DEV`), viewport 1440(데스크톱 안내 모달 회피), 파트너=REST password grant→`sb-<ref>-auth-token` 주입. 프로젝트 PM은 **pnpm**(npm은 `link:./src/types`로 실패). 라이브 검증은 preview 도구로 충분(네트워크 `&select=*` 200·`budget_collaborators 200`·`budget_invitations 201/409`로 확정).
-- **[CL-ADSENSE-20260619]** AdSense 거절의 진짜 원인은 콘텐츠 부족이 아니라 **등록 사이트(apex `moderninsightspot.com`)가 빈약한 옛 Cloudflare CSR 빌드(noscript "JS 켜세요")를 서빙**하는 것 — 풍부한 wedsem(GitHub Pages 프리렌더)는 등록 사이트가 아님. 진단은 `curl apex` 본문 크기·`Server` 헤더로 확정. 해결(비파괴 최우선): **wedsem canonical/CNAME/OAuth/Supabase 허용목록 일절 미변경** + apex→wedsem **301**(같은 root라 ads.txt·콘텐츠 검토 정상). 필수 보강은 **순수 추가만**: `public/ads.txt`(`google.com, pub-…, DIRECT, f08c47fec0942fa0`), 정책 4종(개인정보처리방침에 **Google AdSense/DART 쿠키 고지 필수**)·푸터 링크·프리렌더 ROUTES, 아티클·FAQ 확장. 정책 페이지는 빈 템플릿이 아닌 실제 운영정보. 도메인 전환(canonical/CNAME 변경)은 OAuth(redirectTo origin)·Supabase 허용목록까지 깨므로 회피.
-- **[CL-OAUTH-LOVABLE-BROKER-20260613]** Lovable Cloud Auth(`@lovable.dev/cloud-auth-js`)는 비-iframe에서 `window.location.href="/~oauth/initiate"`(서버사이드 OAuth 브로커)로 이동 → **정적 호스팅(GitHub Pages)엔 그 백엔드가 없어 404 → SPA catch-all NotFound**. 로그인이 구글 도달 전에 죽음. 진단은 추측 말고 **라이브 `curl /~oauth/initiate`(404 GitHub.com) vs `curl <proj>.supabase.co/auth/v1/authorize`(302→accounts.google.com)** 로 확정. 해결: **Supabase 네이티브 `supabase.auth.signInWithOAuth({provider, options:{redirectTo}})` + client에 `detectSessionInUrl:true`·`flowType:'pkce'`**(호스트 비종속). 대시보드 Redirect URLs에 신규 도메인 `…/**` 등록 필수(미등록 시 Site URL로 폴백). 정적 호스트엔 백엔드 의존 인증 금지.
-- **[CL-CF-AUTODEPLOY-20260531]** 라이브 호스팅 진단: `Server: cloudflare` 헤더만으로 "사용자=Cloudflare 사용"이라 **단정 금지** → **NS 레코드**로 실제 DNS 운영처 확인(이 프로젝트는 가비아). Lovable 앱은 Lovable=인증·빌더이고 호스팅은 별개. 커스텀 도메인 SEO 퍼블리시 정답: **Gabia 서브도메인 CNAME→`<user>.github.io`** + `gh api pages -f cname` 등록 → 인증서 자동발급 → `https_enforced=true`. `build`에 프리렌더 통합으로 어느 호스트가 `npm run build`해도 SSG 보장.
-- **[CL-QA100-BTN-20260531]** 테스트 안정화: 멀티fork×대용량heap=Windows IPC/OOM 크래시 → `singleFork`로 해결. 컴포넌트 테스트는 Supabase env `define`+전역 client mock 필수(Footer→FeatureRequestButton이 client import). 페이지마다 Footer가 동명 링크 추가 → `within()` 스코핑. 테스트가 실제 버그 발견(Footer가 `/guide`·`/faq` 슬래시 누락 → 301 hop) 후 교정.
-- **[CL-SSG-PRERENDER-20260531]** CSR SPA를 GitHub Pages 배포 시 빌드-후 Puppeteer 프리렌더가 최저 리스크(실제 브라우저=SSR 폴리필 불필요, createRoot 유지, useSEO JSON-LD 자동 캡처). 디렉터리형 출력+trailing-slash canonical, `404.html` SPA 폴백, sitemap 단일소스화. noscript는 프리렌더 후에도 남으므로 CSR 판별은 본문 마커로.
-- **[CL-GAMIFY-INT-20260418]** 공용 Foundation 1회 구축으로 기능 경량화. Supabase types.ts 수동확장으로 타입-safe(배포 후 regen 동일). Rule-engine은 discriminated union + `_exhaustive:never`. streak-calc 미래날짜 필터(`daysBetween>=0`) 누락 버그 테스트로 발견.
-- **[CL-SEC-HARDEN-20260418]** `window.location.href=userInput`은 origin allowlist+HTTPS-only+URL파싱 3중 검증. service_role Edge Function은 ENVIRONMENT 가드+공유시크릿+IP rate limit+이메일 regex+감사로그 5층 방어.
-- **[CL-AI-EXTNAV-OVERLAY-20260418]** 외부 도메인 전환 시 공백 UX 붕괴 → 400ms 지연 navigation + 풀스크린 portal 오버레이 + 단계 메시지 + preconnect + 8초 safety timeout. z-index는 toast(z-100) 하위 z-[90].
-- **[CL-CHECKLIST-9PERIOD-20260412]** 유니온 타입 확장은 타입정의→상수맵→템플릿→분기→테스트→DB 동시 일치. grep 전수조사 후 일괄 치환. 기존 DB는 `CASE WHEN title ILIKE '%X%'` 무손실 매핑.
-- **[CL-FK-BUDGET-DELETE-20260412]** FK 다중참조 삭제는 DB `ON DELETE SET NULL` + 클라이언트 사전 cleanup(`update({budget_id:null})`) 이중 방어.
-- **[CL-AI-CHAT-LIMIT5-20260408]** 폴백 체인(rag-query→ai-chat) 모든 단계에 동일 rate limit 복제 + `feature` 컬럼 scope. 클라이언트는 RAG 429 시 폴백 차단.
-- **[CL-HONEYMOON-BACK-STATE-20260408]** "항상 초기화" vs "뒤로가기 보존" 충돌은 출발측 `sessionStorage` 플래그 세팅 → 도착측 consume 분기.
-- **[CL-QA-50-SWEEP-20260408]** Radix Sheet/Dialog는 `<SheetDescription className="sr-only">` 누락 시 `aria-describedby` 콘솔 경고 — 스크린리더 전용 설명 필수.
-- **[CL-SKIP-SCHEDULE-20260405]** 숙박일 변경 시 `nightsRatio` 비례 스케일링(flight 고정). 온보딩 스텝 제거는 타입→순서→프로그레스→뒤로가기→셸→라우팅 전수 변경.
-- **[CL-PLAN-ADD-DEST-NOMAP-20260405]** 동적 목록은 props 배열이 아닌 글로벌 소스(`getDestinationById`)로 해상도. 제거 기능은 import만 끊고 파일 보존(tree-shaking).
-- **[CL-WORLDCUP-IMG-ALGO-20260405]** 외부 CDN 이미지는 빌드 검증 + 런타임 `onError` 폴백 동시 적용. 사용자 선택(월드컵 랭킹)은 AI 매칭점수보다 강한 시그널 → 고정 슬롯 배치.
-- **[CL-WORLDCUP-CONNECT-20260330]** Unsplash photo ID는 WebFetch로 개별 검증(AI 생성 URL 불신). 데이터 소스 간 동일 photo ID 중복 방지.
-- **[CL-MAP-WORLDCUP-FIX-20260330]** react-map-gl은 `viewState`(인터랙션)와 `flyToTarget`(프로그래밍) 분리, 호출 후 즉시 null 클리어. (이후 maplibre 제거됨.)
-- **[CL-TIMELINE-FALLBACK-20260403]** 외부 AI API 기능은 반드시 로컬 폴백 준비 + `isFallback` state로 구분, catch에서 에러+폴백 동시 설정.
+## Governance & Rules 포인터 (Harness 6-5 점진 노출)
+- **프로젝트 규칙**: `.claude/rules/deployment.md`(GitHub Pages·Gabia DNS·도메인 토폴로지·cutover 순서) · `.claude/rules/seo-ssg.md`(canonical/sitemap/prerender·SITE_ORIGIN). 일반 규칙은 전역 `~/.claude/rules/`(orchestration·verification·testing·security·code-style·data-governance·communication) 상속.
+- **교훈 전체 아카이브**: `.dev/lessons-learned.md` — **신규 교훈은 여기 적재**(CLAUDE.md엔 Top 5만). AI 작업 로그·트러블슈팅도 `.dev/`.
+- **골든/회귀 1급 자산**: `tests/golden/`(예: canonical 도메인 회귀 가드).
+
+## Lessons Learned (Top 5 — 전체는 `.dev/lessons-learned.md`)
+- **[CL-DOMAIN-PROMOTE-20260621]** 정식 도메인=apex `moderninsightspot.com`(GitHub Pages 직접 서빙), `wedsem.…`→apex 자동 301. 런타임은 `window.location.origin`(호스트 무관), SEO 절대URL만 `src/config/site.ts`(`SITE_ORIGIN`) 단일소스(7곳). **AdSense는 등록지=서빙지 일치가 안전**(리다이렉트로 빼지 말 것). 컷오버=**DNS(Gabia A→GitHub) 먼저 → push 나중**(반대면 좀비로 튕김). [CL-ADSENSE]의 'apex→wedsem 301' 권고 대체.
+- **[CL-COEDIT-E2E-20260620]** 공동편집="예산별 공유 뷰 필터"(협업자 0=개인/있으면 우리). field-level LWW+3중 에코억제, 낙관적+`.select().single()` ACK+롤백, 초대 멱등(409→기존 토큰). 마이그/Edge는 사용자 적용. 상세 `.dev/`.
+- **[CL-OAUTH-LOVABLE-BROKER-20260613]** 정적 호스트엔 백엔드 의존 인증 금지 → Supabase 네이티브 `signInWithOAuth({redirectTo})`+`detectSessionInUrl`+`pkce`(호스트 비종속). 대시보드 Redirect URLs에 도메인 `…/**` 등록 필수.
+- **[CL-SSG-PRERENDER-20260531]** GitHub Pages는 빌드-후 Puppeteer 프리렌더(디렉터리형+trailing-slash canonical, `404.html` SPA 폴백, sitemap 단일소스). CSR 판별은 본문 마커(noscript 잔존).
+- **[CL-SEC-HARDEN/R1/R2]** 정적 SPA는 RLS가 유일 보안경계 → 컬럼불변 트리거(소유권/항목 절취 차단)·관리자 게이트·feature allowlist·형제함수 레이트리밋·intent 살균·realtime `REPLICA IDENTITY DEFAULT`·공급망 frozen-lockfile. 상세 `.dev/` + git `cfc10c1`·`79b4f68`.

@@ -15,7 +15,8 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // [CL-DOMAIN-PROMOTE-20260621] tests/golden/ 회귀·골든 스위트도 포함(1급 자산).
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
     // [CL-QA100-BTN-20260531] Windows 안정화: 멀티 fork + 대용량 heap 조합이 IPC/OOM 크래시 유발.
     // 단일 fork로 직렬 실행 → 메모리 안정 (NODE_OPTIONS 대용량 heap 불필요).
     pool: "forks",

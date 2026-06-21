@@ -15,4 +15,4 @@ Allow: /
 Disallow: /admin
 Disallow: /shared/
 
-Sitemap: https://wedsem.moderninsightspot.com/sitemap.xml
+Sitemap: https://moderninsightspot.com/sitemap.xml

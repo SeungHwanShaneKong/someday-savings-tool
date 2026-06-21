@@ -75,11 +75,23 @@ export interface TrendDataPoint {
   wau?: number;
   mau?: number;
   signups?: number;
+  /** [CL-ADMIN-SIGNUP-TREND-20260622] 시점별 누적 가입자(윈도우 이전 baseline + 일별 신규 누계 = 진짜 누적) */
+  cumulativeSignups?: number;
   budgetCreated?: number;
   amountEntered?: number;
   pv?: number;
   loyalCount?: number;
   avgDuration?: number;
+}
+
+// [CL-ADMIN-SIGNUP-TREND-20260622] 일별 신규 가입자(signups)를 누계해 cumulativeSignups 주입.
+//   baseline = 윈도우 시작 이전 누적 가입자 수(윈도우 0부터 세는 오해 방지). points 는 오래된→최신 순.
+export function withCumulativeSignups(points: TrendDataPoint[], baseline = 0): TrendDataPoint[] {
+  let acc = Math.max(0, baseline);
+  return points.map((p) => {
+    acc += p.signups ?? 0;
+    return { ...p, cumulativeSignups: acc };
+  });
 }
 
 export interface TopPage {

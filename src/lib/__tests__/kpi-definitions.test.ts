@@ -4,8 +4,10 @@ import {
   KPI_DEFINITIONS,
   getKPIStatus,
   getStatusColor,
+  withCumulativeSignups,
   type KPIDefinition,
   type KPIStatus,
+  type TrendDataPoint,
 } from '../kpi-definitions';
 
 // 테스트 전용 fixture: 실제 정의에 의존하지 않고 임계값 경계 의미를 고정 검증한다.
@@ -133,5 +135,44 @@ describe('kpi-definitions / KPI_DEFINITIONS 레지스트리 불변식', () => {
         }
       }
     }
+  });
+});
+
+// [CL-ADMIN-SIGNUP-TREND-20260622] 누적 가입자 계산(withCumulativeSignups) 검증
+describe('withCumulativeSignups (신규→누적 가입자)', () => {
+  const pts = (signups: (number | undefined)[]): TrendDataPoint[] =>
+    signups.map((s, i) => ({ date: `7/${i + 1}`, signups: s }));
+
+  it('baseline + 일별 신규를 누계한다(진짜 누적)', () => {
+    const out = withCumulativeSignups(pts([2, 3, 5]), 100);
+    expect(out.map((p) => p.cumulativeSignups)).toEqual([102, 105, 110]);
+  });
+
+  it('baseline=0 이면 0부터 누계', () => {
+    const out = withCumulativeSignups(pts([1, 0, 4]), 0);
+    expect(out.map((p) => p.cumulativeSignups)).toEqual([1, 1, 5]);
+  });
+
+  it('signups undefined 는 0으로 처리', () => {
+    const out = withCumulativeSignups(pts([undefined, 2, undefined]), 10);
+    expect(out.map((p) => p.cumulativeSignups)).toEqual([10, 12, 12]);
+  });
+
+  it('빈 배열은 빈 배열', () => {
+    expect(withCumulativeSignups([], 50)).toEqual([]);
+  });
+
+  it('누적은 단조 증가(감소 없음)', () => {
+    const out = withCumulativeSignups(pts([3, 0, 7, 1]), 5);
+    const cum = out.map((p) => p.cumulativeSignups!);
+    for (let i = 1; i < cum.length; i++) expect(cum[i]).toBeGreaterThanOrEqual(cum[i - 1]);
+  });
+
+  it('원본 signups 는 보존하고 cumulativeSignups 만 추가(불변)', () => {
+    const input = pts([4, 6]);
+    const out = withCumulativeSignups(input, 0);
+    expect(out[0].signups).toBe(4);
+    expect(out[1].signups).toBe(6);
+    expect(input[0].cumulativeSignups).toBeUndefined(); // 원본 비변형
   });
 });

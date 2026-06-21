@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
+  ComposedChart, // [CL-ADMIN-SIGNUP-TREND-20260622] 신규(막대)+누적(선) 이중축
   XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
@@ -329,6 +330,29 @@ export default function Admin() {
                       <Line type="monotone" dataKey="wau" name="WAU" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
                       <Line type="monotone" dataKey="mau" name="MAU" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
                     </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* [CL-ADMIN-SIGNUP-TREND-20260622] 신규/누적 가입자 추이 — 활성 사용자 추이 바로 아래(이중축) */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">신규 / 누적 가입자 추이</h3>
+                <div className="h-56 sm:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis yAxisId="left" allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                      <RechartsTooltip
+                        contentStyle={chartTooltipStyle}
+                        formatter={(value: number, name: string) => [`${value}명`, name]}
+                        labelFormatter={(label) => `날짜: ${label}`}
+                      />
+                      <Legend wrapperStyle={{ fontSize: '13px' }} />
+                      <Bar yAxisId="left" dataKey="signups" name="신규 가입자" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                      <Line yAxisId="right" type="monotone" dataKey="cumulativeSignups" name="누적 가입자" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </Card>

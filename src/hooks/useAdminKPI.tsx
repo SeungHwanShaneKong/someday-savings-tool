@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { subDays, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
+import { withCumulativeSignups } from '@/lib/kpi-definitions'; // [CL-ADMIN-SIGNUP-TREND-20260622]
 import { calculateImpact, type ImpactSummary, type BudgetForImpact } from '@/lib/impact-calculator';
 
 // 관리자 user_id — 모든 KPI 계산에서 제외
@@ -100,6 +101,7 @@ export function useAdminKPI(): UseAdminKPIResult {
         sharedBudgets,
         snapshots,
         todayPVRes, weekPVRes, monthPVRes,
+        preWindowSignups,
       ] = await Promise.all([
         // profiles — small table, no pagination needed
         supabase.from('profiles').select('user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', startISO).lte('created_at', endISO).then(r => r.data || []),
@@ -134,6 +136,8 @@ export function useAdminKPI(): UseAdminKPIResult {
         fetchAllRows<{ user_id: string | null }>(
           () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: true })
         ),
+        // [CL-ADMIN-SIGNUP-TREND-20260622] 윈도우 이전 누적 가입자 수 = 진짜 누적의 baseline(소형 profiles 테이블, head count)
+        supabase.from('profiles').select('user_id', { count: 'exact', head: true }).neq('user_id', ADMIN_USER_ID).lt('created_at', startISO).then(r => r.count ?? 0),
       ]);
 
       const todayPV = todayPVRes;
@@ -344,7 +348,8 @@ export function useAdminKPI(): UseAdminKPIResult {
           avgDuration: dayAvgDuration,
         });
       }
-      setTrendData(trend);
+      // [CL-ADMIN-SIGNUP-TREND-20260622] 일별 신규 → 누적 가입자 주입(윈도우 이전 baseline 포함 = 진짜 누적)
+      setTrendData(withCumulativeSignups(trend, preWindowSignups));
 
       // Top pages
       const pageCounts: Record<string, number> = {};

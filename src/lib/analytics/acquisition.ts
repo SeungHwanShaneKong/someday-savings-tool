@@ -30,6 +30,18 @@ function hostOf(url: string): string | null {
   }
 }
 
+// [CL-AUDIT-R3-REFNORM-20260623-000000] referrer 정규화(개인정보 최소수집 + 저장 bloat 방지):
+//   원본 URL(쿼리스트링에 검색어/세션토큰 등 PII 가능)을 통째로 저장하지 않고 origin(scheme+host)만 보관.
+//   분류는 어차피 도메인 기반이라 정보 손실 0. 파싱 불가/빈 값은 null.
+export function normalizeReferrer(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).origin.slice(0, 255) || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 현재 진입의 유입원 분류(순수). search/referrer 를 주입 가능(테스트용).
  * 자기 도메인 referrer(내부 네비)는 'direct' 로 간주해 자기참조 오염 방지.
@@ -45,11 +57,13 @@ export function classifySource(
   const params = new URLSearchParams(search || '');
   const utmSource = params.get('utm_source');
   const utmMedium = params.get('utm_medium');
+  // [CL-AUDIT-R3-REFNORM-20260623-000000] 저장/반환 referrer 는 origin 만(PII·bloat 방지). 분류 매칭엔 원본 사용.
+  const ref = normalizeReferrer(referrer);
   if (utmSource) {
     return {
       source: utmSource.toLowerCase().slice(0, 40),
       medium: utmMedium ? utmMedium.toLowerCase().slice(0, 40) : null,
-      referrer: referrer || null,
+      referrer: ref,
     };
   }
 
@@ -60,12 +74,12 @@ export function classifySource(
 
   const labels = host.split('.');
   const matched = (toks: string[]) => toks.find((t) => labels.includes(t));
-  if (matched(KAKAO_LABELS)) return { source: 'kakao', medium: 'social', referrer };
+  if (matched(KAKAO_LABELS)) return { source: 'kakao', medium: 'social', referrer: ref };
   const s = matched(SEARCH_LABELS);
-  if (s) return { source: s, medium: 'search', referrer };
+  if (s) return { source: s, medium: 'search', referrer: ref };
   const so = matched(SOCIAL_LABELS);
-  if (so) return { source: so === 'fb' ? 'facebook' : so, medium: 'social', referrer };
-  return { source: host, medium: 'referral', referrer };
+  if (so) return { source: so === 'fb' ? 'facebook' : so, medium: 'social', referrer: ref };
+  return { source: host, medium: 'referral', referrer: ref };
 }
 
 /** 최초 방문 유입원을 localStorage 에 1회 기록·반환. SSR/프라이빗 모드 등 예외는 null. */

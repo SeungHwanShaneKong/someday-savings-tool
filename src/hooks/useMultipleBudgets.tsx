@@ -8,6 +8,7 @@ import { ExtendedBudgetItem } from '@/components/BudgetTable';
 import { useVersionRecovery } from './useVersionRecovery';
 // [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 — 충돌 refs/applier 배선
 import { type PendingOp, upsertById } from '@/lib/collab/conflict-resolution';
+import { createTombstoneStore, type TombstoneStore } from '@/lib/collab/tombstone';
 import type { RealtimeApplier, ItemRow } from './useRealtimeBudget';
 
 // Snapshot data can be either:
@@ -80,22 +81,16 @@ export function useMultipleBudgets() {
   const pendingWritesRef = useRef<Map<string, PendingOp>>(new Map());
   const localUpdatedAtRef = useRef<Map<string, string>>(new Map());
   const editingColumnsRef = useRef<Map<string, Set<string>>>(new Map());
-  // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 삭제 항목 id→삭제시각(ms). TTL 내면 부활 차단.
-  const deletedTombstonesRef = useRef<Map<string, number>>(new Map());
+  // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012 / CL-AUDIT-R3-TOMBSTONE-20260623-000000]
+  //   삭제 항목 툼스톤 — mark 시 만료분 일괄 스윕(무제한 증식·메모리 누수 차단). 순수 스토어로 분리해 단위테스트.
+  const tombstonesRef = useRef<TombstoneStore | null>(null);
+  if (!tombstonesRef.current) tombstonesRef.current = createTombstoneStore(TOMBSTONE_TTL_MS);
   const markTombstone = useCallback((id: string) => {
-    deletedTombstonesRef.current.set(id, Date.now());
+    tombstonesRef.current!.mark(id);
     pendingWritesRef.current.delete(id);
     localUpdatedAtRef.current.delete(id);
   }, []);
-  const isTombstoned = useCallback((id: string) => {
-    const t = deletedTombstonesRef.current.get(id);
-    if (t === undefined) return false;
-    if (Date.now() - t > TOMBSTONE_TTL_MS) {
-      deletedTombstonesRef.current.delete(id); // lazy 청소
-      return false;
-    }
-    return true;
-  }, []);
+  const isTombstoned = useCallback((id: string) => tombstonesRef.current!.isTombstoned(id), []);
 
   // [CL-HOME-FIX-20260315-120000] setter 래핑 — sessionStorage 동기화
   const setActiveBudgetId = useCallback((id: string | null) => {
@@ -409,8 +404,10 @@ export function useMultipleBudgets() {
   //  비소유자가 삭제를 시도하면 budget_items 는 RLS상 지워지지만 budgets 행은 소유자 전용 DELETE 라
   //  거부→부분삭제(항목만 사라지고 옵션 잔존)→재조회 시 빈 옵션 '좀비' 부활. 어떤 삭제도 하기 전에 차단한다.
   const deleteBudget = async (budgetId: string) => {
+    // [CL-AUDIT-R3-FAILCLOSED-20260623-000000] fail-closed: 소유자 확인 불가(미발견/비소유/미인증)면 차단.
+    //   (이전 fail-open 은 target 미발견 시 가드를 건너뛰어 부분삭제 좀비 가능성이 이론상 남았음.)
     const target = budgets.find(b => b.id === budgetId);
-    if (target && user && target.user_id !== user.id) {
+    if (!user || !target || target.user_id !== user.id) {
       toast({
         title: '삭제할 수 없어요',
         description: '이 옵션은 만든 사람만 삭제할 수 있어요.',

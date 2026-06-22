@@ -116,4 +116,19 @@ describe('normalizeAcceptResult (RPC 응답 정규화)', () => {
     const r = normalizeAcceptResult(null, new Error('network'));
     expect(r).toEqual({ status: 'error', message: 'network' });
   });
+
+  // [CL-AUDIT-R3-PAIRED-20260623-000000] 1:1 가드 거부가 startsWith('already')/includes('owner')에
+  //   삼켜져 거짓 성공/오분류되던 회귀를 차단(개선6).
+  it('IR.18 already_paired → already_paired(거짓 already_member 아님)', () => {
+    expect(normalizeAcceptResult({ ok: false, error: 'already_paired' }, null)).toEqual({ status: 'already_paired' });
+  });
+  it('IR.19 owner_already_paired → already_paired(거짓 owner 아님)', () => {
+    expect(normalizeAcceptResult({ ok: false, error: 'owner_already_paired' }, null)).toEqual({ status: 'already_paired' });
+  });
+  it('IR.20 회귀가드: 일반 already_accepted 는 여전히 already_member', () => {
+    expect(normalizeAcceptResult({ ok: false, error: 'already_accepted', budget_id: 'b9' }, null)).toEqual({
+      status: 'already_member',
+      budgetId: 'b9',
+    });
+  });
 });

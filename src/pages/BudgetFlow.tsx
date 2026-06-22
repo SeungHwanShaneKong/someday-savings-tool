@@ -64,9 +64,11 @@ import { CollaboratorManager } from '@/components/collaboration/CollaboratorMana
 import { useCollaboration } from '@/hooks/useCollaboration';
 import { NicknameDialog } from '@/components/collaboration/NicknameDialog';
 import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
+import { useToast } from '@/hooks/use-toast'; // [CL-AUDIT-R3-SHARE-20260623-000000] 자동공유 실패 안내
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
   // [CL-SEC-ADMIN-GATE-20260621] 운영자 이메일 하드코딩 제거 → user_roles RLS 기반 isAdmin(번들에 PII 미노출)
   const { isAdmin } = useAdmin();
@@ -162,14 +164,30 @@ export default function BudgetFlow() {
   // [CL-COEDIT-COPY-20260622-233012] 개선2+3: '복사하여 공동편집'은 탭 무관하게 항상 '우리' 옵션(shared:true)을 만든다.
   //  (기존 버그: shared 미전달 → 복사본이 개인탭에 떨어져 "우리로 안 됨".) 생성 후 우리탭 전환 +
   //  파트너 있으면 자동 공유(개선6), 없으면 초대 링크 자동 생성.
+  // [CL-AUDIT-R3-SHARE-20260623-000000] 파트너 자동공유 — 실패 시 침묵하지 않고 안내(이전엔 결과 미검사). 성공 여부 반환.
+  const autoShareToPartner = async (budgetId: string): Promise<boolean> => {
+    const ok = await collaboration.shareBudgetWithPartner(budgetId);
+    if (ok) {
+      await collaboration.refresh();
+    } else {
+      toast({
+        title: '파트너 공유에 실패했어요',
+        description: '잠시 후 다시 시도하거나, 초대 링크로 직접 공유해주세요.',
+        variant: 'destructive',
+      });
+    }
+    return ok;
+  };
+
   const handleCopyToCoedit = async () => {
     if (!activeBudget) return;
     const copy = await copyBudget(activeBudget.id, `${activeBudget.name} (공동편집)`, { shared: true });
     if (copy) {
       setMode('shared');
       if (collaboration.myPartner) {
-        await collaboration.shareBudgetWithPartner(copy.id);
-        await collaboration.refresh();
+        // 자동공유 실패 시 초대 링크로 폴백(파트너가 못 보는 채로 방치되지 않게)
+        const ok = await autoShareToPartner(copy.id);
+        if (!ok) setAutoInvite(true);
       } else {
         setAutoInvite(true);
       }
@@ -182,8 +200,7 @@ export default function BudgetFlow() {
     const newName = `옵션 ${visibleBudgets.length + 1}`;
     const created = await createNewBudget(newName, { shared: mode === 'shared' });
     if (created && mode === 'shared' && collaboration.myPartner) {
-      await collaboration.shareBudgetWithPartner(created.id);
-      await collaboration.refresh();
+      await autoShareToPartner(created.id);
     }
   };
 
@@ -193,8 +210,7 @@ export default function BudgetFlow() {
       const newName = `${sourceBudget.name} (복사본)`;
       const created = await copyBudget(sourceBudgetId, newName, { shared: mode === 'shared' });
       if (created && mode === 'shared' && collaboration.myPartner) {
-        await collaboration.shareBudgetWithPartner(created.id);
-        await collaboration.refresh();
+        await autoShareToPartner(created.id);
       }
     }
   };

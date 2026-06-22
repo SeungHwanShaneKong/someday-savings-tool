@@ -95,6 +95,9 @@ export type AcceptOutcome =
   | { status: 'owner' }
   | { status: 'expired' }
   | { status: 'invalid' }
+  // [CL-AUDIT-R3-PAIRED-20260623-000000] 전역 1:1 가드 거부(개선6) — 수락자 또는 소유자가 이미 다른 사람과 파트너.
+  //   주의: 'already_paired' 는 startsWith('already')에 걸려 거짓 성공(already_member)으로 오분류됐었음 → 명시 분기로 차단.
+  | { status: 'already_paired' }
   | { status: 'error'; message: string };
 
 export function normalizeAcceptResult(data: unknown, error: unknown): AcceptOutcome {
@@ -107,6 +110,8 @@ export function normalizeAcceptResult(data: unknown, error: unknown): AcceptOutc
   // ok:false 형태 (error 코드)
   if (d.ok === false || typeof d.error === 'string') {
     const code = String(d.error ?? '');
+    // 1:1 페어링 거부는 owner/already 일반 분기보다 먼저(owner_already_paired 가 'owner' 로 오분류되는 것도 방지)
+    if (code === 'already_paired' || code === 'owner_already_paired') return { status: 'already_paired' };
     if (code.includes('owner')) return { status: 'owner' };
     if (code.includes('expired')) return { status: 'expired' };
     if (code.includes('invalid') || code.includes('not_found')) return { status: 'invalid' };

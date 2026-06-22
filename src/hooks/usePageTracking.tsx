@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 // [CL-ACQ-CLASSIFY-20260622-233012] 유입경로(개선1): first-touch 보관 + last-touch 소스 기록 + 가입 귀속
-import { classifySource, getOrSetFirstTouch, readFirstTouch } from '@/lib/analytics/acquisition';
+import { classifySource, getOrSetFirstTouch, readFirstTouch, normalizeReferrer } from '@/lib/analytics/acquisition';
 
 // Generate or retrieve session ID
 const getSessionId = () => {
@@ -49,11 +49,17 @@ export function usePageTracking() {
       .update({ first_source: ft.source, first_referrer: ft.referrer, acquisition_at: ft.ts })
       .eq('user_id', user.id)
       .is('first_source', null)
-      .then(() => {
-        try {
-          localStorage.setItem(flag, '1');
-        } catch {
-          /* noop */
+      // [CL-AUDIT-R3-FTSYNC-20260623-000000] 성공(error 없음)일 때만 synced 플래그 설정 →
+      //   RLS/네트워크 실패 시 플래그 미설정 → 다음 마운트에서 재시도(귀속 영구 유실 방지).
+      //   단 컬럼 미배포(42703)는 영구 실패이므로 그때만 플래그를 박아 무한 재시도 차단.
+      .then(({ error }) => {
+        const code = (error as { code?: string } | null)?.code;
+        if (!error || code === '42703') {
+          try {
+            localStorage.setItem(flag, '1');
+          } catch {
+            /* noop */
+          }
         }
       });
   }, [user?.id]);
@@ -77,7 +83,8 @@ export function usePageTracking() {
         const c = classifySource();
         const { error } = await supabase
           .from('page_views')
-          .insert({ ...base, referrer: (typeof document !== 'undefined' ? document.referrer : '') || null, utm_source: c.source });
+          // [CL-AUDIT-R3-REFNORM-20260623-000000] origin 만 저장(PII/bloat 방지)
+          .insert({ ...base, referrer: normalizeReferrer(typeof document !== 'undefined' ? document.referrer : ''), utm_source: c.source });
         if (error && isMissingAcquisitionColumn(error)) {
           await supabase.from('page_views').insert(base);
         }

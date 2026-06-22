@@ -1,6 +1,6 @@
 // [CL-ACQ-CLASSIFY-20260622-233012] 유입경로 분류/first-touch 단위 검증 (개선1)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { classifySource, getOrSetFirstTouch, readFirstTouch, sourceLabel } from '../acquisition';
+import { classifySource, getOrSetFirstTouch, readFirstTouch, sourceLabel, normalizeReferrer } from '../acquisition';
 
 describe('classifySource (유입경로 분류)', () => {
   it('AQ.1 UTM 우선 — utm_source/medium 소문자, referrer 보존', () => {
@@ -44,6 +44,13 @@ describe('classifySource (유입경로 분류)', () => {
     });
   });
 
+  it('AQ.7b [R3] 반환 referrer 는 origin 만 — 쿼리스트링(PII) 제거', () => {
+    // 검색어/세션토큰이 든 referrer 라도 origin 만 저장되어야 함
+    const r = classifySource('', 'https://search.naver.com/search?query=내검색어&sid=secret', 'wedsem.com');
+    expect(r.source).toBe('naver');
+    expect(r.referrer).toBe('https://search.naver.com'); // path/query 제거
+  });
+
   it('AQ.8 잘못된 referrer URL → direct(견고)', () => {
     expect(classifySource('', 'not-a-url', 'wedsem.com')).toEqual({ source: 'direct', medium: null, referrer: null });
   });
@@ -66,6 +73,17 @@ describe('getOrSetFirstTouch / readFirstTouch (최초 1회 보관)', () => {
 
   it('AQ.10 보관 전 readFirstTouch 는 null', () => {
     expect(readFirstTouch()).toBeNull();
+  });
+});
+
+describe('normalizeReferrer ([R3] origin 만 보관)', () => {
+  it('AQ.12 전체 URL → origin, 쿼리/패스 제거', () => {
+    expect(normalizeReferrer('https://x.com/abc?utm=1&token=secret')).toBe('https://x.com');
+  });
+  it('AQ.13 빈 값/파싱 불가 → null', () => {
+    expect(normalizeReferrer('')).toBeNull();
+    expect(normalizeReferrer(null)).toBeNull();
+    expect(normalizeReferrer('not-a-url')).toBeNull();
   });
 });
 

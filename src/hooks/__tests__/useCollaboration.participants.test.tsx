@@ -75,3 +75,27 @@ describe('useCollaboration.refresh — 참여자 이름(RPC) 경로', () => {
     expect(supabase.from).not.toHaveBeenCalled();
   });
 });
+
+// [CL-AUDIT-R3-SHARE-20260623-000000] shareBudgetWithPartner — 침묵 실패 방지(결과 검사)
+describe('useCollaboration.shareBudgetWithPartner — ok 반환(폴백 유도)', () => {
+  // 참여자/파트너 RPC 는 빈 배열로(refresh 조기 종료, from 폴백 미진입), share 만 시나리오별 반환
+  const setRpc = (shareResult: unknown) =>
+    vi.mocked(supabase.rpc).mockImplementation(((fn: string) =>
+      Promise.resolve(fn === 'share_budget_with_partner' ? shareResult : { data: [], error: null })) as never);
+
+  it('PA.4 RPC ok:true → true', async () => {
+    setRpc({ data: { ok: true, status: 'shared' }, error: null });
+    const { result } = renderHook(() => useCollaboration('budget-1'));
+    expect(await result.current.shareBudgetWithPartner('budget-1')).toBe(true);
+  });
+  it('PA.5 RPC 에러 → false(호출측이 초대 폴백)', async () => {
+    setRpc({ data: null, error: { message: 'PGRST202 function not found' } });
+    const { result } = renderHook(() => useCollaboration('budget-1'));
+    expect(await result.current.shareBudgetWithPartner('budget-1')).toBe(false);
+  });
+  it('PA.6 RPC ok:false(not_owner) → false', async () => {
+    setRpc({ data: { ok: false, error: 'not_owner' }, error: null });
+    const { result } = renderHook(() => useCollaboration('budget-1'));
+    expect(await result.current.shareBudgetWithPartner('budget-1')).toBe(false);
+  });
+});

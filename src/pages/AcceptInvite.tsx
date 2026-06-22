@@ -108,6 +108,11 @@ export default function AcceptInvite() {
             setErrorMsg('이미 사용되었거나 유효하지 않은 초대예요.');
             setPhase('error');
             break;
+          // [CL-AUDIT-R3-PAIRED-20260623-000000] 전역 1:1 가드 거부 — 정확한 사유 안내(우회 시도 유도 방지)
+          case 'already_paired':
+            setErrorMsg('이미 다른 분과 파트너로 연결되어 있어요. 새로운 파트너와 함께하려면, 기존 파트너를 먼저 해지한 뒤 다시 초대해주세요.');
+            setPhase('error');
+            break;
           default:
             setErrorMsg(outcome.status === 'error' ? outcome.message : '초대 수락에 실패했어요.');
             setPhase('error');

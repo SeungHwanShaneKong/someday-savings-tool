@@ -36,8 +36,8 @@ export interface UseCollaborationResult {
   removeCollaborator: (userId: string) => Promise<void>;
   /** 파트너 해지 — 양방향 협업자 링크 제거(예산 본문은 소유자 보관). 성공 여부 반환 */
   releasePartner: () => Promise<boolean>;
-  /** 새 우리 옵션을 현재 파트너에게 자동 공유(파트너 없으면 no-op) */
-  shareBudgetWithPartner: (budgetId: string) => Promise<void>;
+  /** 새 우리 옵션을 현재 파트너에게 자동 공유(파트너 없으면 no-op). 성공 여부 반환(실패 시 호출측 폴백) */
+  shareBudgetWithPartner: (budgetId: string) => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
@@ -179,9 +179,11 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
     }
   }, [refresh, refreshPartner]);
 
-  // [CL-PARTNER-1TO1-20260622-233012] 새 우리 옵션을 현재 파트너에게 자동 공유(파트너 없으면 서버에서 no-op)
-  const shareBudgetWithPartner = useCallback(async (bId: string) => {
-    await supabase.rpc('share_budget_with_partner', { p_budget_id: bId });
+  // [CL-PARTNER-1TO1-20260622-233012 / CL-AUDIT-R3-SHARE-20260623-000000] 새 우리 옵션을 현재 파트너에게 자동 공유.
+  //   RPC 미배포/에러/not_owner 면 false 반환(이전엔 결과 미검사로 '공유됐다' 오인 → 침묵 실패). 파트너 없으면 ok=true(no-op).
+  const shareBudgetWithPartner = useCallback(async (bId: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('share_budget_with_partner', { p_budget_id: bId });
+    return !error && (data as { ok?: boolean } | null)?.ok !== false;
   }, []);
 
   return {

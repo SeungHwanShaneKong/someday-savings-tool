@@ -18,7 +18,7 @@ const externalStub: UseCollaborationResult = {
   createInvite: vi.fn(async () => null),
   removeCollaborator: vi.fn(async () => {}),
   releasePartner: vi.fn(async () => true),
-  shareBudgetWithPartner: vi.fn(async () => {}),
+  shareBudgetWithPartner: vi.fn(async () => true),
   refresh: vi.fn(async () => {}),
 };
 

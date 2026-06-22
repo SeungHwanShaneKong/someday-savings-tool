@@ -174,8 +174,15 @@ export function useMultipleBudgets() {
           allItems.forEach(item => {
             // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] in-flight 재조회가 방금 삭제한 항목을 되살리지 못하게
             if (isTombstoned(item.id)) return;
+            // [CL-AUDIT-R4-INFLIGHT-20260623] in-flight 낙관 쓰기(미ACK)는 서버 옛값으로 덮지 않고 로컬 낙관값 보존.
+            //   Supabase 는 read-after-write 미보장 → 저장 직후 포커스 refetch 가 옛값을 읽어 입력이 사라지던 결함(#4) 차단.
+            let row = item as ExtendedBudgetItem;
+            if (pendingWritesRef.current.has(item.id)) {
+              const localRow = itemsRef.current.find(i => i.id === item.id);
+              if (localRow) row = localRow;
+            }
             if (!grouped[item.budget_id]) grouped[item.budget_id] = [];
-            grouped[item.budget_id].push(item as ExtendedBudgetItem);
+            grouped[item.budget_id].push(row);
           });
           setAllBudgetsItems(grouped);
         }
@@ -547,14 +554,23 @@ export function useMultipleBudgets() {
         setSaveState('error');
         savedTimerRef.current = setTimeout(() => setSaveState('idle'), 2400);
       }
-      // 4') 낙관적 롤백 — 직전 값 복원
+      // 4') 낙관적 롤백 — [CL-AUDIT-R4-ROLLBACK-SCOPE-20260623] 근본수정(#3): 항목 전체가 아니라
+      //   '이번 호출이 바꾼 컬럼(updates)'만 직전값으로 되돌린다. 그래야 in-flight 동안 성공한 다른 필드 편집이 보존된다
+      //   (기존엔 prevItem 통째 복원이라 동시 편집한 notes 등이 유실됐음 — field-level LWW 모델과 정합).
       if (prevItem) {
-        setItems(prev => prev.map(item => (item.id === itemId ? prevItem : item)));
+        const revertKeys = Object.keys(updates) as (keyof ExtendedBudgetItem)[];
+        const prevRec = prevItem as unknown as Record<string, unknown>;
+        const revertCols = (item: ExtendedBudgetItem): ExtendedBudgetItem => {
+          const next = { ...item } as unknown as Record<string, unknown>;
+          for (const k of revertKeys) next[k as string] = prevRec[k as string];
+          return next as unknown as ExtendedBudgetItem;
+        };
+        setItems(prev => prev.map(item => (item.id === itemId ? revertCols(item) : item)));
         if (activeBudgetId) {
           setAllBudgetsItems(prev => ({
             ...prev,
             [activeBudgetId]: (prev[activeBudgetId] || []).map(item =>
-              item.id === itemId ? prevItem : item
+              item.id === itemId ? revertCols(item) : item
             ),
           }));
         }

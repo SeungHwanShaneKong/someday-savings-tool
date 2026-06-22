@@ -14,5 +14,6 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /shared/
+Disallow: /invite/
 
 Sitemap: https://moderninsightspot.com/sitemap.xml

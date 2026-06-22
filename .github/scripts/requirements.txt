@@ -1,5 +1,8 @@
 # [ZERO-COST-PIPELINE-2026-03-07] Python document crawler dependencies
-PyPDF2>=3.0.0
-python-pptx>=0.6.21
-requests>=2.31.0
-beautifulsoup4>=4.12.0
+# [CL-AUDIT-R4-DEPPIN-20260623] (#15) 정확 버전 핀(==) — service_role 키를 보유한 crawl 잡에서
+#   in-range 신규 릴리스/공급망 하이재킹이 매 실행 재해석되던 비재현 설치를 차단(deploy.yml 의 pnpm --frozen-lockfile 과 동일 정책).
+#   업그레이드는 의도적 PR 로만. (해시 고정까지 원하면 pip-compile 로 requirements.lock 생성 후 --require-hashes 권장.)
+PyPDF2==3.0.1
+python-pptx==0.6.23
+requests==2.32.3
+beautifulsoup4==4.12.3

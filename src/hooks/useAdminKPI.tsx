@@ -98,6 +98,11 @@ export function useAdminKPI(): UseAdminKPIResult {
           return [];
         }
       })();
+      // [CL-AUDIT-R4-WATERFALL-20260623] (#14) admin 소유 예산 id 조회를 메인 배치와 병렬 시작 → 직렬 워터폴 1단계(1 RTT) 제거.
+      const adminBudgetIdsPromise: Promise<string[]> = (async () => {
+        const r = await supabase.from('budgets').select('id').eq('user_id', ADMIN_USER_ID);
+        return (r.data || []).map((b) => b.id);
+      })();
       const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const prevStart = subDays(startDate, periodDays);
       const prevEnd = subDays(endDate, periodDays);
@@ -167,10 +172,8 @@ export function useAdminKPI(): UseAdminKPIResult {
       const monthPV = monthPVRes;
 
       // Filter budget_items to exclude admin-owned budgets (client-side)
-      const adminBudgetIds = new Set(
-        (await supabase.from('budgets').select('id').eq('user_id', ADMIN_USER_ID).then(r => r.data || []))
-          .map(b => b.id)
-      );
+      // [CL-AUDIT-R4-WATERFALL-20260623] 병렬로 시작한 admin 예산 id 결과 수거(직렬 추가 RTT 제거)
+      const adminBudgetIds = new Set(await adminBudgetIdsPromise);
       const filteredBudgetItems = budgetItems.filter(bi => !adminBudgetIds.has(bi.budget_id));
       const filteredPeriodBudgetItems = periodBudgetItems.filter(bi => !adminBudgetIds.has(bi.budget_id));
       const filteredSharedBudgets = sharedBudgets.filter(sb => !adminBudgetIds.has(sb.budget_id));

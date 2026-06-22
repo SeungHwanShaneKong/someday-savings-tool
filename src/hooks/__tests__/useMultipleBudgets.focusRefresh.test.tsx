@@ -112,4 +112,57 @@ describe('useMultipleBudgets — 탭 복귀 자동 재조회(F1B)', () => {
     act(() => { window.dispatchEvent(new Event('focus')); });
     expect(counts.budgets).toBe(before); // visibilityState!=='visible' → 조기 return
   });
+
+  it('FR.6 [R4 #4] in-flight 낙관 입력은 포커스 재조회의 서버 옛값으로 덮이지 않는다', async () => {
+    // 서버 budget_items 는 항상 옛값(amount=100) 반환. amount=999 저장이 ACK 보류(in-flight)인 동안 focus refetch.
+    //   버그(과거): refetch 가 allBudgetsItems(비교대시보드)를 100 으로 덮어 입력 유실(ACK 도 복구 못함).
+    //   수정: pendingWritesRef 미ACK 항목은 로컬 낙관값(999) 보존.
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    let resolveAck: () => void = () => {};
+    const ack = new Promise<{ data: unknown; error: unknown }>((res) => {
+      resolveAck = () => res({ data: { updated_at: NOW }, error: null });
+    });
+    const mkItem = () => ({
+      id: 'i1', budget_id: 'b1', category: 'wedding-hall', sub_category: 'sub-i1',
+      amount: 100, is_paid: false, notes: null, unit_price: null, quantity: null,
+      custom_name: null, is_custom: false, updated_at: NOW,
+    });
+    vi.mocked(supabase.from).mockImplementation(((table: string) => {
+      if (table === 'budgets') return chain([mkBudget()]) as never;
+      if (table === 'budget_items') {
+        const q: Record<string, unknown> = {};
+        let payload: Record<string, unknown> | undefined;
+        for (const m of ['select', 'insert', 'delete', 'eq', 'neq', 'in', 'order', 'limit', 'is']) q[m] = vi.fn(() => q);
+        q.update = vi.fn((p: Record<string, unknown>) => { payload = p; return q; });
+        q.single = vi.fn(() => (payload ? ack : Promise.resolve({ data: null, error: null })));
+        (q as { then: unknown }).then = (r: (v: unknown) => unknown) =>
+          Promise.resolve({ data: [mkItem()], error: null }).then(r); // 서버는 항상 옛값(100)
+        return q;
+      }
+      return chain([]) as never;
+    }) as never);
+
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // 1) 낙관 저장 시작(ACK 보류) — 이 act 종료 시 낙관 렌더가 커밋되어 itemsRef=999 확정
+    let pending: Promise<unknown> | undefined;
+    await act(async () => {
+      pending = result.current.updateAmount('wedding-hall', 'sub-i1', 999);
+      await Promise.resolve();
+    });
+    // 낙관 반영 확인(아직 ACK 전)
+    expect(result.current.getBudgetsForComparison().find(b => b.id === 'b1')?.items.find(i => i.id === 'i1')?.amount).toBe(999);
+
+    // 2) ACK 전에 포커스 재조회(서버 옛값 100 반환) — 수정본은 pending 항목의 낙관값 보존
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((r) => setTimeout(r, 60));
+    });
+    const comp = result.current.getBudgetsForComparison().find(b => b.id === 'b1');
+    expect(comp?.items.find(i => i.id === 'i1')?.amount).toBe(999); // 옛값 100 으로 덮이지 않음
+
+    // 3) ACK 마무리
+    await act(async () => { resolveAck(); await pending; });
+  });
 });

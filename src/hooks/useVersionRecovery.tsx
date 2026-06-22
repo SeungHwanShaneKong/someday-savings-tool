@@ -245,21 +245,13 @@ export function useVersionRecovery() {
         throw new Error(`데이터 무결성 오류: ${validation.errors.join(', ')}`);
       }
 
-      // Phase 4: Delete existing data (batch)
-      setProgress({
-        phase: 'deleting',
-        current: 3,
-        total: 5,
-        message: '기존 데이터 정리 중...'
-      });
-      
-      const budgetIds = currentBudgets.map(b => b.id);
-      await batchDeleteBudgets(budgetIds);
-
-      // Phase 5: Restore all budgets in parallel
+      // [CL-AUDIT-R4-RESTORE-ATOMIC-20260623] 근본수정(#7 영구 데이터 유실):
+      //   기존엔 '전체 삭제(Phase4) → 삽입(Phase5)' 순서라 삽입 도중 실패 시 기존 데이터가 이미 사라져 복구 불능이었다.
+      //   순서를 뒤집어 '신규 전량 삽입·검증 성공 후에만 기존 삭제'로 바꾼다. 삽입이 실패하면 기존 데이터는 그대로 보존(최악=중복, 무손실).
+      // Phase 4: Restore (INSERT new) FIRST
       setProgress({
         phase: 'restoring',
-        current: 4,
+        current: 3,
         total: 5,
         message: `${snapshotData.budgets.length}개 예산 복원 중...`
       });
@@ -283,8 +275,8 @@ export function useVersionRecovery() {
 
       for (let i = 0; i < budgetResults.length; i++) {
         const result = budgetResults[i];
-        if (result.error) throw result.error;
-        
+        if (result.error) throw result.error; // 기존 데이터 미삭제 상태 → 무손실
+
         const newBudget = result.data as Budget;
         newBudgets.push(newBudget);
 
@@ -306,16 +298,32 @@ export function useVersionRecovery() {
         allItemsToInsert.push({ budgetId: newBudget.id, items: itemsToInsert });
       }
 
-      // Insert all items in parallel batches
+      // Insert all items in parallel batches (batchInsertItems 는 실패 시 throw → 기존 데이터 보존)
       const itemInsertPromises = allItemsToInsert.map(async ({ budgetId, items }) => {
         const inserted = await batchInsertItems(items as any);
         return { budgetId, items: inserted };
       });
 
       const itemResults = await Promise.all(itemInsertPromises);
-      
+
       for (const { budgetId, items } of itemResults) {
         newAllBudgetsItems[budgetId] = items;
+      }
+
+      // Phase 5: 신규 복원이 모두 성공한 뒤에만 기존(구) 데이터 삭제.
+      // [CL-AUDIT-R4-DELETE-GUARD-20260623] 근본수정(#8): ①소유 예산만 삭제(비소유 공유예산은 RLS상 0행 → 좀비/중복 방지)
+      //   ②batchDeleteBudgets 반환값을 검사해 실패 시 throw(중복 잔존하더라도 무손실, 사용자 재시도 가능).
+      setProgress({
+        phase: 'deleting',
+        current: 4,
+        total: 5,
+        message: '기존 데이터 정리 중...'
+      });
+
+      const oldOwnedIds = currentBudgets.filter(b => b.user_id === user.id).map(b => b.id);
+      const deleteOk = await batchDeleteBudgets(oldOwnedIds);
+      if (!deleteOk) {
+        throw new Error('기존 데이터 정리에 실패했어요. 복원본은 생성되었고 기존 데이터도 보존되었어요(중복 가능) — 새로고침 후 다시 시도해주세요.');
       }
 
       // Phase 6: Complete
@@ -415,7 +423,13 @@ export function useVersionRecovery() {
         return Promise.resolve({ error: null });
       });
 
-      await Promise.all(updatePromises);
+      // [CL-AUDIT-R4-LEGACY-VERIFY-20260623] 근본수정(#6): 개별 update 의 {error} 를 검사(PostgREST 는 reject 안 함).
+      //   하나라도 실패하면 거짓 '복원 완료' 대신 throw → 부분 복원을 사용자에게 정직하게 알림.
+      const updateResults = await Promise.all(updatePromises);
+      const failedCount = (updateResults as Array<{ error: unknown } | null>).filter((r) => r && r.error).length;
+      if (failedCount > 0) {
+        throw new Error(`${failedCount}개 항목 복원에 실패했어요. 일부만 복원되었을 수 있으니 새로고침 후 다시 시도해주세요.`);
+      }
 
       setProgress({
         phase: 'complete',

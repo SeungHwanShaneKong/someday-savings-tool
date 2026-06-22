@@ -232,6 +232,49 @@ describe('useMultipleBudgets.updateItem (낙관 + ACK + 롤백)', () => {
     expect(result.current.items.find(i => i.id === 'i1')?.notes).toBeNull();
   });
 
+  it('I2b [R4 #3] 동시편집 중 한 필드 저장 실패 시 롤백이 다른 필드(성공분)를 덮지 않는다', async () => {
+    // 시나리오: amount 저장이 in-flight(ACK 보류)인 동안 notes 저장이 성공 → 이후 amount 가 실패.
+    //   버그(과거): 롤백이 항목 '전체'를 amount 호출 시점 스냅샷(notes=null)으로 되돌려 notes 유실.
+    //   수정: 롤백을 'amount' 컬럼만으로 한정 → notes('메모') 보존.
+    let resolveAmountAck: (v: unknown) => void = () => {};
+    const amountAck = new Promise((res) => { resolveAmountAck = res; });
+    const items = [mkItem('i1'), mkItem('i2')];
+
+    const smartItems = () => {
+      const q: Record<string, unknown> = {};
+      let payload: Record<string, unknown> | undefined;
+      for (const m of ['select', 'insert', 'delete', 'eq', 'in', 'order', 'limit', 'is']) q[m] = vi.fn(() => q);
+      q.update = vi.fn((p: Record<string, unknown>) => { payload = p; return q; });
+      q.single = vi.fn(() =>
+        payload && 'amount' in payload
+          ? amountAck // amount 저장 → 보류(나중에 에러로 resolve)
+          : Promise.resolve({ data: { updated_at: NOW }, error: null }), // notes 등 → 즉시 성공
+      );
+      (q as { then: unknown }).then = (r: (v: unknown) => unknown) =>
+        Promise.resolve({ data: items, error: null }).then(r);
+      return q;
+    };
+    vi.mocked(supabase.from).mockImplementation(((table: string) => {
+      if (table === 'budget_items') return smartItems() as never;
+      if (table === 'budgets') return chain({ list: { data: [mkBudget()], error: null } }) as never;
+      return chain() as never;
+    }) as never);
+
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      const pAmount = result.current.updateAmount('wedding-hall', 'sub-i1', 999); // in-flight
+      await result.current.updateNotes('i1', '메모'); // 성공 → notes='메모'
+      resolveAmountAck({ data: null, error: { message: 'boom' } }); // amount 실패 유발
+      await pAmount;
+    });
+
+    const i1 = result.current.items.find(i => i.id === 'i1');
+    expect(i1?.amount).toBe(100); // 실패한 amount 는 직전값으로 롤백
+    expect(i1?.notes).toBe('메모'); // 동시 성공한 notes 는 보존(롤백이 덮지 않음)
+  });
+
   it('I6 error 시 pending 삭제: 이후 동일 updated_at 실시간 에코가 더 이상 억제되지 않는다', async () => {
     // 핵심: 실패한 쓰기의 pending 은 정리되어야(에코 ack 미존재) onUpsert 가 정상 적용.
     installFrom({ itemAck: { data: null, error: { message: 'fail' } } });

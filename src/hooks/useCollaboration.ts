@@ -3,6 +3,7 @@
 // 오너가 초대 링크를 발급(budget_invitations insert → token)하고, 협업자 목록을 조회/해제한다.
 // 수락은 AcceptInvite + accept_budget_invitation RPC 가 담당(별도). RLS 가 보안 경계.
 // ※ 추가형 — 기존 훅 무수정. 단독사용자(협업 0) 영향 없음.
+// [CL-PARTNER-1TO1-20260622-233012] 전역 1:1 파트너(myPartner·해지·자동공유) + [CL-ACQ-EMAIL] 파트너 이메일 표출.
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,16 +13,31 @@ export interface Collaborator {
   role: string;
   /** [CL-COEDIT-PARTICIPANTS-20260620] get_budget_participants RPC 의 표시명. 폴백 시 undefined → '파트너' 표시 */
   display_name?: string | null;
+  /** [CL-ACQ-EMAIL-RPC-20260622-233012] 동일 예산 협업자에게만 노출되는 이메일(개선5). RPC v2 미배포 시 undefined */
+  email?: string | null;
   /** 현재 사용자 본인 여부(목록에서 자기 자신 제외·표기에 사용) */
   isMe?: boolean;
+}
+
+/** [CL-PARTNER-1TO1-20260622-233012] 전역 1:1 현재 파트너(없으면 null) */
+export interface PartnerInfo {
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
 }
 
 export interface UseCollaborationResult {
   collaborators: Collaborator[];
   inviteUrl: string | null;
   busy: boolean;
+  /** 전역 1:1 현재 파트너(없으면 null) */
+  myPartner: PartnerInfo | null;
   createInvite: () => Promise<string | null>;
   removeCollaborator: (userId: string) => Promise<void>;
+  /** 파트너 해지 — 양방향 협업자 링크 제거(예산 본문은 소유자 보관). 성공 여부 반환 */
+  releasePartner: () => Promise<boolean>;
+  /** 새 우리 옵션을 현재 파트너에게 자동 공유(파트너 없으면 no-op) */
+  shareBudgetWithPartner: (budgetId: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -30,13 +46,30 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [myPartner, setMyPartner] = useState<PartnerInfo | null>(null);
 
   const refresh = useCallback(async () => {
     if (!budgetId) {
       setCollaborators([]);
       return;
     }
-    // [CL-COEDIT-PARTICIPANTS-20260620] 참여자(오너+협업자) 이름 포함 RPC. 미배포/에러 시 budget_collaborators 폴백('파트너').
+    // [CL-ACQ-EMAIL-RPC-20260622-233012] 1순위: 이메일 포함 RPC(개선5). 미배포/에러 시 단계적 폴백.
+    const { data: withEmail, error: emailErr } = await supabase.rpc('get_budget_participants_email', {
+      p_budget_id: budgetId,
+    });
+    if (!emailErr && Array.isArray(withEmail)) {
+      setCollaborators(
+        withEmail.map((p) => ({
+          user_id: p.user_id,
+          role: p.role,
+          display_name: p.display_name,
+          email: p.email,
+          isMe: p.user_id === user?.id,
+        })),
+      );
+      return;
+    }
+    // [CL-COEDIT-PARTICIPANTS-20260620] 2순위: 이름만 RPC. 3순위: budget_collaborators('파트너').
     const { data: participants, error: rpcError } = await supabase.rpc('get_budget_participants', {
       p_budget_id: budgetId,
     });
@@ -64,9 +97,28 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
     );
   }, [budgetId, user?.id]);
 
+  // [CL-PARTNER-1TO1-20260622-233012] 전역 파트너(user 단위) 조회. 미배포 RPC → null 강등.
+  const refreshPartner = useCallback(async () => {
+    if (!user) {
+      setMyPartner(null);
+      return;
+    }
+    const { data, error } = await supabase.rpc('get_my_partner');
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const p = data[0];
+      setMyPartner({ user_id: p.user_id, display_name: p.display_name, email: p.email });
+    } else {
+      setMyPartner(null);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    void refreshPartner();
+  }, [refreshPartner]);
 
   const createInvite = useCallback(async (): Promise<string | null> => {
     if (!budgetId || !user) return null;
@@ -80,7 +132,6 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
       let token = (data as { token?: string } | null)?.token;
       // [CL-COEDIT-E2E-20260620-130000] 멱등 재초대: 이 예산에 이미 초대가 있으면(UNIQUE 409)
       //  기존 행을 pending + 만료 7일 연장으로 **갱신**해 항상 사용 가능한 링크를 반환.
-      //  (단순 재노출이면 옛 expired/accepted 토큰을 줘 수락 실패 → E2E 가 발견. refresh 가 정답.)
       if (!token && error) {
         const sevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         const { data: refreshed } = await supabase
@@ -109,9 +160,39 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
         .eq('budget_id', budgetId)
         .eq('user_id', userId);
       await refresh();
+      await refreshPartner();
     },
-    [budgetId, refresh],
+    [budgetId, refresh, refreshPartner],
   );
 
-  return { collaborators, inviteUrl, busy, createInvite, removeCollaborator, refresh };
+  // [CL-PARTNER-1TO1-20260622-233012] 파트너 해지 — 양방향 링크 제거(예산 본문은 소유자 보관)
+  const releasePartner = useCallback(async (): Promise<boolean> => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('release_partner');
+      await refreshPartner();
+      await refresh();
+      const ok = !error && (data as { ok?: boolean } | null)?.ok !== false;
+      return ok;
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh, refreshPartner]);
+
+  // [CL-PARTNER-1TO1-20260622-233012] 새 우리 옵션을 현재 파트너에게 자동 공유(파트너 없으면 서버에서 no-op)
+  const shareBudgetWithPartner = useCallback(async (bId: string) => {
+    await supabase.rpc('share_budget_with_partner', { p_budget_id: bId });
+  }, []);
+
+  return {
+    collaborators,
+    inviteUrl,
+    busy,
+    myPartner,
+    createInvite,
+    removeCollaborator,
+    releasePartner,
+    shareBudgetWithPartner,
+    refresh,
+  };
 }

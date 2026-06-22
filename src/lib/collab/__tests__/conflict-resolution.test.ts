@@ -180,3 +180,45 @@ describe('decideItemUpsert (최종 결정 — 통합)', () => {
     }
   });
 });
+
+// [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 좀비 부활 차단(개선10) — 툼스톤 가드
+describe('decideItemUpsert — 툼스톤(삭제 항목 부활 차단)', () => {
+  const pending = new Map<string, PendingOp>();
+
+  it('CR.21 툼스톤 + local 없음(INSERT) → ignore(tombstone) (어떤 가드보다 우선)', () => {
+    const remote = baseItem({ id: 'gone', updated_at: T(9) });
+    const d = decideItemUpsert(undefined, remote, {
+      pending,
+      knownUpdatedAt: undefined,
+      isTombstoned: (id) => id === 'gone',
+    });
+    expect(d).toEqual({ action: 'ignore', reason: 'tombstone' });
+  });
+
+  it('CR.22 툼스톤 + local 존재(UPDATE) → ignore(tombstone) (되살아난 편집도 차단)', () => {
+    const local = baseItem({ id: 'gone', amount: 1, updated_at: T(1) });
+    const remote = baseItem({ id: 'gone', amount: 2, updated_at: T(5) });
+    const d = decideItemUpsert(local, remote, {
+      pending,
+      knownUpdatedAt: T(1),
+      isTombstoned: () => true,
+    });
+    expect(d).toEqual({ action: 'ignore', reason: 'tombstone' });
+  });
+
+  it('CR.23 비-툼스톤 신규 id 는 정상 INSERT(차단 안 함)', () => {
+    const remote = baseItem({ id: 'fresh', updated_at: T(1) });
+    const d = decideItemUpsert(undefined, remote, {
+      pending,
+      knownUpdatedAt: undefined,
+      isTombstoned: (id) => id === 'gone',
+    });
+    expect(d).toEqual({ action: 'apply', merged: remote });
+  });
+
+  it('CR.24 isTombstoned 미제공 → 기존 동작(INSERT) 유지(하위호환)', () => {
+    const remote = baseItem({ id: 'x', updated_at: T(1) });
+    const d = decideItemUpsert(undefined, remote, { pending, knownUpdatedAt: undefined });
+    expect(d).toEqual({ action: 'apply', merged: remote });
+  });
+});

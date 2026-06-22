@@ -39,6 +39,10 @@ function isMissingIsSharedColumn(error: unknown): boolean {
   return e.code === '42703' || /is_shared/i.test(e.message ?? '');
 }
 
+// [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 삭제 좀비 방지(개선10): 방금 삭제한 항목 id 를
+//   TTL 동안 기억해, 순서역전 실시간 이벤트나 in-flight 재조회가 그 항목을 되살리지 못하게 한다.
+const TOMBSTONE_TTL_MS = 30_000;
+
 export function useMultipleBudgets() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -76,6 +80,22 @@ export function useMultipleBudgets() {
   const pendingWritesRef = useRef<Map<string, PendingOp>>(new Map());
   const localUpdatedAtRef = useRef<Map<string, string>>(new Map());
   const editingColumnsRef = useRef<Map<string, Set<string>>>(new Map());
+  // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 삭제 항목 id→삭제시각(ms). TTL 내면 부활 차단.
+  const deletedTombstonesRef = useRef<Map<string, number>>(new Map());
+  const markTombstone = useCallback((id: string) => {
+    deletedTombstonesRef.current.set(id, Date.now());
+    pendingWritesRef.current.delete(id);
+    localUpdatedAtRef.current.delete(id);
+  }, []);
+  const isTombstoned = useCallback((id: string) => {
+    const t = deletedTombstonesRef.current.get(id);
+    if (t === undefined) return false;
+    if (Date.now() - t > TOMBSTONE_TTL_MS) {
+      deletedTombstonesRef.current.delete(id); // lazy 청소
+      return false;
+    }
+    return true;
+  }, []);
 
   // [CL-HOME-FIX-20260315-120000] setter 래핑 — sessionStorage 동기화
   const setActiveBudgetId = useCallback((id: string | null) => {
@@ -157,6 +177,8 @@ export function useMultipleBudgets() {
         if (!allItemsError && allItems) {
           const grouped: Record<string, ExtendedBudgetItem[]> = {};
           allItems.forEach(item => {
+            // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] in-flight 재조회가 방금 삭제한 항목을 되살리지 못하게
+            if (isTombstoned(item.id)) return;
             if (!grouped[item.budget_id]) grouped[item.budget_id] = [];
             grouped[item.budget_id].push(item as ExtendedBudgetItem);
           });
@@ -179,7 +201,7 @@ export function useMultipleBudgets() {
     } finally {
       setLoading(false);
     }
-  }, [user, toast]); // [CL-HOME-FIX-20260315-120000] activeBudgetId 의존성 제거
+  }, [user, toast, isTombstoned]); // [CL-HOME-FIX-20260315-120000] activeBudgetId 의존성 제거(isTombstoned 안정)
 
   // Fetch items for active budget
   const fetchItems = useCallback(async () => {
@@ -192,7 +214,8 @@ export function useMultipleBudgets() {
         .eq('budget_id', activeBudgetId);
 
       if (itemsError) throw itemsError;
-      setItems((budgetItems || []) as ExtendedBudgetItem[]);
+      // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 방금 삭제한 항목은 재조회 결과에서도 제외(좀비 방지)
+      setItems(((budgetItems || []) as ExtendedBudgetItem[]).filter(i => !isTombstoned(i.id)));
     } catch (error: any) {
       toast({
         title: '오류가 발생했어요',
@@ -200,7 +223,7 @@ export function useMultipleBudgets() {
         variant: 'destructive',
       });
     }
-  }, [activeBudgetId, toast]);
+  }, [activeBudgetId, toast, isTombstoned]);
 
   // Create a new budget
   // [CL-COEDIT-OPTADD-20260621] opts.shared = 현재 워크스페이스 모드('우리'면 true) → 생성 옵션이 같은 탭에 귀속
@@ -382,7 +405,20 @@ export function useMultipleBudgets() {
   };
 
   // Delete a budget
+  // [CL-OWNERDEL-GUARD-20260622-233012] 개선7+10: 공유 옵션은 소유자만 삭제.
+  //  비소유자가 삭제를 시도하면 budget_items 는 RLS상 지워지지만 budgets 행은 소유자 전용 DELETE 라
+  //  거부→부분삭제(항목만 사라지고 옵션 잔존)→재조회 시 빈 옵션 '좀비' 부활. 어떤 삭제도 하기 전에 차단한다.
   const deleteBudget = async (budgetId: string) => {
+    const target = budgets.find(b => b.id === budgetId);
+    if (target && user && target.user_id !== user.id) {
+      toast({
+        title: '삭제할 수 없어요',
+        description: '이 옵션은 만든 사람만 삭제할 수 있어요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (budgets.length <= 1) {
       toast({
         title: '삭제할 수 없어요',
@@ -412,7 +448,14 @@ export function useMultipleBudgets() {
 
       const newBudgets = budgets.filter(b => b.id !== budgetId);
       setBudgets(newBudgets);
-      
+      // [CL-OWNERDEL-GUARD-20260622-233012] 삭제된 옵션의 항목 캐시 제거(stale 비교 대시보드/좀비 방지)
+      setAllBudgetsItems(prev => {
+        if (!(budgetId in prev)) return prev;
+        const next = { ...prev };
+        delete next[budgetId];
+        return next;
+      });
+
       if (activeBudgetId === budgetId && newBudgets.length > 0) {
         setActiveBudgetId(newBudgets[0].id);
       }
@@ -557,13 +600,15 @@ export function useMultipleBudgets() {
           [activeBudgetId]: (prev[activeBudgetId] || []).filter(i => i.id !== id),
         }));
       }
-      localUpdatedAtRef.current.delete(id);
-      pendingWritesRef.current.delete(id);
+      // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 원격 삭제도 툼스톤 등록(이후 늦은 upsert 부활 차단)
+      markTombstone(id);
     },
     setKnownUpdatedAt: (id: string, updatedAt: string) => {
       localUpdatedAtRef.current.set(id, updatedAt);
     },
-  }), [activeBudgetId, EMPTY_COLS]);
+    // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 실시간 머지에서 툼스톤 항목 부활 차단
+    isTombstoned,
+  }), [activeBudgetId, EMPTY_COLS, markTombstone, isTombstoned]);
 
   // Update amount with optional unit price and quantity
   const updateAmount = async (
@@ -662,14 +707,18 @@ export function useMultipleBudgets() {
 
       if (error) throw error;
 
+      // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] DB 삭제 성공 직후 툼스톤 등록 →
+      //   순서역전 실시간 이벤트/in-flight 재조회가 이 항목을 되살리지 못함(좀비 부활 0).
+      markTombstone(itemId);
+
       setItems(prev => prev.filter(item => item.id !== itemId));
-      
+
       // Also update allBudgetsItems for real-time comparison dashboard sync
       setAllBudgetsItems(prev => ({
         ...prev,
         [activeBudgetId]: (prev[activeBudgetId] || []).filter(item => item.id !== itemId)
       }));
-      
+
       toast({
         title: '항목이 삭제되었어요',
       });
@@ -1098,13 +1147,14 @@ export function useMultipleBudgets() {
       // allBudgetsItems에 이미 데이터가 있으면 중복 API 호출 제거
       const cached = allBudgetsItems[activeBudgetId];
       if (cached && cached.length > 0) {
-        setItems(cached);
+        // [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 캐시 복원 시에도 툼스톤 항목 제외
+        setItems(cached.filter(i => !isTombstoned(i.id)));
       } else {
         fetchItems();
       }
       fetchSnapshots();
     }
-  }, [activeBudgetId, fetchSnapshots]); // fetchItems 의존성 제거로 불필요 실행 방지
+  }, [activeBudgetId, fetchSnapshots, isTombstoned]); // fetchItems 의존성 제거로 불필요 실행 방지
 
   return {
     budgets,

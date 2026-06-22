@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+// [CL-ACQ-CLASSIFY-20260622-233012] 유입경로(개선1): first-touch 보관 + last-touch 소스 기록 + 가입 귀속
+import { classifySource, getOrSetFirstTouch, readFirstTouch } from '@/lib/analytics/acquisition';
 
 // Generate or retrieve session ID
 const getSessionId = () => {
@@ -13,27 +15,72 @@ const getSessionId = () => {
   return sessionId;
 };
 
+// [CL-ACQ-PAGEVIEWS-20260622-233012] page_views 컬럼 미배포(42703) 판별 → 소스 컬럼 없이 재시도(분석 마비 방지)
+function isMissingAcquisitionColumn(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; message?: string };
+  return e.code === '42703' || /referrer|utm_source/i.test(e.message ?? '');
+}
+
 export function usePageTracking() {
   const location = useLocation();
   const { user } = useAuth();
   const pageEntryTime = useRef<number>(Date.now());
   const currentPath = useRef<string>(location.pathname);
 
+  // [CL-ACQ-CLASSIFY-20260622-233012] 최초 방문 유입원 1회 보관(익명 포함, 로컬만 — DB 익명행 0, 프라이버시).
+  useEffect(() => {
+    getOrSetFirstTouch();
+  }, []);
+
+  // [CL-ACQ-PROFILE-FT-20260622-233012] 가입자 first-touch 귀속(사용자당 1회). first_source 가 NULL 인 행만 갱신(덮어쓰기 0).
+  useEffect(() => {
+    if (!user?.id) return;
+    const ft = readFirstTouch();
+    if (!ft) return;
+    const flag = `wedsem_ft_synced_${user.id}`;
+    try {
+      if (localStorage.getItem(flag)) return;
+    } catch {
+      /* noop */
+    }
+    void supabase
+      .from('profiles')
+      .update({ first_source: ft.source, first_referrer: ft.referrer, acquisition_at: ft.ts })
+      .eq('user_id', user.id)
+      .is('first_source', null)
+      .then(() => {
+        try {
+          localStorage.setItem(flag, '1');
+        } catch {
+          /* noop */
+        }
+      });
+  }, [user?.id]);
+
   useEffect(() => {
     // Only track authenticated users to prevent anonymous session correlation
     if (!user?.id) return;
 
     const sessionId = getSessionId();
-    
+
     // Track page view
     const trackPageView = async () => {
       try {
-        await supabase.from('page_views').insert({
+        const base = {
           user_id: user.id,
           page_path: location.pathname,
           session_id: sessionId,
           duration_seconds: 0,
-        });
+        };
+        // [CL-ACQ-PAGEVIEWS-20260622-233012] last-touch 소스 동반 기록. 컬럼 미배포(42703) → 소스 없이 재시도(분석 유지).
+        const c = classifySource();
+        const { error } = await supabase
+          .from('page_views')
+          .insert({ ...base, referrer: (typeof document !== 'undefined' ? document.referrer : '') || null, utm_source: c.source });
+        if (error && isMissingAcquisitionColumn(error)) {
+          await supabase.from('page_views').insert(base);
+        }
       } catch (err) {
         // Silent fail for analytics
         console.debug('Analytics tracking failed:', err);

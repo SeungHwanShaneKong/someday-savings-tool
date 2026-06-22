@@ -13,8 +13,12 @@ const externalStub: UseCollaborationResult = {
   collaborators: [{ user_id: 'p1', role: 'editor', display_name: '신부', isMe: false }],
   inviteUrl: null,
   busy: false,
+  // [CL-PARTNER-1TO1-20260622-233012] 인터페이스 확장 반영(파트너 1:1)
+  myPartner: null,
   createInvite: vi.fn(async () => null),
   removeCollaborator: vi.fn(async () => {}),
+  releasePartner: vi.fn(async () => true),
+  shareBudgetWithPartner: vi.fn(async () => {}),
   refresh: vi.fn(async () => {}),
 };
 

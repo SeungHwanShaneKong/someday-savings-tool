@@ -17,6 +17,8 @@ export interface RealtimeContext {
   pending: ReadonlyMap<string, PendingOp>;
   knownUpdatedAt: ReadonlyMap<string, string>;
   editingColumns?: (id: string) => Set<string>;
+  /** [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 방금 삭제된 항목(TTL 내)이면 upsert 차단(좀비 부활 방지) */
+  isTombstoned?: (id: string) => boolean;
 }
 
 export type RealtimeAction =
@@ -40,6 +42,7 @@ export function resolveRealtimeEvent(
     pending: ctx.pending,
     knownUpdatedAt: ctx.knownUpdatedAt.get(newRow.id),
     editingColumns: ctx.editingColumns?.(newRow.id),
+    isTombstoned: ctx.isTombstoned,
   });
   return decision.action === 'ignore' ? { type: 'ignore' } : { type: 'upsert', row: decision.merged };
 }

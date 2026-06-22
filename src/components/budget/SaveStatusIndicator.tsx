@@ -25,7 +25,8 @@ export function SaveStatusIndicator({ state, className }: SaveStatusIndicatorPro
         </span>
       )}
       {state === 'saved' && (
-        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 animate-save-pop">
+        /* [CL-ANIM-SAVE-DOPAMINE-20260622-233012] 저장됨 — 도파민 강화 팝(개선9). 실패는 차분한 save-pop 유지. */
+        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 animate-save-dopamine">
           <Check className="w-3.5 h-3.5" aria-hidden />
           저장됨
         </span>

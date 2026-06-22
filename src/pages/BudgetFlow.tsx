@@ -132,6 +132,8 @@ export default function BudgetFlow() {
   }, [mode, visibleBudgets, activeBudgetId, setActiveBudgetId]);
   const activeBudget = visibleBudgets.find(b => b.id === activeBudgetId) ?? null;
   const isOwnerOfActive = !!activeBudget && activeBudget.user_id === user?.id;
+  // [CL-COEDIT-OPTADD-20260622-233012] 개선4: 우리탭 옵션추가 드롭다운에 '개인 옵션에서 가져오기'로 노출할 내 개인 예산
+  const personalBudgets = budgets.filter(b => !b.isShared && b.user_id === user?.id);
 
   // [CL-COEDIT-E2E-20260620-130000] 실시간 구독 = '우리' 모드 활성 예산에서만.
   // 개인 모드(또는 활성 예산 없음) → null → 구독 안 함 = 개인↔공동 완전 분리(개인 예산 절대 비동기화).
@@ -157,24 +159,43 @@ export default function BudgetFlow() {
     setOwnNickOpen(true);
   }, [mode, user, meUserId, meDisplayName]);
 
-  // [CL-COEDIT-COPY-20260620] 개인 예산 → 복사본을 만들어 공동편집(원본 보존). 복사본이 active 가 되고 autoInvite 로 초대링크 자동 생성.
+  // [CL-COEDIT-COPY-20260622-233012] 개선2+3: '복사하여 공동편집'은 탭 무관하게 항상 '우리' 옵션(shared:true)을 만든다.
+  //  (기존 버그: shared 미전달 → 복사본이 개인탭에 떨어져 "우리로 안 됨".) 생성 후 우리탭 전환 +
+  //  파트너 있으면 자동 공유(개선6), 없으면 초대 링크 자동 생성.
   const handleCopyToCoedit = async () => {
     if (!activeBudget) return;
-    const copy = await copyBudget(activeBudget.id, `${activeBudget.name} (공동편집)`);
-    if (copy) setAutoInvite(true);
+    const copy = await copyBudget(activeBudget.id, `${activeBudget.name} (공동편집)`, { shared: true });
+    if (copy) {
+      setMode('shared');
+      if (collaboration.myPartner) {
+        await collaboration.shareBudgetWithPartner(copy.id);
+        await collaboration.refresh();
+      } else {
+        setAutoInvite(true);
+      }
+    }
   };
 
   // [CL-COEDIT-OPTADD-20260621] 현재 탭(개인/우리)에 귀속되도록 mode 전달 + 탭 내 번호
+  // [CL-PARTNER-1TO1-20260622-233012] 우리탭 신규 옵션은 현재 파트너에게 자동 공유(워크스페이스 일관).
   const handleCreateBudget = async () => {
     const newName = `옵션 ${visibleBudgets.length + 1}`;
-    await createNewBudget(newName, { shared: mode === 'shared' });
+    const created = await createNewBudget(newName, { shared: mode === 'shared' });
+    if (created && mode === 'shared' && collaboration.myPartner) {
+      await collaboration.shareBudgetWithPartner(created.id);
+      await collaboration.refresh();
+    }
   };
 
   const handleCopyBudget = async (sourceBudgetId: string) => {
     const sourceBudget = budgets.find(b => b.id === sourceBudgetId);
     if (sourceBudget) {
       const newName = `${sourceBudget.name} (복사본)`;
-      await copyBudget(sourceBudgetId, newName, { shared: mode === 'shared' });
+      const created = await copyBudget(sourceBudgetId, newName, { shared: mode === 'shared' });
+      if (created && mode === 'shared' && collaboration.myPartner) {
+        await collaboration.shareBudgetWithPartner(created.id);
+        await collaboration.refresh();
+      }
     }
   };
 
@@ -434,12 +455,13 @@ export default function BudgetFlow() {
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
-                          {budgets.length > 1 && (
+                          {/* [CL-OWNERDEL-GUARD-20260622-233012] 개선7: 옵션 삭제는 소유자만(비소유자에겐 숨김) */}
+                          {budgets.length > 1 && budget.user_id === user?.id && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
                                   className="h-6 w-6 hover:bg-destructive/20"
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -487,7 +509,7 @@ export default function BudgetFlow() {
                     <Plus className="h-4 w-4 mr-2" />
                     새 옵션 추가
                   </DropdownMenuItem>
-                  {/* [CL-COEDIT-OPTADD-20260621] 복사 목록 = 현재 탭(visibleBudgets)만 — 다른 탭 예산 노출/복사 차단 */}
+                  {/* [CL-COEDIT-OPTADD-20260621] 현재 탭 옵션 복사 */}
                   {visibleBudgets.length > 0 && (
                     <>
                       <DropdownMenuSeparator />
@@ -495,11 +517,30 @@ export default function BudgetFlow() {
                         기존 옵션 복사
                       </div>
                       {visibleBudgets.map(budget => (
-                        <DropdownMenuItem 
+                        <DropdownMenuItem
                           key={budget.id}
                           onClick={() => handleCopyBudget(budget.id)}
                         >
                           <Copy className="h-4 w-4 mr-2" />
+                          {budget.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                  {/* [CL-COEDIT-OPTADD-20260622-233012] 개선4: 우리탭에선 '개인 옵션에서 가져오기'도 함께(Lock 아이콘으로 구분) */}
+                  {mode === 'shared' && personalBudgets.length > 0 && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">
+                        개인 옵션에서 가져오기
+                      </div>
+                      {personalBudgets.map(budget => (
+                        <DropdownMenuItem
+                          key={`personal-${budget.id}`}
+                          onClick={() => handleCopyBudget(budget.id)}
+                          className="text-muted-foreground"
+                        >
+                          <Lock className="h-4 w-4 mr-2" />
                           {budget.name}
                         </DropdownMenuItem>
                       ))}
@@ -575,6 +616,8 @@ export default function BudgetFlow() {
                   onAutoInviteHandled={() => setAutoInvite(false)}
                   showCopyToCoedit={isOwnerOfActive && !activeBudget.isShared}
                   onCopyToCoedit={handleCopyToCoedit}
+                  /* [CL-COEDIT-NICK-20260622-233012] 개선8: 내 닉네임 상시 변경 트리거 */
+                  onEditMyNickname={() => setOwnNickOpen(true)}
                   /* [CL-AUDIT-RPC-DEDUP-20260622] 상위 단일 useCollaboration 주입 → 중복 RPC 제거 */
                   external={collaboration}
                 />

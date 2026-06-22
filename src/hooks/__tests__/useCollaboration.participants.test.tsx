@@ -39,7 +39,8 @@ describe('useCollaboration.refresh — 참여자 이름(RPC) 경로', () => {
     const { result } = renderHook(() => useCollaboration('budget-1'));
     await waitFor(() => expect(result.current.collaborators).toHaveLength(2));
 
-    expect(vi.mocked(supabase.rpc)).toHaveBeenCalledWith('get_budget_participants', { p_budget_id: 'budget-1' });
+    // [CL-ACQ-EMAIL-RPC-20260622-233012] 이제 이메일 포함 RPC 가 1순위(개선5). 미배포 시 get_budget_participants 폴백.
+    expect(vi.mocked(supabase.rpc)).toHaveBeenCalledWith('get_budget_participants_email', { p_budget_id: 'budget-1' });
     const me = result.current.collaborators.find((c) => c.user_id === 'owner-1');
     const other = result.current.collaborators.find((c) => c.user_id === 'partner-9');
     expect(me).toMatchObject({ role: 'owner', display_name: '신랑 민준', isMe: true });

@@ -95,12 +95,15 @@ export function upsertById<T extends { id: string }>(list: readonly T[], row: T)
 }
 
 export type RealtimeDecision<T> =
-  | { action: 'ignore'; reason: 'echo' | 'stale' }
+  | { action: 'ignore'; reason: 'echo' | 'stale' | 'tombstone' }
   | { action: 'apply'; merged: T };
 
 /**
  * 실시간 INSERT/UPDATE 1건에 대한 최종 결정.
  * local 미존재 → INSERT(=remote 그대로 upsert). 존재 → 3중 가드 후 필드 머지.
+ * [CL-AUDIT-ZOMBIE-TOMBSTONE-20260622-233012] 좀비 부활 차단(개선10): 방금 삭제한 항목(툼스톤)은
+ *   local 이 없어 기존엔 remote 를 그대로 apply(=부활)했다. 어떤 가드보다 먼저 tombstone 을 확인해
+ *   순서역전·동시편집 commit 으로 도착한 늦은 INSERT/UPDATE 가 삭제를 되살리지 못하게 한다.
  */
 export function decideItemUpsert<T extends Record<string, any> & { id: string; updated_at: string }>(
   local: T | undefined,
@@ -110,8 +113,13 @@ export function decideItemUpsert<T extends Record<string, any> & { id: string; u
     knownUpdatedAt?: string;
     editingColumns?: ReadonlySet<string>;
     mergeableColumns?: readonly string[];
+    /** 방금 삭제된 항목 id 인가? (TTL 내 툼스톤) — true면 부활 차단 */
+    isTombstoned?: (id: string) => boolean;
   },
 ): RealtimeDecision<T> {
+  if (opts.isTombstoned?.(remote.id)) {
+    return { action: 'ignore', reason: 'tombstone' };
+  }
   if (isOwnEcho(remote.id, remote.updated_at, opts.pending)) {
     return { action: 'ignore', reason: 'echo' };
   }

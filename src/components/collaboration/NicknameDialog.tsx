@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 
-const MAX = 20;
+// [CL-COEDIT-NICK-MAX-20260622-233012] 서버 CHECK(≤40, 20260622091000)와 정합 — 클라/서버 상한 일치(개선8)
+const MAX = 40;
 
 interface NicknameDialogProps {
   open: boolean;

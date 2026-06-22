@@ -25,6 +25,8 @@ import {
   type KPIValue
 } from '@/lib/kpi-definitions';
 import type { SummaryKPIs } from '@/hooks/useAdminKPI';
+// [CL-ACQ-ADMIN-20260622-233012] 유입경로 소스 한국어 라벨(개선1)
+import { sourceLabel } from '@/lib/analytics/acquisition';
 import { ImpactMetrics } from '@/components/admin/ImpactMetrics';
 // [ADMIN-RAG-MONITOR-2026-03-07] RAG 모니터링 통합
 import { useAdminRAGStats } from '@/hooks/useAdminRAGStats';
@@ -76,7 +78,7 @@ export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, loading: dataLoading, fetchData } = useAdminKPI();
+  const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, loading: dataLoading, fetchData } = useAdminKPI();
   // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계 hook
   const { ragStats, loading: ragLoading, fetchRAGStats } = useAdminRAGStats();
 
@@ -98,6 +100,18 @@ export default function Admin() {
     const start = period === 'ytd' ? startOfYear(end) : subDays(end, parseInt(period));
     return { startDate: start, endDate: end };
   }, [period]);
+
+  // [CL-ACQ-ADMIN-20260622-233012] 유입경로 표시 가공 — 한국어 라벨 + 비율(개선1)
+  const acquisitionView = useMemo(() => {
+    const total = acquisitionData.reduce((s, a) => s + a.users, 0);
+    const rows = acquisitionData.map((a) => ({
+      source: a.source,
+      label: sourceLabel(a.source),
+      users: a.users,
+      percentage: total > 0 ? Math.round((a.users / total) * 1000) / 10 : 0,
+    }));
+    return { total, rows };
+  }, [acquisitionData]);
 
   useEffect(() => {
     if (!authLoading && !user) { navigate('/auth'); return; }
@@ -355,6 +369,49 @@ export default function Admin() {
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
+              </Card>
+
+              {/* [CL-ACQ-ADMIN-20260622-233012] 유입 경로(가입자 기준) — 신규/누적 가입자 추이 바로 아래(개선1) */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">유입 경로 (가입자 기준)</h3>
+                {acquisitionView.rows.length > 0 ? (
+                  <>
+                    <div className="h-56 sm:h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart layout="vertical" data={acquisitionView.rows} margin={{ left: 8, right: 16 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                          <YAxis type="category" dataKey="label" width={84} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                          <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => [`${value}명`, '가입자']} />
+                          <Bar dataKey="users" name="가입자" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>유입원</TableHead>
+                          <TableHead className="text-right">가입자</TableHead>
+                          <TableHead className="text-right">비율</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {acquisitionView.rows.map((r) => (
+                          <TableRow key={r.source}>
+                            <TableCell className="font-medium">{r.label}</TableCell>
+                            <TableCell className="text-right">{r.users}명</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{r.percentage}%</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">아직 유입 경로 데이터가 없어요.</p>
+                )}
+                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                  데이터 수집 시작: 2026-06-22 · 이전 가입자는 '미상'으로 집계됩니다.
+                </p>
               </Card>
 
               {/* 페이지뷰 추이 */}

@@ -21,12 +21,20 @@ export interface SummaryKPIs {
   monthlyPageViews: number;
 }
 
+// [CL-ACQ-ADMIN-20260622-233012] 유입경로(가입자 first_source)별 인원 (개선1)
+export interface AcquisitionDatum {
+  source: string;
+  users: number;
+}
+
 interface UseAdminKPIResult {
   kpiValues: KPIValue[];
   trendData: TrendDataPoint[];
   topPages: TopPage[];
   summaryKPIs: SummaryKPIs;
   impactSummary: ImpactSummary;
+  /** [CL-ACQ-ADMIN-20260622-233012] 유입경로 집계(가입자 기준). RPC 미배포/비관리자 시 빈 배열 */
+  acquisitionData: AcquisitionDatum[];
   loading: boolean;
   error: string | null;
   fetchData: (startDate: Date, endDate: Date) => Promise<void>;
@@ -71,6 +79,7 @@ export function useAdminKPI(): UseAdminKPIResult {
     totalSavingsEstimate: 0, belowAvgPercent: 0, aboveAvgPercent: 0,
     avgHiddenCostsIdentified: 0, totalContingencyFund: 0, categoryBreakdown: [],
   });
+  const [acquisitionData, setAcquisitionData] = useState<AcquisitionDatum[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +88,16 @@ export function useAdminKPI(): UseAdminKPIResult {
     setError(null);
 
     try {
+      // [CL-ACQ-ADMIN-20260622-233012] 유입경로 집계(개선1) — 메인 쿼리와 병렬(기존 튜플 불변).
+      //  RPC 미배포/비관리자 → 빈 배열 degrade. 결과는 본문 끝에서 반영.
+      const acquisitionPromise: Promise<AcquisitionDatum[]> = (async () => {
+        try {
+          const r = await supabase.rpc('admin_acquisition_breakdown');
+          return !r.error && Array.isArray(r.data) ? (r.data as AcquisitionDatum[]) : [];
+        } catch {
+          return [];
+        }
+      })();
       const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const prevStart = subDays(startDate, periodDays);
       const prevEnd = subDays(endDate, periodDays);
@@ -406,6 +425,9 @@ export function useAdminKPI(): UseAdminKPIResult {
         monthlyPageViews: monthPV.length,
       });
 
+      // [CL-ACQ-ADMIN-20260622-233012] 유입경로 집계 반영(개선1)
+      setAcquisitionData(await acquisitionPromise);
+
       // ─── Phase 4-A: 경제적 파급 효과 계산 ───
       try {
         // Group budget_items by budget_id to build BudgetForImpact[]
@@ -446,5 +468,5 @@ export function useAdminKPI(): UseAdminKPIResult {
     }
   }, []);
 
-  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, loading, error, fetchData };
+  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, loading, error, fetchData };
 }

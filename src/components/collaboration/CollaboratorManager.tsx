@@ -2,11 +2,23 @@
 //
 // 오너: "파트너 초대" → 초대 링크 발급·복사. 협업자 목록·해제.
 // 협업자(비오너): 목록만 표시(초대/해제 불가 — RLS+UI 이중).
-// ※ 추가형 — BudgetFlow/Summary 등에서 마운트해 사용.
+// ※ 추가형 — BudgetFlow 등에서 마운트해 사용.
+// [CL-PARTNER-1TO1-20260622-233012] 전역 1:1 파트너(현재 파트너·이메일·해지) + [CL-COEDIT-NICK] 내 닉네임 변경.
 import { useState, useEffect, useRef } from 'react';
-import { UserPlus, Copy, Check, Users, X } from 'lucide-react';
+import { UserPlus, Copy, Check, Users, X, UserMinus, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCollaboration, type UseCollaborationResult } from '@/hooks/useCollaboration';
 
@@ -21,20 +33,20 @@ interface CollaboratorManagerProps {
   /** [CL-COEDIT-COPY-20260620] 개인 예산일 때 "복사하여 공동편집(원본 보존)" 1순위 버튼 노출 */
   showCopyToCoedit?: boolean;
   onCopyToCoedit?: () => void;
-  /** [CL-AUDIT-RPC-DEDUP-20260622] 상위에서 단일 useCollaboration 을 주입(중복 get_budget_participants RPC 제거).
-   *  주어지면 내부 훅은 budgetId=null 로 호출돼 RPC 를 발사하지 않는다(훅 규칙 준수). 미주입 시 기존대로 자체 조회. */
+  /** [CL-COEDIT-NICK-20260622-233012] 내 닉네임 변경 트리거(상위가 NicknameDialog 오픈). 없으면 미노출(개선8) */
+  onEditMyNickname?: () => void;
+  /** [CL-AUDIT-RPC-DEDUP-20260622] 상위에서 단일 useCollaboration 을 주입(중복 RPC 제거). */
   external?: UseCollaborationResult;
 }
 
-export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit, external }: CollaboratorManagerProps) {
-  // external 주입 시 내부 훅은 null 로 비활성(RPC 0). 미주입 시 자체 조회(독립 사용·테스트 호환).
+export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit, onEditMyNickname, external }: CollaboratorManagerProps) {
+  // external 주입 시 내부 훅은 null 로 비활성(RPC 최소화). 미주입 시 자체 조회(독립 사용·테스트 호환).
   const internal = useCollaboration(external ? null : budgetId);
-  const { collaborators, inviteUrl, busy, createInvite, removeCollaborator } = external ?? internal;
+  const { collaborators, inviteUrl, busy, myPartner, createInvite, removeCollaborator, releasePartner } = external ?? internal;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
   // [CL-COEDIT-INVITE-DISCOVER-20260620] '파트너 초대하기' 바로가기: 소유자·예산이 준비되면 초대 링크를 1회 자동 생성.
-  // 멱등(409 시 기존 토큰 재노출)·소유자 한정·inviteUrl/busy 가드로 중복 발사 없음. onAutoInviteHandled 로 부모 플래그 해제.
   useEffect(() => {
     if (!autoInvite) return;
     if (isOwner && budgetId && !inviteUrl && !busy) {
@@ -69,19 +81,40 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
     }
   };
 
-  // [CL-COEDIT-PARTICIPANTS-20260620] 나를 제외한 "상대" 참여자(오너 시 협업자들 / 협업자 시 오너+다른협업자).
-  // get_budget_participants RPC 가 display_name 제공 → 실제 이름 표시. 폴백 시 '파트너'.
+  // [CL-PARTNER-1TO1-20260622-233012] 파트너 해지 — 양방향 링크 제거(예산 본문은 소유자 보관)
+  const handleRelease = async () => {
+    const ok = await releasePartner();
+    toast(
+      ok
+        ? { title: '파트너를 해지했어요', description: '이제 다른 분과 새로 함께할 수 있어요.' }
+        : { title: '해지 중 오류가 발생했어요', variant: 'destructive' },
+    );
+  };
+
+  // [CL-COEDIT-PARTICIPANTS-20260620] 나를 제외한 "상대" 참여자. display_name 우선('파트너' 폴백) + 이메일(개선5).
   const others = collaborators.filter((c) => !c.isMe);
   const roleLabel = (role: string) => (role === 'owner' ? '관리자' : role === 'viewer' ? '뷰어' : '편집');
 
   return (
     <Card className="p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <Users className="w-4 h-4 text-primary" aria-hidden="true" />
-        <h3 className="text-sm font-semibold text-foreground">파트너와 공동관리</h3>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-primary" aria-hidden="true" />
+          <h3 className="text-sm font-semibold text-foreground">파트너와 공동관리</h3>
+        </div>
+        {/* [CL-COEDIT-NICK-20260622-233012] 내 닉네임 상시 변경(개선8) */}
+        {onEditMyNickname && (
+          <button
+            onClick={onEditMyNickname}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+            aria-label="내 닉네임 변경"
+          >
+            <Pencil className="w-3 h-3" /> 내 닉네임
+          </button>
+        )}
       </div>
 
-      {/* 참여자 목록 — 본인 제외, 실제 이름(닉네임) 표시 */}
+      {/* 참여자 목록 — 본인 제외, 실제 이름(닉네임)+이메일 표시 */}
       {others.length > 0 ? (
         <ul className="space-y-2 mb-3">
           {others.map((c) => {
@@ -90,6 +123,7 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
               <li key={c.user_id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="text-muted-foreground truncate">
                   {c.role === 'owner' ? '👑' : '👫'} {name}
+                  {c.email && <span className="ml-1 text-[11px] text-muted-foreground/70">· {c.email}</span>}
                   <span className="ml-1 text-[11px] text-muted-foreground/60">· {roleLabel(c.role)}</span>
                 </span>
                 {/* 해제: 오너만, 협업자(오너 row 제외)만 */}
@@ -112,6 +146,39 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
         </p>
       )}
 
+      {/* [CL-PARTNER-1TO1-20260622-233012] 현재 파트너(전역 1:1) + 해지 — 오너/협업자 공통 */}
+      {myPartner && (
+        <div className="mb-3 p-2.5 bg-secondary/60 rounded-lg">
+          <p className="text-[11px] text-muted-foreground mb-1.5">
+            현재 파트너:{' '}
+            <span className="font-medium text-foreground">{myPartner.display_name?.trim() || '파트너'}</span>
+            {myPartner.email && <span className="text-muted-foreground/70"> · {myPartner.email}</span>}
+          </p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-destructive hover:text-destructive">
+                <UserMinus className="w-3.5 h-3.5" /> 파트너 해지
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>파트너를 해지할까요?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  해지하면 함께 보던 '우리' 옵션에서 서로의 접근이 끊겨요. 내가 만든 옵션은 그대로 보관돼요.
+                  다른 분과 새로 공동편집하려면 먼저 해지해야 해요.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={handleRelease} className="bg-destructive hover:bg-destructive/90">
+                  파트너 해지
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
+
       {/* 초대 (오너만) */}
       {isOwner && (
         <>
@@ -127,31 +194,41 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
               </p>
             </>
           )}
-          <Button
-            onClick={handleInvite}
-            disabled={busy || !budgetId}
-            className="w-full gap-2"
-            size="sm"
-            variant={showCopyToCoedit ? 'outline' : 'default'}
-          >
-            <UserPlus className="w-4 h-4" />
-            {busy ? '링크 생성 중...' : showCopyToCoedit ? '이 예산 그대로 공유' : '파트너 초대 링크 만들기'}
-          </Button>
 
-          {inviteUrl && (
-            <div className="mt-3 flex items-center gap-2 p-2.5 bg-secondary rounded-lg">
-              <span className="flex-1 text-xs font-mono text-foreground truncate">{inviteUrl}</span>
-              <Button onClick={handleCopy} size="sm" variant="secondary" className="h-8 gap-1.5 flex-shrink-0">
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? '복사됨' : '복사'}
-              </Button>
-            </div>
-          )}
-          {inviteUrl && (
-            <p className="text-[11px] text-muted-foreground/70 mt-2">
-              이 링크를 받은 사람은 구글 로그인 후 이 예산을 함께 편집할 수 있어요. (7일간 유효)
-              <br />💡 카톡 등 앱 안에서 링크가 안 열리면 사파리·크롬 등 외부 브라우저로 열어주세요.
+          {/* [CL-PARTNER-1TO1-20260622-233012] 1:1 — 이미 파트너가 있으면 신규 초대 비노출(교체는 '해지' 후) */}
+          {myPartner ? (
+            <p className="text-[11px] text-muted-foreground/70">
+              이미 파트너와 함께하고 있어요. 다른 분과 함께하려면 위 '파트너 해지' 후 초대해주세요.
             </p>
+          ) : (
+            <>
+              <Button
+                onClick={handleInvite}
+                disabled={busy || !budgetId}
+                className="w-full gap-2"
+                size="sm"
+                variant={showCopyToCoedit ? 'outline' : 'default'}
+              >
+                <UserPlus className="w-4 h-4" />
+                {busy ? '링크 생성 중...' : showCopyToCoedit ? '이 예산 그대로 공유' : '파트너 초대 링크 만들기'}
+              </Button>
+
+              {inviteUrl && (
+                <div className="mt-3 flex items-center gap-2 p-2.5 bg-secondary rounded-lg">
+                  <span className="flex-1 text-xs font-mono text-foreground truncate">{inviteUrl}</span>
+                  <Button onClick={handleCopy} size="sm" variant="secondary" className="h-8 gap-1.5 flex-shrink-0">
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copied ? '복사됨' : '복사'}
+                  </Button>
+                </div>
+              )}
+              {inviteUrl && (
+                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                  이 링크를 받은 사람은 구글 로그인 후 이 예산을 함께 편집할 수 있어요. (7일간 유효)
+                  <br />💡 카톡 등 앱 안에서 링크가 안 열리면 사파리·크롬 등 외부 브라우저로 열어주세요.
+                </p>
+              )}
+            </>
           )}
         </>
       )}

@@ -462,31 +462,42 @@ export type Database = {
           duration_seconds: number | null
           id: string
           page_path: string
+          // [CL-ACQ-PAGEVIEWS-20260622-233012] 유입 소스(last-touch)
+          referrer: string | null
           session_id: string
           user_id: string | null
+          utm_source: string | null
         }
         Insert: {
           created_at?: string
           duration_seconds?: number | null
           id?: string
           page_path: string
+          referrer?: string | null
           session_id: string
           user_id?: string | null
+          utm_source?: string | null
         }
         Update: {
           created_at?: string
           duration_seconds?: number | null
           id?: string
           page_path?: string
+          referrer?: string | null
           session_id?: string
           user_id?: string | null
+          utm_source?: string | null
         }
         Relationships: []
       }
       profiles: {
         Row: {
+          // [CL-ACQ-PROFILE-FT-20260622-233012] first-touch 유입 귀속(가입자별, 1회 기록)
+          acquisition_at: string | null
           created_at: string
           display_name: string | null
+          first_referrer: string | null
+          first_source: string | null
           // [CL-DBSWITCH-VERIFY-20260620] gamify_foundation: profiles.gamification_state JSONB NOT NULL DEFAULT '{}'
           gamification_state: Json
           id: string
@@ -494,16 +505,22 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          acquisition_at?: string | null
           created_at?: string
           display_name?: string | null
+          first_referrer?: string | null
+          first_source?: string | null
           gamification_state?: Json
           id?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          acquisition_at?: string | null
           created_at?: string
           display_name?: string | null
+          first_referrer?: string | null
+          first_source?: string | null
           gamification_state?: Json
           id?: string
           updated_at?: string
@@ -682,12 +699,34 @@ export type Database = {
     }
     Functions: {
       accept_budget_invitation: { Args: { p_token: string }; Returns: Json }
+      // [CL-ACQ-EMAIL-RPC-20260622-233012] 유입 집계(관리자) — 가입자별 first_source 인원
+      admin_acquisition_breakdown: {
+        Args: Record<string, never>
+        Returns: { source: string; users: number }[]
+      }
+      // [CL-PARTNER-1TO1-20260622-233012] 내 파트너(닉네임+이메일) / 파트너 해지 / 예산 자동공유
+      get_my_partner: {
+        Args: Record<string, never>
+        Returns: { user_id: string; display_name: string; email: string }[]
+      }
+      release_partner: { Args: Record<string, never>; Returns: Json }
+      share_budget_with_partner: { Args: { p_budget_id: string }; Returns: Json }
       get_budget_participants: {
         Args: { p_budget_id: string }
         Returns: {
           user_id: string
           role: string
           display_name: string
+        }[]
+      }
+      // [CL-ACQ-EMAIL-RPC-20260622-233012] 파트너 이메일 포함 참여자(개선5)
+      get_budget_participants_email: {
+        Args: { p_budget_id: string }
+        Returns: {
+          user_id: string
+          role: string
+          display_name: string
+          email: string
         }[]
       }
       get_budget_role: {

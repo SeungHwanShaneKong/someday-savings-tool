@@ -3,10 +3,12 @@
  * - 레벨 링 + 총 포인트 + streak 2종 + 뱃지 그리드
  * - 로그인 사용자 전용 (미로그인 시 /auth로 리다이렉트)
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+// [CL-COEDIT-NICK-20260622-233012] 닉네임 상시 변경(개선8)
+import { NicknameDialog } from '@/components/collaboration/NicknameDialog';
 import { useGamificationState } from '@/hooks/useGamificationState';
 import { useStreak } from '@/hooks/useStreak';
 import { useBadgeUnlock, useUserEarnedBadges } from '@/hooks/useBadgeUnlock';
@@ -29,6 +31,25 @@ export default function Profile() {
   const { definitions, pendingUnlock, dismissUnlock, triggerCheck } =
     useBadgeUnlock();
   const { data: earnedRaw } = useUserEarnedBadges();
+
+  // [CL-COEDIT-NICK-20260622-233012] 닉네임 변경(개선8) — 현재 display_name 로드 + 다이얼로그
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [nickOpen, setNickOpen] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled) setDisplayName((data as { display_name?: string | null } | null)?.display_name ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   // [CL-GAMIFY-INT-20260418-222329] 프로필 페이지 mount 시 백그라운드 뱃지 재평가
   // 사용자가 이전 세션에서 획득 조건을 충족했지만 trigger가 없었던 경우 catch-up
@@ -165,6 +186,22 @@ export default function Profile() {
           </div>
         </Card>
 
+        {/* ─── 닉네임 변경(개선8) ─── */}
+        <Card className="p-5 sm:p-6 mb-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-foreground">닉네임</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                공동편집 시 파트너에게 보이는 이름이에요 ·{' '}
+                <span className="font-medium text-foreground">{displayName?.trim() || '미설정'}</span>
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setNickOpen(true)}>
+              변경
+            </Button>
+          </div>
+        </Card>
+
         {/* ─── Badge Collection ─── */}
         <Card className="p-5 sm:p-6">
           <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-4">
@@ -192,6 +229,15 @@ export default function Profile() {
           badge={pendingUnlock?.badge ?? null}
           pointsGained={pendingUnlock?.points_gained ?? 0}
           onClose={dismissUnlock}
+        />
+
+        {/* [CL-COEDIT-NICK-20260622-233012] 닉네임 변경 다이얼로그(개선8) */}
+        <NicknameDialog
+          open={nickOpen}
+          onOpenChange={setNickOpen}
+          userId={user.id}
+          initialValue={displayName}
+          onSaved={(name) => setDisplayName(name)}
         />
       </div>
     </div>

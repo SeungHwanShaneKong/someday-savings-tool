@@ -7,7 +7,8 @@ import { verifyUserToken } from '../_shared/jwt.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 // [CL-SEC-AIQUOTA-20260621] 비용 남용 방지 일일 한도
-import { checkDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
+import { reserveDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 
 interface NegotiateRequest {
   category: string;
@@ -124,8 +125,8 @@ serve(async (req) => {
       );
     }
 
-    // [CL-SEC-AIQUOTA-20260621] 일일 한도(협상 코치 20회/일) — ai_conversations(feature='negotiate') 집계
-    const quota = await checkDailyLimit(supabase, userId, 'negotiate', 20);
+    // [CL-VULN-R8-AIQUOTA-20260626] 일일 한도(협상 코치 20회/일) — 원자 예약(reserve-before-call, D1·D2 해소)
+    const quota = await reserveDailyLimit(supabase, userId, 'negotiate', 20);
     if (!quota.allowed) {
       return new Response(
         JSON.stringify({ error: dailyLimitMessage('협상 코치', quota.limit), remaining: 0, limit: quota.limit }),
@@ -213,9 +214,7 @@ serve(async (req) => {
 
     logFunctionCall('negotiate-coach', startTime, false, { error: message });
 
-    return new Response(
-      JSON.stringify({ error: '협상 팁 생성 중 오류가 발생했습니다', detail: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환, 원본은 서버 로그.
+    return errorResponse('negotiate-coach', error, { userMessage: '협상 팁 생성 중 오류가 발생했습니다' });
   }
 });

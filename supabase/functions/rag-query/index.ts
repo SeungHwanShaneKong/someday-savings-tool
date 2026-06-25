@@ -6,6 +6,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
 import { DEFAULT_MODEL } from '../_shared/openai.ts';
 import { verifyUserToken } from '../_shared/jwt.ts';
+import { reserveDailyLimit } from '../_shared/rate-limit.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 
 const openai = new OpenAI({
   apiKey: Deno.env.get('OPENAI_API_KEY')!,
@@ -106,18 +108,11 @@ serve(async (req) => {
       );
     }
 
-    // [CL-AI-CHAT-LIMIT5-20260408-100500] Feature-scoped rate limit (RAG 폴백 우회 방지)
+    // [CL-VULN-R8-AIQUOTA-20260626] Feature-scoped rate limit (RAG 폴백 우회 방지) — 원자 예약(D1·D2 해소).
     const limit = DAILY_LIMITS[feature] ?? DEFAULT_DAILY_LIMIT;
-    const today = new Date().toISOString().split('T')[0];
-    const { count } = await supabase
-      .from('ai_conversations')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('feature', feature)
-      .gte('created_at', `${today}T00:00:00Z`);
-
-    const usedToday = count ?? 0;
-    if (usedToday >= limit) {
+    const quota = await reserveDailyLimit(supabase, userId, feature, limit);
+    const usedToday = quota.used; // post-increment(이번 요청 포함)
+    if (!quota.allowed) {
       const isQa = feature === 'qa';
       const friendlyMsg = isQa
         ? `오늘의 AI Q&A 질문 ${limit}회를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`
@@ -217,8 +212,8 @@ serve(async (req) => {
       console.warn('Failed to save RAG conversation:', saveError);
     }
 
-    // [CL-AI-CHAT-LIMIT5-20260408-100500] 응답에 remaining 포함 (클라이언트 카운터용)
-    const remaining = Math.max(0, limit - (usedToday + 1));
+    // [CL-VULN-R8-AIQUOTA-20260626] 응답에 remaining 포함. usedToday 는 이미 post-increment → +1 불필요.
+    const remaining = Math.max(0, limit - usedToday);
     return new Response(
       JSON.stringify({
         reply,
@@ -233,12 +228,8 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'RAG 쿼리 중 오류';
-    console.error('rag-query error:', error);
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환, 원본은 서버 로그.
+    return errorResponse('rag-query', error, { userMessage: 'RAG 쿼리 중 오류가 발생했습니다' });
   }
 });
 

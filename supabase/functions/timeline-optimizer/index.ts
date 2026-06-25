@@ -7,7 +7,8 @@ import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 // [CL-SEC-AIQUOTA-20260621] 비용 남용 방지 일일 한도
-import { checkDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
+import { reserveDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 
 const SYSTEM_PROMPT = `당신은 한국 결혼 준비 일정 최적화 전문 AI 플래너입니다.
 
@@ -114,7 +115,8 @@ serve(async (req: Request) => {
     }
 
     // [CL-SEC-AIQUOTA-20260621] 일일 한도(일정 최적화 10회/일)
-    const quota = await checkDailyLimit(supabase, userId, 'timeline', 10);
+    // [CL-VULN-R8-AIQUOTA-20260626] 원자 예약(reserve-before-call, D1·D2 해소)
+    const quota = await reserveDailyLimit(supabase, userId, 'timeline', 10);
     if (!quota.allowed) {
       await logFunctionCall(supabase, 'timeline-optimizer', startTime, 429, userId, '일일 한도 초과');
       return new Response(
@@ -195,9 +197,7 @@ serve(async (req: Request) => {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('timeline-optimizer error:', message);
     await logFunctionCall(supabase, 'timeline-optimizer', startTime, 500, userId, message);
-    return new Response(
-      JSON.stringify({ error: '일정 최적화 중 오류가 발생했습니다', detail: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환.
+    return errorResponse('timeline-optimizer', error, { userMessage: '일정 최적화 중 오류가 발생했습니다' });
   }
 });

@@ -4,6 +4,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { verifyUserToken } from '../_shared/jwt.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 
 interface ShareCategory {
@@ -226,9 +227,7 @@ serve(async (req) => {
       // Ignore logging failure
     }
 
-    return new Response(
-      JSON.stringify({ error: '공유 카드 생성 중 오류가 발생했습니다', detail: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환.
+    return errorResponse('share-image-gen', error, { userMessage: '공유 카드 생성 중 오류가 발생했습니다' });
   }
 });

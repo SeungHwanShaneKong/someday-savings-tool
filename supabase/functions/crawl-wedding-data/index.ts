@@ -6,6 +6,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
 import { verifyUserToken } from '../_shared/jwt.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 import { safeFetch, extractTextFromHtml, chunkText, contentHash, checkRobotsTxt, urlHash } from '../_shared/anti-block.ts';
 import { filterOutliers, filterByCategory } from '../_shared/outlier-filter.ts';
@@ -242,10 +243,8 @@ serve(async (req) => {
     const message = error instanceof Error ? error.message : String(error);
     await updateJob(supabase, jobId, 'failed', totalProcessed, message);
 
-    return new Response(
-      JSON.stringify({ error: message, jobId }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — jobId 는 추적용 보존.
+    return errorResponse('crawl-wedding-data', error, { userMessage: '크롤링 중 오류가 발생했습니다', extra: { jobId } });
   }
 });
 

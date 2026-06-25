@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { verifyUserToken } from '../_shared/jwt.ts';
+import { reserveDailyLimit } from '../_shared/rate-limit.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 
 // Feature-specific system prompts
 const SYSTEM_PROMPTS: Record<string, string> = {
@@ -131,19 +133,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // [CL-AI-CHAT-LIMIT5-20260408-100500] Feature-scoped rate limit
-    // feature 컬럼으로 필터링하여 qa 5회/일, 나머지 20회/일 (feature 간 카운트 격리)
+    // [CL-VULN-R8-AIQUOTA-20260626] Feature-scoped rate limit — 원자 예약(reserve-before-call).
+    //   D1: 한도원천을 사용자가 삭제 가능한 ai_conversations count → service_role 전용 ai_usage 원장으로 분리(변조 차단).
+    //   D2: count-then-act 비원자 우회 → 원자 증가 후 카운트 비교(동시 버스트 차단). ai_conversations 는 로깅 전용 유지.
     const limit = DAILY_LIMITS[feature] ?? DEFAULT_DAILY_LIMIT;
-    const today = new Date().toISOString().split('T')[0];
-    const { count } = await supabase
-      .from('ai_conversations')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('feature', feature)
-      .gte('created_at', `${today}T00:00:00Z`);
-
-    const usedToday = count ?? 0;
-    if (usedToday >= limit) {
+    const quota = await reserveDailyLimit(supabase, userId, feature, limit);
+    const usedToday = quota.used; // post-increment(이번 요청 포함) → remaining = limit - usedToday
+    if (!quota.allowed) {
       const isQa = feature === 'qa';
       const friendlyMsg = isQa
         ? `오늘의 AI Q&A 질문 ${limit}회를 모두 사용하셨어요. 내일 다시 이용해주세요! 🌙`
@@ -190,18 +186,14 @@ Deno.serve(async (req: Request) => {
       console.warn('Failed to save conversation:', saveError);
     }
 
-    // [CL-AI-CHAT-LIMIT5-20260408-100500] 성공 응답에 remaining 포함 (클라이언트 카운터용)
-    const remaining = Math.max(0, limit - (usedToday + 1));
+    // [CL-VULN-R8-AIQUOTA-20260626] 성공 응답에 remaining 포함. usedToday 는 이미 post-increment → +1 불필요.
+    const remaining = Math.max(0, limit - usedToday);
     return new Response(
       JSON.stringify({ reply, feature, remaining, limit }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('ai-chat error:', message);
-    return new Response(
-      JSON.stringify({ error: 'AI 응답 생성 중 오류가 발생했습니다', detail: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환, 원본은 서버 로그.
+    return errorResponse('ai-chat', error, { userMessage: 'AI 응답 생성 중 오류가 발생했습니다' });
   }
 });

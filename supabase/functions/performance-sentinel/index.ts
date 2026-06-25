@@ -4,6 +4,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { verifyUserToken } from '../_shared/jwt.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
 serve(async (req) => {
@@ -168,9 +169,7 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error('[performance-sentinel] Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || '성능 통계 조회 실패' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환.
+    return errorResponse('performance-sentinel', error, { userMessage: '성능 통계 조회 실패' });
   }
 });

@@ -11,7 +11,8 @@ import { chatCompletion, type ChatMessage } from '../_shared/openai.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { parseGptJson } from '../_shared/parse-gpt-json.ts';
 // [CL-SEC-AIQUOTA-20260621] 비용 남용 방지 일일 한도
-import { checkDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
+import { reserveDailyLimit, dailyLimitMessage } from '../_shared/rate-limit.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 
 // [CL-TOP100-DESTINATIONS-20260325] 후보 정보 인터페이스
 interface CandidateInfo {
@@ -151,8 +152,8 @@ serve(async (req) => {
       );
     }
 
-    // [CL-SEC-AIQUOTA-20260621] 일일 한도(신혼여행 큐레이션 10회/일)
-    const quota = await checkDailyLimit(supabase, userId, 'honeymoon-curate', 10);
+    // [CL-VULN-R8-AIQUOTA-20260626] 일일 한도(신혼여행 큐레이션 10회/일) — 원자 예약(D1·D2 해소)
+    const quota = await reserveDailyLimit(supabase, userId, 'honeymoon-curate', 10);
     if (!quota.allowed) {
       return new Response(
         JSON.stringify({ error: dailyLimitMessage('신혼여행 추천', quota.limit), remaining: 0, limit: quota.limit }),
@@ -235,9 +236,7 @@ serve(async (req) => {
       // Fire-and-forget
     }
 
-    return new Response(
-      JSON.stringify({ error: '신혼여행 추천 생성 중 오류가 발생했습니다', detail: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환.
+    return errorResponse('honeymoon-planner', error, { userMessage: '신혼여행 추천 생성 중 오류가 발생했습니다' });
   }
 });

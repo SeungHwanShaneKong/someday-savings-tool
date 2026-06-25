@@ -5,6 +5,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { verifyUserToken } from '../_shared/jwt.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 import { logFunctionCall } from '../_shared/log-call.ts';
 import { checkAdminOnMainProject } from '../_shared/admin-check.ts';
 
@@ -204,9 +205,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('[embedding-tuner] Error:', error);
     await logFunctionCall(supabase, 'embedding-tuner', startTime, 500, userId, error.message);
-    return new Response(
-      JSON.stringify({ error: error.message || '임베딩 분석 실패' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환.
+    return errorResponse('embedding-tuner', error, { userMessage: '임베딩 분석 실패' });
   }
 });

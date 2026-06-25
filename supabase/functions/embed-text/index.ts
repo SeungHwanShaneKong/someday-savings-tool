@@ -1,6 +1,7 @@
 // embed-text: Convert text to vector embedding using OpenAI text-embedding-3-small
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { errorResponse } from '../_shared/error-response.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import OpenAI from 'https://esm.sh/openai@4.77.0';
 // [CL-SEC-EMBED-ADMIN-20260621] 관리자 검증(RAG 오염 차단). crawl-wedding-data 와 동일 패턴.
@@ -121,10 +122,8 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('DB upsert error:', dbError);
-      return new Response(
-        JSON.stringify({ error: 'DB 저장 오류', details: dbError.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // [CL-VULN-R8-ERRLEAK-20260626] DB 내부 메시지 비노출.
+      return errorResponse('embed-text', dbError, { userMessage: 'DB 저장 오류' });
     }
 
     return new Response(
@@ -137,11 +136,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '임베딩 생성 중 오류';
-    console.error('embed-text error:', error);
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // [CL-VULN-R8-ERRLEAK-20260626] 내부 메시지 비노출 — requestId 만 반환(errorResponse 가 서버 로깅).
+    return errorResponse('embed-text', error, { userMessage: '임베딩 생성 중 오류가 발생했습니다' });
   }
 });

@@ -109,6 +109,13 @@ describe('mergeRemoteFields (같은 항목·다른 필드 = 무손실)', () => {
       expect.arrayContaining(['amount', 'is_paid', 'notes', 'cost_split', 'payment_date']),
     );
   });
+  // [CL-EDIT5-EDITOR-20260625] 편집자(last_edited_by)도 updated_at 처럼 서버 bookkeeping → 실시간 머지 후 remote 채택.
+  it('CR.25 last_edited_by 는 remote 값으로 채택(파트너/내 변경 구분 정확)', () => {
+    const local = { ...baseItem({ updated_at: T(2) }), last_edited_by: 'me' } as Item & { last_edited_by?: string | null };
+    const remote = { ...baseItem({ updated_at: T(3) }), last_edited_by: 'partner' } as Item & { last_edited_by?: string | null };
+    const merged = mergeRemoteFields(local, remote, new Set()) as Item & { last_edited_by?: string | null };
+    expect(merged.last_edited_by).toBe('partner');
+  });
 });
 
 describe('resolveLWW (같은 필드 경쟁)', () => {

@@ -227,6 +227,7 @@ export type Database = {
           id: string
           is_custom: boolean | null
           is_paid: boolean
+          last_edited_by: string | null
           notes: string | null
           quantity: number | null
           sub_category: string
@@ -243,6 +244,7 @@ export type Database = {
           id?: string
           is_custom?: boolean | null
           is_paid?: boolean
+          last_edited_by?: string | null
           notes?: string | null
           quantity?: number | null
           sub_category: string
@@ -259,6 +261,7 @@ export type Database = {
           id?: string
           is_custom?: boolean | null
           is_paid?: boolean
+          last_edited_by?: string | null
           notes?: string | null
           quantity?: number | null
           sub_category?: string
@@ -708,6 +711,16 @@ export type Database = {
       admin_visit_source_breakdown: {
         Args: { p_start: string; p_end: string }
         Returns: { source: string; visits: number }[]
+      }
+      // [CL-IMPROVE2-VISITHIST-20260625] 방문 횟수별 유저 수(1..10, 10=10회 이상)
+      admin_visit_histogram: {
+        Args: { p_start: string; p_end: string }
+        Returns: { visits: number; user_count: number }[]
+      }
+      // [CL-IMPROVE3-REFJOINS-20260625] 초대 수락(협업자 합류) 일자별 추이
+      admin_referral_joins: {
+        Args: { p_start: string; p_end: string }
+        Returns: { day: string; joins: number }[]
       }
       // [CL-PARTNER-1TO1-20260622-233012] 내 파트너(닉네임+이메일) / 파트너 해지 / 예산 자동공유
       get_my_partner: {

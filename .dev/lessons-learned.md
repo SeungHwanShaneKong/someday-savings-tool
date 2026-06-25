@@ -7,6 +7,25 @@
 
 ## 최신
 
+### [CL-VULN-AUDIT-R7-20260626] 사전배포 적대 감사(개선5종 publish 직전) — 5건 수정 + 2건 수용
+- 14후보→8확정, 전부 저점수(≤4, 치명 0 — R5/R6에서 굵직한 표면 이미 차단). 마이그(트리거/RPC)는 사용자가 step3로 라이브 적용 완료.
+- **R7-1/R7-2(score4) 수정**: BudgetFlow baseline(lastSeen) 전진이 `maxUpdatedAt(items)` 로 **내 편집 updated_at 까지 포함**해, 내 편집보다 시각은 이르지만 이후 도착할 파트너 변경을 마스킹/영구 미강조. 근본수정 = `maxUpdatedAt(items, myUserId)`(내 편집·null 편집자 제외) → 파트너 변경 max 로만 전진. CS.15/16 회귀가드.
+- **R7-4(score2) 수정**: usePartnerEditNotifier 가 예산 전환 시 sessionRef 미초기화 → A의 누적 편집시간이 B로 새어 잘못된 예산 2분알림 오발사. 근본수정 = `[budgetId, active]` 변경 시 sessionRef=initial + lastSignalRef=editSignal 동기화. 회귀가드 R7-4.
+- **R7-6(score2) 수정**: ACK 의 last_edited_by 보정이 setItems 만 하고 setAllBudgetsItems(예산별 캐시) 누락 → 캐시 정합 위반. 낙관/롤백/onUpsert 와 동일 '이중 갱신'으로 통일. EDIT5-D1 테스트 확장.
+- **R7-7(score1) 수정**: 파트너 해지(partnerPresent true→false) 시 활성 강조가 3분 잔존 → partnerPresent false cleanup effect 로 즉시 소거+가드 리셋.
+- **R7-5(score1) 수정**: 초대 합류 차트 X축 raw 날짜(YYYY-MM-DD) 겹침 → tickFormatter(M/d)+interval='preserveStartEnd'.
+- **수용(2건)**: R7-3 칭찬 토스트 개인모드 적립 = '적극 편집자' 일반 보상 설계의도(무해). R7-8 last_edited_by 마이그 무백필 → 트리거 적용 전 파트너 변경(NULL)은 1회성 미강조 — 추정 백필=오귀속 위험이라 **보수적 제외가 안전**(transitional, 문서화).
+- **검증**: tsc 0 · vitest **935**(+CS.15/16·R7-4)×3 · build 19 · 독립 verifier.
+
+### [CL-IMPROVE5-20260625] 개선 5종 — 도메인 진단 · 방문 히스토그램 · 초대유입 · 변경 토스트 · 강조 근본수정
+- **#1 도메인 통일(진단)**: apex=최신(GitHub). **www=구 Lovable 빌드(Cloudflare, DNS 미이전)**, **wedsem=구 리다이렉트 스텁(별도 repo `wedsem-redirect` 미재배포·단 apex로 리다이렉트는 동작)**, `/budget`=SPA 404 폴백(정상). 교훈: apex 승격 시 **www CNAME 이전 누락**이 사고 — 코드로 못 고침, Gabia DNS(www→github.io)+별도 repo 재배포 = 사용자. deployment.md에 www 컷오버 항목 추가.
+- **#2 방문 히스토그램**: RPC `admin_visit_histogram`(per-user COUNT → LEAST(v,10) 버킷) + useAdminKPI(빈 버킷 0채움) + Admin BarChart. page_views는 **로그인 유저만 기록** → 익명 제외(정직 라벨).
+- **#3 초대유입**: RPC `admin_referral_joins`(budget_collaborators created_at 일자별) — 익명 /invite 방문은 미기록이라 **'합류(수락)'만 확정 카운트**. 일반 외부 referrer는 기존 유입경로 차트가 커버.
+- **#4 변경 요약 토스트**: 재접속 시 changedItemIds 0→N 최초 전이 1회 `toast`(예산별 ref 가드).
+- **#5 강조 근본수정(핵심)**: 근본원인 = **`budget_items.last_edited_by` 부재**(편집자 구분 불가 → 내 편집 오표시) + 스냅샷 effect '예산당 1회' 가드(실시간 늦은 도착 누락). 해결: ①컬럼+트리거(`auth.uid()` 권위 기록, 마이그) ②`computeChangedSince(items,lastSeen,myUserId)` — `updated_at>lastSeen AND last_edited_by≠me AND ≠null`(myUserId 옵셔널=하위호환, null=보수적 제외) ③`mergeRemoteFields`가 last_edited_by를 remote 채택(실시간 머지 후 정확) ④BudgetFlow를 **items 변경마다 union 재계산**(예산당 1회 가드 제거 → 늦은 도착도 강조)+lastSeen 진입시 동결+서버시각 단조 baseline. R6-D '내 편집 lastSeen 전진' 휴리스트 **제거**(last_edited_by가 자기제외 보장 → 단순화). last_edited_by 미배포(null) → 강조 0(오탐 없음, degrade-safe).
+- **교훈**: 협업 '누가 바꿨나'는 타이밍 휴리스트로 추정 불가 — **편집자 컬럼이 정공법**(처음부터 넣었어야). myUserId 옵셔널 인자로 기존 테스트 0 회귀.
+- **검증**: tsc 0 · vitest **930+**(편집자 구분 CS.10-14·mergeRemoteFields CR.14)×3 · build 19. 마이그 3종(visit_histogram·referral_joins·last_edited_by)+트리거=사용자 적용. 라이브(RPC권한·트리거·DNS)=사용자 확인.
+
 ### [CL-VULN-AUDIT-R6-20260625] 사전-배포 적대 감사 — 6건 근본수정(데이터유실 차단 포함) + 배포 게이트
 - **맥락**: R5 이후 신규 변경(저장됨 인디케이터)+전체 미커밋 페이로드를 '커밋/푸시/배포 직전' 적대 감사. 14후보→8확정→6 distinct.
 - **A [impact5·최우선] 게이미피케이션 캐시 미로드 클로버**: `increment/append/update` 가 base 를 `qc.getQueryData ?? DEFAULT` 로 잡아, 쿼리 로드 前(BudgetFlow 스냅샷 effect 가 mount 직후 increment 호출) 호출되면 gamification_state JSONB '전체'를 DEFAULT+delta 로 덮어써 **스트릭·배지·퀘스트 영구 유실**. 근본수정 = `resolveBase()`(캐시→없으면 DB 최신 fetch→행없을때만 DEFAULT) 공유 + 배지 합집합을 mutationFn 안에서 fresh base 기준으로 수행 + 모든 write 동일 scope 직렬화. red→green(cold-cache repro: pending-first maybeSingle).

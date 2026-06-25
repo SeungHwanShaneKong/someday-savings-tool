@@ -442,6 +442,34 @@ describe('useMultipleBudgets.realtimeApplier (실시간 적용)', () => {
     // 내가 입력한 값 자체는 낙관 반영(555)
     expect(result.current.items.find(i => i.id === 'i1')?.amount).toBe(555);
   });
+
+  // [CL-EDIT5-EDITOR-20260625] D-1: ACK 가 채택될 때 last_edited_by 도 서버값(=나)으로 반영 →
+  //  로컬에 남아있던 '이전 파트너 편집자'가 갱신돼, 내 편집이 '파트너 변경'으로 오표시되지 않음.
+  it('EDIT5-D1 내 편집 ACK 채택 시 last_edited_by 가 서버값(나)으로 갱신(stale partner 제거)', async () => {
+    const T1 = '2026-06-20T01:00:00.000Z'; // 과거 파트너 편집(로컬)
+    const T2 = '2026-06-20T02:00:00.000Z'; // 내 편집 ACK(최신)
+    installFrom({ itemAck: { data: { id: 'i1', updated_at: T2, last_edited_by: 'owner-1' }, error: null } });
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // 과거 파트너 편집이 로컬에 반영된 상태(last_edited_by='partner', updated_at=T1, known=T1)
+    act(() => {
+      result.current.realtimeApplier.onUpsert({ ...mkItem('i1'), updated_at: T1, last_edited_by: 'partner' } as unknown as ItemRow);
+      result.current.realtimeApplier.setKnownUpdatedAt('i1', T1);
+    });
+    expect((result.current.items.find(i => i.id === 'i1') as { last_edited_by?: string }).last_edited_by).toBe('partner');
+
+    // 내가 편집 → ACK(T2>T1, last_edited_by=owner-1) 채택
+    await act(async () => {
+      await result.current.updateAmount('wedding-hall', 'sub-i1', 555);
+    });
+
+    // last_edited_by 가 '나(owner-1)'로 갱신 — stale 'partner' 제거(버그면 'partner' 잔존)
+    expect((result.current.items.find(i => i.id === 'i1') as { last_edited_by?: string }).last_edited_by).toBe('owner-1');
+    // [CL-EDIT5-R7CACHE-20260626] allBudgetsItems(비교 대시보드 캐시)도 동일 보정 — 두 소스 정합(R7-6)
+    const compItem = result.current.getBudgetsForComparison().find(b => b.id === 'b1')?.items.find(i => i.id === 'i1');
+    expect((compItem as { last_edited_by?: string } | undefined)?.last_edited_by).toBe('owner-1');
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────

@@ -35,6 +35,8 @@ export interface ExtendedBudgetItem {
   cost_split?: CostSplitType;
   // [CL-COEDIT-E2E-20260620-130000] 서버 소유 타임스탬프(트리거) — 실시간 LWW 게이트용(additive·optional)
   updated_at?: string;
+  // [CL-EDIT5-EDITOR-20260625-000000] 마지막 편집자(서버 트리거 auth.uid()) — 파트너/내 변경 구분용(additive·optional)
+  last_edited_by?: string | null;
 }
 
 export const COST_SPLIT_OPTIONS: {

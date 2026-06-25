@@ -78,7 +78,7 @@ export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, visitSourceData, loading: dataLoading, fetchData } = useAdminKPI();
+  const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, visitSourceData, visitHistogram, referralJoins, referralJoinsTotal, loading: dataLoading, fetchData } = useAdminKPI();
   // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계 hook
   const { ragStats, loading: ragLoading, fetchRAGStats } = useAdminRAGStats();
 
@@ -466,6 +466,56 @@ export default function Admin() {
                 )}
                 <p className="text-[11px] text-muted-foreground/70 mt-2">
                   방문마다 카운트 · 직전 페이지(referrer)/소스 기준 · 선택 기간 내 · 수집 시작 2026-06-22.
+                </p>
+              </Card>
+
+              {/* [CL-IMPROVE2-VISITHIST-20260625] 방문 빈도 분포(가입 유저) — 정확히 N회(1..10+) 막대 히스토그램 */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">방문 빈도 분포 (가입 유저)</h3>
+                {visitHistogram.some((d) => d.users > 0) ? (
+                  <div className="h-56 sm:h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={visitHistogram} margin={{ left: 8, right: 16, top: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis dataKey="bucket" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" interval={0} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                        <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => [`${value}명`, '유저']} />
+                        <Bar dataKey="users" name="유저" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">아직 방문 빈도 데이터가 없어요.</p>
+                )}
+                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                  로그인 유저 기준 · 방문=페이지뷰 · 선택 기간 내 정확히 N회 방문한 유저 수(10회+ 합산).
+                </p>
+              </Card>
+
+              {/* [CL-IMPROVE3-REFJOINS-20260625] 초대(추천 링크) 수락 합류 추이 */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm sm:text-base font-semibold leading-relaxed">초대 링크 합류 추이</h3>
+                  <span className="text-xs sm:text-sm text-muted-foreground">합류 {referralJoinsTotal}명</span>
+                </div>
+                {referralJoins.length > 0 ? (
+                  <div className="h-56 sm:h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={referralJoins} margin={{ left: 8, right: 16, top: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        {/* [CL-EDIT5-R7CHART-20260626] 날짜 라벨 축약(M/d) + 양끝만 표시 → 장기/희소 구간 라벨 겹침 방지(R7-5) */}
+                        <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" interval="preserveStartEnd" tickFormatter={(d: string) => (typeof d === 'string' && d.length >= 10 ? d.slice(5).replace('-', '/') : d)} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                        <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number) => [`${value}명`, '합류']} labelFormatter={(d: string) => (typeof d === 'string' && d.length >= 10 ? d.slice(5).replace('-', '/') : d)} />
+                        <Bar dataKey="joins" name="합류" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">아직 초대 합류 데이터가 없어요.</p>
+                )}
+                <p className="text-[11px] text-muted-foreground/70 mt-2">
+                  파트너/추천 링크로 초대 수락해 합류한 사람(협업자 등록 기준) · 선택 기간 내.
                 </p>
               </Card>
 

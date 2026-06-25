@@ -190,73 +190,99 @@ export default function BudgetFlow() {
     },
   });
 
-  // 개선3: 부재 중 파트너 변경분 시머 강조 — 예산당 1회 스냅샷, 3분 유지 후 자동 소거.
+  // [CL-EDIT5-EDITOR-20260625-000000] 개선5 근본수정: 부재 중 '파트너가' 바꾼 항목만 강조.
+  //   - last_edited_by 로 편집자 구분 → 내 편집은 절대 강조 안 됨(오표시 0).
+  //   - items 변경(실시간 도착 포함)마다 재계산·union → 늦게 온 파트너 변경도 누락 없이 강조(예산당 1회 가드 제거).
+  //   - 진입 시점 lastSeen 동결 + 다음 방문 baseline 은 서버 updated_at 단조 전진(클라 now 미사용 → 시계 스큐 무관).
+  const myUserId = user?.id ?? null;
   const [changedItemIds, setChangedItemIds] = useState<Set<string>>(() => new Set());
-  const snapshotBudgetRef = useRef<string | null>(null);
+  const lastSeenAtOpenRef = useRef<{ budgetId: string; lastSeen: string | null } | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reviewAwardedRef = useRef<string | null>(null);   // 예산별 보상 1회
+  const summaryToastRef = useRef<string | null>(null);    // 예산별 요약 토스트 1회(개선4)
+  const highlightDoneRef = useRef<string | null>(null);   // 3분 fade 후 재강조 중단(피로조절)
 
-  // (a) 예산 전환/언마운트 → 이전 강조 즉시 제거 + 타이머 정리 + 재스냅샷 허용(고아 setState 방지)
+  // (a) 예산 전환/언마운트 → 강조·동결·가드 초기화 + 타이머 정리(고아 setState 방지)
   useEffect(() => {
-    snapshotBudgetRef.current = null;
     setChangedItemIds(new Set());
+    lastSeenAtOpenRef.current = null;
+    reviewAwardedRef.current = null;
+    summaryToastRef.current = null;
+    highlightDoneRef.current = null;
     if (highlightTimerRef.current) { clearTimeout(highlightTimerRef.current); highlightTimerRef.current = null; }
     return () => {
       if (highlightTimerRef.current) { clearTimeout(highlightTimerRef.current); highlightTimerRef.current = null; }
     };
   }, [activeBudgetId]);
 
-  // (b) 활성 예산 items 로드 완료 시 1회 스냅샷(스위치 직후 stale items 레이스는 budget_id 가드로 차단)
+  // (b) items 로드/실시간 도착마다 파트너 변경분 재계산(union-add). 내 편집은 last_edited_by 로 자동 제외.
   useEffect(() => {
     if (!partnerPresent || !activeBudgetId) return;
-    if (items.length === 0 || items[0].budget_id !== activeBudgetId) return;
-    if (snapshotBudgetRef.current === activeBudgetId) return; // 예산당 1회
-    snapshotBudgetRef.current = activeBudgetId;
+    if (items.length === 0 || items[0].budget_id !== activeBudgetId) return; // 전환 직후 stale items 레이스 차단
+    if (highlightDoneRef.current === activeBudgetId) return;                  // 3분 fade 끝 → 이번 세션 재강조 안 함
 
-    let lastSeen: string | null = null;
-    try { lastSeen = localStorage.getItem(lastSeenKey(activeBudgetId)); } catch { /* noop */ }
-    const changed = computeChangedSince(items, lastSeen);
-    // [CL-VULN-V6-LASTSEEN-MAX-20260624] last-seen 을 now 가 아니라 '스냅샷 항목의 max(updated_at)'로 전진
-    //  (역행 금지: 기존 lastSeen 과 비교해 더 큰 값). 그래야 스냅샷 직후 도착한 더 늦은 파트너 변경이
-    //  다음 open 에서 strict-> 게이트를 통과해 보존된다(now 전진은 그 사이 변경을 영구 유실).
-    const snapMax = maxUpdatedAt(items);
-    if (snapMax) {
-      const advanceTo =
-        lastSeen && Date.parse(lastSeen) > Date.parse(snapMax) ? lastSeen : snapMax;
-      try { localStorage.setItem(lastSeenKey(activeBudgetId), advanceTo); } catch { /* noop */ }
+    // 진입 시점 lastSeen 1회 동결(이후 내 편집이 baseline 을 밀어도 강조 기준 불변)
+    if (!lastSeenAtOpenRef.current || lastSeenAtOpenRef.current.budgetId !== activeBudgetId) {
+      let stored: string | null = null;
+      try { stored = localStorage.getItem(lastSeenKey(activeBudgetId)); } catch { /* noop */ }
+      lastSeenAtOpenRef.current = { budgetId: activeBudgetId, lastSeen: stored };
+    }
+    const frozen = lastSeenAtOpenRef.current.lastSeen;
+
+    // 다음 방문 baseline = max(stored, '파트너 변경'의 최신 updated_at) — 서버시각 단조.
+    // [CL-EDIT5-R7BASELINE-20260626] 내 편집(myUserId)·미상(null)은 제외 — baseline 이 내 편집 시각으로 과전진해
+    //  '내 편집보다 이르지만 이후 도착할' 파트너 변경을 마스킹/영구 미강조하던 문제(R7-1/R7-2) 차단.
+    try {
+      const snapMax = maxUpdatedAt(items, myUserId);
+      if (snapMax) {
+        const cur = localStorage.getItem(lastSeenKey(activeBudgetId));
+        const advanceTo = cur && Date.parse(cur) > Date.parse(snapMax) ? cur : snapMax;
+        localStorage.setItem(lastSeenKey(activeBudgetId), advanceTo);
+      }
+    } catch { /* noop */ }
+
+    // 파트너 변경분만(내 편집·미상(null) 제외)
+    const partnerChanged = computeChangedSince(items, frozen, myUserId);
+    if (partnerChanged.size === 0) return;
+
+    setChangedItemIds(prev => {
+      let grew = false;
+      const next = new Set(prev);
+      for (const id of partnerChanged) if (!next.has(id)) { next.add(id); grew = true; }
+      return grew ? next : prev;
+    });
+
+    // 보상 + 요약 토스트(개선4) — 예산별 재접속 1회
+    if (reviewAwardedRef.current !== activeBudgetId) {
+      reviewAwardedRef.current = activeBudgetId;
+      increment({ partner_reviews: 1, total_points: 3 });
+    }
+    if (summaryToastRef.current !== activeBudgetId) {
+      summaryToastRef.current = activeBudgetId;
+      toast({ title: `👀 파트너가 ${partnerChanged.size}개 항목을 수정했어요`, description: '바뀐 항목이 잠시 강조돼요' });
     }
 
-    if (changed.size > 0) {
-      setChangedItemIds(changed);
-      // 게이미피케이션: 파트너 변경 확인 누계 + 보상(증분 누적 — 동시 보상 유실 없음)
-      increment({ partner_reviews: 1, total_points: 3 });
-      // 3분 유지 후 클래스 제거 → CSS transition 으로 부드럽게 fade-out
-      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    // 3분 후 자동 소거(세션당 1 타이머) + 이후 재강조 중단(피로조절)
+    if (!highlightTimerRef.current) {
       highlightTimerRef.current = setTimeout(() => {
+        highlightDoneRef.current = activeBudgetId;
         setChangedItemIds(new Set());
         highlightTimerRef.current = null;
       }, HIGHLIGHT_HOLD_MS);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partnerPresent, activeBudgetId, items]);
+  }, [partnerPresent, activeBudgetId, items, myUserId]);
 
-  // 개선3 보강: 내 편집마다 내 last-seen 을 전진시킨다 → 재방문 시 '내 편집'을 파트너 변경분으로 오강조하지 않음.
-  //   (부재 = 내가 편집 안 함 → lastSeen 정지 → 그 사이 파트너 변경분만 다음 open 에서 강조됨.)
-  //   editSignal 은 '활성 예산에 대한 내 성공 편집'에서만 +1 → 전환 시엔 미발화(스냅샷 effect 와 무경합).
-  // [CL-VULN-R6D-LASTSEEN-MONO-20260625] 스냅샷 effect(maxUpdatedAt)와 동일하게 '역행 금지(단조)' 가드 적용.
-  //   클라 시계가 서버보다 느리면 무가드 now 쓰기가 lastSeen 을 후퇴시켜 파트너 변경분이 재강조·중복보상되던 문제 차단.
+  // [CL-EDIT5-R7PARTNERGONE-20260626-000000] 파트너 해지/마지막 협업자 제거(partnerPresent true→false) 시
+  //  활성 강조를 즉시 소거(3분 타이머 만료 전 잔존 방지). 재페어링 시 정상 재강조되도록 예산별 가드도 리셋(R7-7).
   useEffect(() => {
-    if (!partnerPresent || !activeBudgetId || editSignal === 0) return;
-    try {
-      const key = lastSeenKey(activeBudgetId);
-      const prev = localStorage.getItem(key);
-      const nowISO = new Date().toISOString();
-      // 더 큰(최신) 값으로만 전진 — 역행 금지(클라 시계 스큐로 인한 lastSeen 후퇴 차단)
-      if (!prev || Date.parse(nowISO) > Date.parse(prev)) {
-        localStorage.setItem(key, nowISO);
-      }
-    } catch { /* noop */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editSignal]);
+    if (partnerPresent) return;
+    setChangedItemIds(new Set());
+    reviewAwardedRef.current = null;
+    summaryToastRef.current = null;
+    highlightDoneRef.current = null;
+    if (highlightTimerRef.current) { clearTimeout(highlightTimerRef.current); highlightTimerRef.current = null; }
+  }, [partnerPresent]);
 
   // 개선4: 마일스톤마다 회전 칭찬 토스트(은은) + 소량 점수. 매 편집이 아니라 점증 간격 → 피로 최소.
   const praiseBagRef = useRef<PraiseBag | null>(null);

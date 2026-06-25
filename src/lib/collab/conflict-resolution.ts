@@ -82,6 +82,8 @@ export function mergeRemoteFields<T extends Record<string, unknown>>(
     if (col in remote) merged[col] = remote[col];
   }
   if ('updated_at' in remote) merged.updated_at = remote.updated_at;
+  // [CL-EDIT5-EDITOR-20260625-000000] 편집자도 서버 bookkeeping — 실시간 머지 후 last_edited_by 정확(파트너/내 구분).
+  if ('last_edited_by' in remote) merged.last_edited_by = remote.last_edited_by;
   return merged as T;
 }
 

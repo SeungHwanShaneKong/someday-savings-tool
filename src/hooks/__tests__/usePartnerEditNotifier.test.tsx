@@ -125,6 +125,22 @@ describe('usePartnerEditNotifier (개선2: 2분 편집 → 파트너 알림)', (
     expect(onNudged).toHaveBeenCalledTimes(1);
   });
 
+  // [CL-EDIT5-R7NOTIFIER-20260626] 예산 전환 시 세션 리셋 — A의 누적 편집시간이 B로 새어나가 오발사되지 않음(R7-4).
+  it('R7-4 A에서 ~90초 편집 후 B로 전환·편집 → A 세션 누적이 B로 안 새어 미발사', async () => {
+    const { rerender } = renderHook(
+      ({ editSignal, budgetId }) => usePartnerEditNotifier({ editSignal, active: true, budgetId }),
+      { initialProps: { editSignal: 0, budgetId: 'A' as string | null } },
+    );
+    rerender({ editSignal: 1, budgetId: 'A' });                    // A 세션 시작(t=0)
+    vi.setSystemTime(new Date('2026-06-24T00:01:30.000Z'));        // +90초(2분 미만)
+    rerender({ editSignal: 2, budgetId: 'A' });
+    expect(invoke).not.toHaveBeenCalled();
+    // B로 전환(A 시작 기준으론 곧 2분 초과) — 세션 리셋되어야 함
+    vi.setSystemTime(new Date('2026-06-24T00:02:10.000Z'));        // A 시작 +130초(2분 초과)
+    rerender({ editSignal: 3, budgetId: 'B' });                    // B 첫 편집 — 리셋되었으므로 미발사
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it('PEN.4 한 세션당 1회만 — 2분 이후 추가 편집은 재발사 안 함', async () => {
     const { rerender } = renderHook(
       ({ editSignal }) => usePartnerEditNotifier({ editSignal, active: true, budgetId: 'b1' }),

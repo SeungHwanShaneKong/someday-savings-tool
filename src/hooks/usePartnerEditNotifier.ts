@@ -22,6 +22,16 @@ export function usePartnerEditNotifier({ editSignal, active, budgetId, onNudged 
   const lastSignalRef = useRef(0);
   const invokingRef = useRef(false);
 
+  // [CL-EDIT5-R7NOTIFIER-20260626-000000] 예산 전환/비활성 시 편집 세션을 초기화한다.
+  //  editSignal 은 '전 예산 공통 단일 카운터'라, 예산 A 에서 ~90초 편집하다 B 로 전환 후 1회 편집하면
+  //  A 세션이 이어져 2분 충족으로 판정 → 잘못된 예산(B)으로 알림 오발사되던 문제(R7-4) 차단.
+  //  lastSignalRef 를 현재값으로 동기화해 전환 직후 잔여 신호 1건이 즉발 nudge 로 오판되지 않게 한다.
+  useEffect(() => {
+    sessionRef.current = initialEditSession;
+    lastSignalRef.current = editSignal;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budgetId, active]);
+
   useEffect(() => {
     if (!active || !budgetId) return;
     if (editSignal === lastSignalRef.current || editSignal === 0) return;

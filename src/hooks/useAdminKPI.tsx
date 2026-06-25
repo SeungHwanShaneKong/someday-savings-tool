@@ -27,6 +27,18 @@ export interface AcquisitionDatum {
   users: number;
 }
 
+// [CL-IMPROVE2-VISITHIST-20260625] 방문 횟수별 유저 수(정확히 N회, bucket='1회'..'10회+')
+export interface VisitHistogramDatum {
+  bucket: string;
+  users: number;
+}
+
+// [CL-IMPROVE3-REFJOINS-20260625] 초대 수락(협업자 합류) 일자별 추이
+export interface ReferralJoinDatum {
+  day: string;
+  joins: number;
+}
+
 interface UseAdminKPIResult {
   kpiValues: KPIValue[];
   trendData: TrendDataPoint[];
@@ -37,6 +49,11 @@ interface UseAdminKPIResult {
   acquisitionData: AcquisitionDatum[];
   /** [CL-ACQ-VISIT-20260623-230113] 유입경로 집계(방문 기준, 기간 내 매 방문). RPC 미배포 시 빈 배열 */
   visitSourceData: AcquisitionDatum[];
+  /** [CL-IMPROVE2-VISITHIST-20260625] 방문 빈도 분포(1..10+회). RPC 미배포 시 빈 배열 */
+  visitHistogram: VisitHistogramDatum[];
+  /** [CL-IMPROVE3-REFJOINS-20260625] 초대 수락 합류 추이(일자별) + 총계 */
+  referralJoins: ReferralJoinDatum[];
+  referralJoinsTotal: number;
   loading: boolean;
   error: string | null;
   fetchData: (startDate: Date, endDate: Date) => Promise<void>;
@@ -83,6 +100,9 @@ export function useAdminKPI(): UseAdminKPIResult {
   });
   const [acquisitionData, setAcquisitionData] = useState<AcquisitionDatum[]>([]);
   const [visitSourceData, setVisitSourceData] = useState<AcquisitionDatum[]>([]);
+  const [visitHistogram, setVisitHistogram] = useState<VisitHistogramDatum[]>([]);
+  const [referralJoins, setReferralJoins] = useState<ReferralJoinDatum[]>([]);
+  const [referralJoinsTotal, setReferralJoinsTotal] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +146,29 @@ export function useAdminKPI(): UseAdminKPIResult {
           return !r.error && Array.isArray(r.data)
             ? (r.data as Array<{ source: string; visits: number }>).map((d) => ({ source: d.source, users: d.visits }))
             : [];
+        } catch {
+          return [];
+        }
+      })();
+      // [CL-IMPROVE2-VISITHIST-20260625] 방문 빈도 분포(1..10+) — RPC 미배포 시 빈배열 degrade. 빈 버킷 0으로 채워 1~10 항상 표시.
+      const visitHistogramPromise: Promise<VisitHistogramDatum[]> = (async () => {
+        try {
+          const r = await supabase.rpc('admin_visit_histogram', { p_start: startISO, p_end: endISO });
+          if (r.error || !Array.isArray(r.data)) return [];
+          const byBucket = new Map<number, number>();
+          for (const d of r.data as Array<{ visits: number; user_count: number }>) byBucket.set(d.visits, d.user_count);
+          const out: VisitHistogramDatum[] = [];
+          for (let v = 1; v <= 10; v++) out.push({ bucket: v === 10 ? '10회+' : `${v}회`, users: byBucket.get(v) ?? 0 });
+          return out;
+        } catch {
+          return [];
+        }
+      })();
+      // [CL-IMPROVE3-REFJOINS-20260625] 초대 수락 합류 추이(일자별) — RPC 미배포 시 빈배열 degrade.
+      const referralJoinsPromise: Promise<ReferralJoinDatum[]> = (async () => {
+        try {
+          const r = await supabase.rpc('admin_referral_joins', { p_start: startISO, p_end: endISO });
+          return !r.error && Array.isArray(r.data) ? (r.data as ReferralJoinDatum[]) : [];
         } catch {
           return [];
         }
@@ -447,6 +490,12 @@ export function useAdminKPI(): UseAdminKPIResult {
       setAcquisitionData(await acquisitionPromise);
       // [CL-ACQ-VISIT-20260623-230113] 방문 기준 유입경로 반영
       setVisitSourceData(await visitSourcePromise);
+      // [CL-IMPROVE2-VISITHIST-20260625] 방문 빈도 분포 반영
+      setVisitHistogram(await visitHistogramPromise);
+      // [CL-IMPROVE3-REFJOINS-20260625] 초대 수락 합류 추이 + 총계 반영
+      const refJoins = await referralJoinsPromise;
+      setReferralJoins(refJoins);
+      setReferralJoinsTotal(refJoins.reduce((s, d) => s + (d.joins || 0), 0));
 
       // ─── Phase 4-A: 경제적 파급 효과 계산 ───
       try {
@@ -488,5 +537,5 @@ export function useAdminKPI(): UseAdminKPIResult {
     }
   }, []);
 
-  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, visitSourceData, loading, error, fetchData };
+  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, visitSourceData, visitHistogram, referralJoins, referralJoinsTotal, loading, error, fetchData };
 }

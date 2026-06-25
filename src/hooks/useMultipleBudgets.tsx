@@ -524,7 +524,8 @@ export function useMultipleBudgets() {
       editSignalRef.current += 1;
       setEditSignal(editSignalRef.current);
 
-      const serverUpdatedAt = (data as { updated_at?: string } | null)?.updated_at;
+      const serverRow = data as { updated_at?: string; last_edited_by?: string | null } | null;
+      const serverUpdatedAt = serverRow?.updated_at;
       if (serverUpdatedAt) {
         // [CL-VULN-V8-ACK-MONOTONIC-20260624-000000] ACK 도 실시간과 동일한 단조 게이트(isNewer)를 거친다.
         //  ackedUpdatedAt 기록은 게이트 밖에서 항상 수행(내 쓰기의 실시간 자기에코 억제는 유지),
@@ -534,11 +535,29 @@ export function useMultipleBudgets() {
         if (p) p.ackedUpdatedAt = serverUpdatedAt;               // 에코 ack 일치(항상 기록)
         if (isNewer(serverUpdatedAt, localUpdatedAtRef.current.get(itemId))) {
           localUpdatedAtRef.current.set(itemId, serverUpdatedAt); // 단조 게이트 기지값(전진만)
+          // [CL-EDIT5-EDITOR-20260625-000000] last_edited_by 도 서버값으로 반영(트리거가 auth.uid()=나로 기록).
+          //  이게 없으면 로컬 행이 '이전 파트너 편집자'를 유지해 내 편집이 '파트너 변경'으로 오표시됨(개선5 잔여 윈도우 차단).
+          //  컬럼 미배포 시 undefined → 기존값 보존(degrade-safe).
+          const serverEditor = serverRow?.last_edited_by;
           setItems(prev =>
             prev.map(item =>
-              item.id === itemId ? ({ ...item, updated_at: serverUpdatedAt }) : item
+              item.id === itemId
+                ? ({ ...item, updated_at: serverUpdatedAt, last_edited_by: serverEditor ?? item.last_edited_by })
+                : item
             )
           );
+          // [CL-EDIT5-R7CACHE-20260626-000000] allBudgetsItems(예산별 캐시)도 동일 보정 — 낙관/롤백/onUpsert 와
+          //  같은 '이중 갱신' 불변식 유지. 누락 시 캐시에 이전 파트너 편집자가 잔존해 오표시 잔여(R7-6).
+          if (activeBudgetId) {
+            setAllBudgetsItems(prev => ({
+              ...prev,
+              [activeBudgetId]: (prev[activeBudgetId] || []).map(item =>
+                item.id === itemId
+                  ? ({ ...item, updated_at: serverUpdatedAt, last_edited_by: serverEditor ?? item.last_edited_by })
+                  : item
+              ),
+            }));
+          }
         }
       }
 

@@ -50,7 +50,9 @@ export function useBadgeUnlock() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { data: definitions = [] } = useBadgeDefinitions();
-  const { state, update, addPoints } = useGamificationState();
+  // [CL-VULN-V3-GAMIFY-RACE-20260624] 배지 보상도 절대값 update 대신 increment(점수)+appendUnlockedBadgeSlugs(합집합)
+  //  로 전환 → BudgetFlow 보상(increment)과 동시 발생해도 total_points lost-update 없음.
+  const { state, increment, appendUnlockedBadgeSlugs, addPoints } = useGamificationState();
   const qc = useQueryClient();
 
   const [pendingUnlock, setPendingUnlock] = useState<PendingUnlock | null>(
@@ -87,6 +89,9 @@ export function useBadgeUnlock() {
           login_streak_days: state.login_streak_days,
           checklist_streak_days: state.checklist_streak_days,
           days_before_wedding: null,
+          // [CL-GAMIFY-COEDIT-20260623-230113] 공동편집 카운터는 state 에서 기본 주입 → Profile catch-up 평가가 자동 반영
+          coedit_nudges_sent: state.coedit_nudges_sent,
+          partner_reviews: state.partner_reviews,
           already_unlocked_slugs: state.unlocked_badge_slugs,
           ...ctx,
         };
@@ -113,15 +118,10 @@ export function useBadgeUnlock() {
           }
         }
 
-        // gamification_state 업데이트
+        // gamification_state 업데이트 — 점수는 증분(lost-update 방지), 슬러그는 합집합 병합(멱등)
         const newSlugs = newly_unlocked.map((b) => b.slug);
-        update({
-          unlocked_badge_slugs: [
-            ...state.unlocked_badge_slugs,
-            ...newSlugs,
-          ],
-          total_points: state.total_points + total_points_gained,
-        });
+        if (total_points_gained > 0) increment({ total_points: total_points_gained });
+        appendUnlockedBadgeSlugs(newSlugs);
         // 캐시 무효화
         qc.invalidateQueries({ queryKey: ['userEarnedBadges', userId] });
 
@@ -140,7 +140,8 @@ export function useBadgeUnlock() {
       userId,
       definitions,
       state,
-      update,
+      increment,
+      appendUnlockedBadgeSlugs,
       qc,
       pendingUnlock,
       showNextFromQueue,

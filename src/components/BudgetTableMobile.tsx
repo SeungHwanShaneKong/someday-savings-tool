@@ -28,6 +28,8 @@ interface BudgetTableMobileProps {
   onAddCustomItem?: (categoryId: string, name: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
+  /** [CL-PARTNER-DIFF-20260624-000000] 재접속 시 파트너가 바꾼 항목 id — 시머 강조(개선3) */
+  changedItemIds?: Set<string>;
 }
 
 // Sortable category for mobile
@@ -84,7 +86,8 @@ export function BudgetTableMobile({
   onRenameItem,
   onAddCustomItem,
   onDeleteItem,
-  onCostSplitChange
+  onCostSplitChange,
+  changedItemIds
 }: BudgetTableMobileProps) {
   const { orderedCategories, reorderCategories } = useCategoryOrder();
   
@@ -378,7 +381,7 @@ export function BudgetTableMobile({
                           const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
                           
                           return (
-                            <div key={item.id} className="p-3 space-y-2">
+                            <div key={item.id} className={cn("p-3 space-y-2", changedItemIds?.has(item.id) && "partner-changed-row")}>
                               {/* Row 1: Checkbox + Item Name + Actions */}
                               <div className="flex items-center gap-2">
                                 <Checkbox
@@ -413,9 +416,16 @@ export function BudgetTableMobile({
                                       item.is_paid && "line-through text-muted-foreground"
                                     )}>
                                       <span className="text-sm truncate">{displayName}</span>
+                                      {/* [CL-VULN-R6C-A11Y-20260625] 파트너 변경 비색상 단서(색맹/SR 가시, WCAG 1.4.1) */}
+                                      {changedItemIds?.has(item.id) && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap flex-shrink-0">
+                                          <Sparkles className="w-2.5 h-2.5 flex-shrink-0" aria-hidden />
+                                          파트너 변경
+                                        </span>
+                                      )}
                                       {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
-                                        <AverageCostTooltip 
-                                          categoryId={category.id} 
+                                        <AverageCostTooltip
+                                          categoryId={category.id}
                                           subCategoryId={subCat.id}
                                           className="flex-shrink-0"
                                         />

@@ -7,7 +7,7 @@ import { Budget } from './useBudget';
 import { ExtendedBudgetItem } from '@/components/BudgetTable';
 import { useVersionRecovery } from './useVersionRecovery';
 // [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 — 충돌 refs/applier 배선
-import { type PendingOp, upsertById } from '@/lib/collab/conflict-resolution';
+import { type PendingOp, upsertById, isNewer } from '@/lib/collab/conflict-resolution';
 import { createTombstoneStore, type TombstoneStore } from '@/lib/collab/tombstone';
 import type { RealtimeApplier, ItemRow } from './useRealtimeBudget';
 
@@ -66,6 +66,11 @@ export function useMultipleBudgets() {
   const errorSeenRef = useRef(false);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); }, []);
+
+  // [CL-COEDIT-NUDGE-20260624-000000] 성공 편집 신호 — updateItem ACK 성공마다 +1.
+  //   개선2(파트너 2분 알림 트리거)·개선4(마일스톤 칭찬)가 동일 신호를 구독(단일 신호원, 중복 인프라 0).
+  const editSignalRef = useRef(0);
+  const [editSignal, setEditSignal] = useState(0);
 
   // [CL-HOME-FIX-20260315-120000] 가드 ref — 중복 fetch/생성 방지
   const isCreatingRef = useRef(false);
@@ -515,16 +520,26 @@ export function useMultipleBudgets() {
 
       if (error) throw error;
 
+      // [CL-COEDIT-NUDGE-20260624-000000] 성공 편집 1건 → 신호 +1 (개선2 알림 트리거 + 개선4 칭찬 마일스톤 구독)
+      editSignalRef.current += 1;
+      setEditSignal(editSignalRef.current);
+
       const serverUpdatedAt = (data as { updated_at?: string } | null)?.updated_at;
       if (serverUpdatedAt) {
-        localUpdatedAtRef.current.set(itemId, serverUpdatedAt); // 단조 게이트 기지값
+        // [CL-VULN-V8-ACK-MONOTONIC-20260624-000000] ACK 도 실시간과 동일한 단조 게이트(isNewer)를 거친다.
+        //  ackedUpdatedAt 기록은 게이트 밖에서 항상 수행(내 쓰기의 실시간 자기에코 억제는 유지),
+        //  단 known/updated_at '전진'은 serverUpdatedAt 이 기지값보다 엄격히 새로울 때만.
+        //  (파트너의 더 최신 변경이 먼저 적용된 뒤 내 과거 ACK 가 와도 LWW 역전·known 후퇴를 차단.)
         const p = pendingWritesRef.current.get(itemId);
-        if (p) p.ackedUpdatedAt = serverUpdatedAt;               // 에코 ack 일치
-        setItems(prev =>
-          prev.map(item =>
-            item.id === itemId ? ({ ...item, updated_at: serverUpdatedAt }) : item
-          )
-        );
+        if (p) p.ackedUpdatedAt = serverUpdatedAt;               // 에코 ack 일치(항상 기록)
+        if (isNewer(serverUpdatedAt, localUpdatedAtRef.current.get(itemId))) {
+          localUpdatedAtRef.current.set(itemId, serverUpdatedAt); // 단조 게이트 기지값(전진만)
+          setItems(prev =>
+            prev.map(item =>
+              item.id === itemId ? ({ ...item, updated_at: serverUpdatedAt }) : item
+            )
+          );
+        }
       }
 
       // 4) budget updated_at 갱신 → 최근 편집 옵션 우선 표시
@@ -1177,6 +1192,8 @@ export function useMultipleBudgets() {
     loading,
     // [CL-ANIM-UPGRADE-20260621-150000] 앰비언트 저장 상태
     saveState,
+    // [CL-COEDIT-NUDGE-20260624-000000] 성공 편집 누계 신호(개선2 알림·개선4 칭찬 구독원)
+    editSignal,
     createNewBudget,
     copyBudget,
     renameBudget,

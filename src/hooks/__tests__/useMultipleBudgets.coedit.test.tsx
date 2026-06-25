@@ -414,6 +414,34 @@ describe('useMultipleBudgets.realtimeApplier (실시간 적용)', () => {
 
     expect(result.current.items.find(i => i.id === 'i1')?.amount).toBe(1);
   });
+
+  // [CL-VULN-V8-ACK-MONOTONIC-20260624] updateItem 의 ACK 경로도 단조 게이트(isNewer)를 거쳐야 한다.
+  //  과거엔 .select().single() 의 serverUpdatedAt 을 무조건 채택 → 파트너의 더 최신 변경이 실시간으로
+  //  먼저 적용된 뒤 내 느린 PATCH 의 과거 ACK 가 도착하면 updated_at/known 이 역전(LWW 깨짐)됐다.
+  it('V8 stale ACK(과거 updated_at)는 이미 적용된 최신 파트너 updated_at 을 역전시키지 않는다', async () => {
+    const T1 = '2026-06-20T01:00:00.000Z'; // 내 PATCH ACK(과거)
+    const T2 = '2026-06-20T02:00:00.000Z'; // 파트너 실시간(최신, 먼저 적용됨)
+    installFrom({ itemAck: { data: { id: 'i1', updated_at: T1 }, error: null } });
+    const { result } = renderHook(() => useMultipleBudgets());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // 파트너의 최신 변경이 실시간으로 먼저 적용됨: 항목 updated_at=T2 + known=T2
+    act(() => {
+      result.current.realtimeApplier.onUpsert({ ...mkItem('i1'), updated_at: T2, amount: 200 } as ItemRow);
+      result.current.realtimeApplier.setKnownUpdatedAt('i1', T2);
+    });
+    expect((result.current.items.find(i => i.id === 'i1') as { updated_at?: string }).updated_at).toBe(T2);
+
+    // 직후 내 느린 PATCH 의 ACK(T1<T2) 도착 → 단조 게이트로 역전 차단되어야 함
+    await act(async () => {
+      await result.current.updateAmount('wedding-hall', 'sub-i1', 555);
+    });
+
+    // updated_at 은 T2 유지(버그면 T1 으로 후퇴) — LWW 단조 불변
+    expect((result.current.items.find(i => i.id === 'i1') as { updated_at?: string }).updated_at).toBe(T2);
+    // 내가 입력한 값 자체는 낙관 반영(555)
+    expect(result.current.items.find(i => i.id === 'i1')?.amount).toBe(555);
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────

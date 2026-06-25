@@ -704,6 +704,11 @@ export type Database = {
         Args: Record<string, never>
         Returns: { source: string; users: number }[]
       }
+      // [CL-ACQ-VISIT-20260623-230113] 방문 기준 유입 집계(관리자) — 기간 내 page_views.utm_source
+      admin_visit_source_breakdown: {
+        Args: { p_start: string; p_end: string }
+        Returns: { source: string; visits: number }[]
+      }
       // [CL-PARTNER-1TO1-20260622-233012] 내 파트너(닉네임+이메일) / 파트너 해지 / 예산 자동공유
       get_my_partner: {
         Args: Record<string, never>

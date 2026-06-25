@@ -35,6 +35,8 @@ interface UseAdminKPIResult {
   impactSummary: ImpactSummary;
   /** [CL-ACQ-ADMIN-20260622-233012] 유입경로 집계(가입자 기준). RPC 미배포/비관리자 시 빈 배열 */
   acquisitionData: AcquisitionDatum[];
+  /** [CL-ACQ-VISIT-20260623-230113] 유입경로 집계(방문 기준, 기간 내 매 방문). RPC 미배포 시 빈 배열 */
+  visitSourceData: AcquisitionDatum[];
   loading: boolean;
   error: string | null;
   fetchData: (startDate: Date, endDate: Date) => Promise<void>;
@@ -80,6 +82,7 @@ export function useAdminKPI(): UseAdminKPIResult {
     avgHiddenCostsIdentified: 0, totalContingencyFund: 0, categoryBreakdown: [],
   });
   const [acquisitionData, setAcquisitionData] = useState<AcquisitionDatum[]>([]);
+  const [visitSourceData, setVisitSourceData] = useState<AcquisitionDatum[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,6 +118,18 @@ export function useAdminKPI(): UseAdminKPIResult {
       const endISO = endDate.toISOString();
       // [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 누적 baseline 컷오프를 첫 일별 버킷 시작과 정렬(경계 갭 제거)
       const cumulativeBaselineISO = firstTrendBucketStart(endDate, periodDays).toISOString();
+
+      // [CL-ACQ-VISIT-20260623-230113] 방문 기준 유입(기간 내) — 메인 배치와 병렬 시작, RPC 미배포 시 [] degrade. {visits}→{users} 매핑(렌더 재사용).
+      const visitSourcePromise: Promise<AcquisitionDatum[]> = (async () => {
+        try {
+          const r = await supabase.rpc('admin_visit_source_breakdown', { p_start: startISO, p_end: endISO });
+          return !r.error && Array.isArray(r.data)
+            ? (r.data as Array<{ source: string; visits: number }>).map((d) => ({ source: d.source, users: d.visits }))
+            : [];
+        } catch {
+          return [];
+        }
+      })();
       const prevStartISO = prevStart.toISOString();
       const prevEndISO = prevEnd.toISOString();
 
@@ -430,6 +445,8 @@ export function useAdminKPI(): UseAdminKPIResult {
 
       // [CL-ACQ-ADMIN-20260622-233012] 유입경로 집계 반영(개선1)
       setAcquisitionData(await acquisitionPromise);
+      // [CL-ACQ-VISIT-20260623-230113] 방문 기준 유입경로 반영
+      setVisitSourceData(await visitSourcePromise);
 
       // ─── Phase 4-A: 경제적 파급 효과 계산 ───
       try {
@@ -471,5 +488,5 @@ export function useAdminKPI(): UseAdminKPIResult {
     }
   }, []);
 
-  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, loading, error, fetchData };
+  return { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, visitSourceData, loading, error, fetchData };
 }

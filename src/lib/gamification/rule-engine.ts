@@ -44,6 +44,11 @@ export function evaluateBadgeRule(
         ctx.days_before_wedding >= 0 &&
         ctx.days_before_wedding <= rule.max_days_before
       );
+    // [CL-GAMIFY-COEDIT-20260623-230113] 공동편집(개선2·3)
+    case 'coedit_nudges_sent':
+      return ctx.coedit_nudges_sent >= rule.threshold;
+    case 'partner_reviews':
+      return ctx.partner_reviews >= rule.threshold;
     default: {
       // 컴파일 타임에 모든 type을 커버하는지 검증
       const _exhaustive: never = rule;
@@ -89,6 +94,8 @@ export function emptyBadgeEvaluationContext(): BadgeEvaluationContext {
     login_streak_days: 0,
     checklist_streak_days: 0,
     days_before_wedding: null,
+    coedit_nudges_sent: 0,
+    partner_reviews: 0,
     already_unlocked_slugs: [],
   };
 }

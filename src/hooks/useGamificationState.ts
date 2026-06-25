@@ -14,6 +14,9 @@ import {
   pointsToNextLevel,
 } from '@/lib/gamification/types';
 
+/** [CL-VULN-V3] 증분 안전 대상 숫자 필드(누적 read-modify-write). */
+type IncrementableKey = 'total_points' | 'coedit_nudges_sent' | 'partner_reviews';
+
 /** profiles.gamification_state JSONB를 타입-safe하게 병합 */
 function mergeGamificationState(
   partial: Partial<GamificationState> | null | undefined,
@@ -25,6 +28,27 @@ export function useGamificationState() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const userId = user?.id ?? null;
+  // 모든 게이미피케이션 write 를 동일 스코프로 직렬화(증분·절대·배지append 간 cross-mutation 경합 제거).
+  const gamifyScope = `gamificationState:${userId ?? 'anon'}`;
+
+  // [CL-VULN-R6A-COLDCACHE-20260625-000000] write 의 base 해석 — 캐시 로드됐으면 그대로,
+  //  미로드면 DB 최신값을 fetch 해 base 로 쓴다. 절대 DEFAULT 로 떨어져 JSONB 전체를 덮어쓰지 않는다
+  //  (캐시 cold 구간에 increment/append/update 가 호출되면 스트릭·배지·퀘스트가 영구 유실되던 impact-5 결함 차단).
+  //  행이 정말 없을 때(신규 유저)만 DEFAULT. 읽기 실패 시 throw → 쓰기 중단(클로버보다 안전, onError 처리).
+  const resolveBase = useCallback(async (): Promise<GamificationState> => {
+    if (!userId) return DEFAULT_GAMIFICATION_STATE;
+    const cached = qc.getQueryData<GamificationState>(['gamificationState', userId]);
+    if (cached) return cached;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('gamification_state')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    const fetched = mergeGamificationState(data?.gamification_state as Partial<GamificationState> | null);
+    qc.setQueryData(['gamificationState', userId], fetched); // 캐시 시드
+    return fetched;
+  }, [userId, qc]);
 
   const query = useQuery({
     queryKey: ['gamificationState', userId],
@@ -45,12 +69,11 @@ export function useGamificationState() {
   });
 
   const mutation = useMutation({
+    scope: { id: gamifyScope },
     mutationFn: async (updates: Partial<GamificationState>) => {
       if (!userId) throw new Error('not authenticated');
-      const current = qc.getQueryData<GamificationState>([
-        'gamificationState',
-        userId,
-      ]) ?? DEFAULT_GAMIFICATION_STATE;
+      // [CL-VULN-R6A] 캐시 미로드 시 DEFAULT 가 아니라 DB 최신값을 base 로(전체 JSONB 클로버 방지)
+      const current = await resolveBase();
       const next = { ...current, ...updates };
       // 레벨 자동 계산
       next.level = calculateLevel(next.total_points);
@@ -88,29 +111,77 @@ export function useGamificationState() {
     },
   });
 
+  // [CL-VULN-V3-GAMIFY-RACE-20260624-000000] 증분(delta) mutation — 절대값 클로버로 인한 lost-update 근본수정.
+  //  ① mutationFn 이 '매 실행마다' 최신 캐시(qc.getQueryData)를 base 로 read-modify-write → 클로저 스냅샷 비의존.
+  //  ② scope.id 로 동일 유저 mutation 을 '직렬화'(이전 settle 후 다음 실행) → 동시/연속 증분도 누적 보존.
+  //  ③ setQueryData 로 캐시 즉시 반영(다음 직렬 증분의 base) + DB 영속.
+  const incrementMutation = useMutation({
+    scope: { id: gamifyScope },
+    mutationFn: async (w: { deltas?: Partial<Record<IncrementableKey, number>>; addSlugs?: ReadonlyArray<string> }) => {
+      if (!userId) throw new Error('not authenticated');
+      // [CL-VULN-R6A] 캐시 미로드 시 DB 최신값을 base 로(DEFAULT 클로버 금지). 직렬 다음 write 의 fresh base 도 됨.
+      const current = await resolveBase();
+      // 증분 대상 숫자 필드만 최신 base 기준으로 누적 → 나머지 필드는 current 보존(부분 클로버 방지).
+      const overrides: Partial<Record<IncrementableKey, number>> = {};
+      if (w.deltas) {
+        (Object.keys(w.deltas) as IncrementableKey[]).forEach((k) => {
+          const d = w.deltas![k];
+          if (typeof d === 'number' && Number.isFinite(d)) {
+            overrides[k] = ((current[k] as number) ?? 0) + d;
+          }
+        });
+      }
+      const next = { ...current, ...overrides }; // 이중 스프레드(기존 mutation 과 동일 — Json 할당성 유지)
+      // 배지 합집합도 mutationFn 안에서 fresh base 기준으로 병합(append 의 stale 클로버 차단).
+      if (w.addSlugs && w.addSlugs.length > 0) {
+        next.unlocked_badge_slugs = Array.from(new Set([...current.unlocked_badge_slugs, ...w.addSlugs]));
+      }
+      next.level = calculateLevel(next.total_points);
+      qc.setQueryData(['gamificationState', userId], next); // 직렬 다음 증분의 fresh base
+      const { error } = await supabase
+        .from('profiles')
+        .update({ gamification_state: next })
+        .eq('user_id', userId);
+      if (error) throw error;
+      return next;
+    },
+    onSettled: () => {
+      if (userId) qc.invalidateQueries({ queryKey: ['gamificationState', userId] });
+    },
+  });
+
   const state = query.data ?? DEFAULT_GAMIFICATION_STATE;
   const nextLevelPoints = useMemo(
     () => pointsToNextLevel(state.total_points),
     [state.total_points],
   );
 
+  /** 숫자 필드 증분(누적 안전). total_points/coedit_nudges_sent/partner_reviews. */
+  const increment = useCallback(
+    (deltas: Partial<Record<IncrementableKey, number>>) => {
+      if (!deltas || Object.keys(deltas).length === 0) return;
+      incrementMutation.mutate({ deltas });
+    },
+    [incrementMutation],
+  );
+
   const addPoints = useCallback(
     (amount: number) => {
       if (!Number.isFinite(amount) || amount <= 0) return;
-      mutation.mutate({ total_points: state.total_points + amount });
+      // [CL-VULN-V3] 절대값(state.total_points+amount) 대신 증분 → 동시 보상 lost-update 제거
+      increment({ total_points: amount });
     },
-    [mutation, state.total_points],
+    [increment],
   );
 
   const appendUnlockedBadgeSlugs = useCallback(
     (slugs: ReadonlyArray<string>) => {
       if (slugs.length === 0) return;
-      const merged = Array.from(
-        new Set([...state.unlocked_badge_slugs, ...slugs]),
-      );
-      mutation.mutate({ unlocked_badge_slugs: merged });
+      // [CL-VULN-R6A] 합집합은 mutationFn 안에서 'fresh base(DB 최신)' 기준으로 수행 —
+      //  여기서 state(캐시, 미로드면 DEFAULT) 기반 pre-merge 하면 기존 배지를 통째로 덮어쓴다(클로버).
+      incrementMutation.mutate({ addSlugs: slugs });
     },
-    [mutation, state.unlocked_badge_slugs],
+    [incrementMutation],
   );
 
   return {
@@ -122,6 +193,7 @@ export function useGamificationState() {
     update: mutation.mutate,
     updateAsync: mutation.mutateAsync,
     addPoints,
+    increment,
     appendUnlockedBadgeSlugs,
   };
 }

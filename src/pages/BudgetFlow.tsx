@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
@@ -65,6 +65,11 @@ import { useCollaboration } from '@/hooks/useCollaboration';
 import { NicknameDialog } from '@/components/collaboration/NicknameDialog';
 import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
 import { useToast } from '@/hooks/use-toast'; // [CL-AUDIT-R3-SHARE-20260623-000000] 자동공유 실패 안내
+// [CL-COEDIT-NUDGE-20260624-000000] 개선2/3/4: 파트너 2분 편집 알림 · 오프라인 변경 시머 · 회전 칭찬
+import { usePartnerEditNotifier } from '@/hooks/usePartnerEditNotifier';
+import { useGamificationState } from '@/hooks/useGamificationState';
+import { computeChangedSince, lastSeenKey, HIGHLIGHT_HOLD_MS, maxUpdatedAt } from '@/lib/collab/changed-since';
+import { crossedMilestone, makePraiseBag, type PraiseBag } from '@/lib/praise-messages';
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
@@ -100,6 +105,8 @@ export default function BudgetFlow() {
     getBudgetsForComparison,
     // [CL-ANIM-UPGRADE-20260621-150000] 앰비언트 저장 상태
     saveState,
+    // [CL-COEDIT-NUDGE-20260624-000000] 성공 편집 누계 신호(개선2 알림 + 개선4 칭찬 단일 신호원)
+    editSignal,
     // [CL-COEDIT-E2E-20260620-130000] 실시간 공동편집 applier
     realtimeApplier,
     // New snapshot/reset functions
@@ -160,6 +167,113 @@ export default function BudgetFlow() {
     try { localStorage.setItem(guard, '1'); } catch { /* noop */ }
     setOwnNickOpen(true);
   }, [mode, user, meUserId, meDisplayName]);
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // [CL-COEDIT-NUDGE-20260624-000000] 개선2·3·4 배선 — 모두 degrade-safe(키/마이그 미배포여도 앱 무영향).
+  //   2) 파트너 2분 연속 편집 → notify-partner(이메일, 서버가 1일1회·글로벌캡 강제)
+  //   3) 재접속 시 부재 중 파트너 변경분 시머 강조(3분 유지 후 자동 소거)
+  //   4) 적극 편집자 마일스톤 칭찬(회전 토스트 + 소량 점수)
+  // ────────────────────────────────────────────────────────────────────────────
+  // [CL-VULN-V3-GAMIFY-RACE-20260624] increment(델타)로 보상 — 절대값(클로저 스냅샷) lost-update 제거.
+  const { addPoints, increment } = useGamificationState();
+  // '우리' 모드 + 현재 파트너 존재 시에만 알림·강조 활성(개인 모드/무파트너 → 완전 미동작)
+  const partnerPresent = mode === 'shared' && !!collaboration.myPartner;
+
+  // 개선2: editSignal(성공 편집 누계)을 구독 → 2분 세션 감지 시 Edge Function 1회 호출
+  usePartnerEditNotifier({
+    editSignal,
+    active: partnerPresent,
+    budgetId: activeBudget?.id ?? null,
+    onNudged: () => {
+      // 게이미피케이션: 파트너 소환 누계 + 보상(증분 누적·직렬화 — 동시 보상 유실 없음). 배지는 Profile catch-up.
+      increment({ coedit_nudges_sent: 1, total_points: 5 });
+    },
+  });
+
+  // 개선3: 부재 중 파트너 변경분 시머 강조 — 예산당 1회 스냅샷, 3분 유지 후 자동 소거.
+  const [changedItemIds, setChangedItemIds] = useState<Set<string>>(() => new Set());
+  const snapshotBudgetRef = useRef<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // (a) 예산 전환/언마운트 → 이전 강조 즉시 제거 + 타이머 정리 + 재스냅샷 허용(고아 setState 방지)
+  useEffect(() => {
+    snapshotBudgetRef.current = null;
+    setChangedItemIds(new Set());
+    if (highlightTimerRef.current) { clearTimeout(highlightTimerRef.current); highlightTimerRef.current = null; }
+    return () => {
+      if (highlightTimerRef.current) { clearTimeout(highlightTimerRef.current); highlightTimerRef.current = null; }
+    };
+  }, [activeBudgetId]);
+
+  // (b) 활성 예산 items 로드 완료 시 1회 스냅샷(스위치 직후 stale items 레이스는 budget_id 가드로 차단)
+  useEffect(() => {
+    if (!partnerPresent || !activeBudgetId) return;
+    if (items.length === 0 || items[0].budget_id !== activeBudgetId) return;
+    if (snapshotBudgetRef.current === activeBudgetId) return; // 예산당 1회
+    snapshotBudgetRef.current = activeBudgetId;
+
+    let lastSeen: string | null = null;
+    try { lastSeen = localStorage.getItem(lastSeenKey(activeBudgetId)); } catch { /* noop */ }
+    const changed = computeChangedSince(items, lastSeen);
+    // [CL-VULN-V6-LASTSEEN-MAX-20260624] last-seen 을 now 가 아니라 '스냅샷 항목의 max(updated_at)'로 전진
+    //  (역행 금지: 기존 lastSeen 과 비교해 더 큰 값). 그래야 스냅샷 직후 도착한 더 늦은 파트너 변경이
+    //  다음 open 에서 strict-> 게이트를 통과해 보존된다(now 전진은 그 사이 변경을 영구 유실).
+    const snapMax = maxUpdatedAt(items);
+    if (snapMax) {
+      const advanceTo =
+        lastSeen && Date.parse(lastSeen) > Date.parse(snapMax) ? lastSeen : snapMax;
+      try { localStorage.setItem(lastSeenKey(activeBudgetId), advanceTo); } catch { /* noop */ }
+    }
+
+    if (changed.size > 0) {
+      setChangedItemIds(changed);
+      // 게이미피케이션: 파트너 변경 확인 누계 + 보상(증분 누적 — 동시 보상 유실 없음)
+      increment({ partner_reviews: 1, total_points: 3 });
+      // 3분 유지 후 클래스 제거 → CSS transition 으로 부드럽게 fade-out
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = setTimeout(() => {
+        setChangedItemIds(new Set());
+        highlightTimerRef.current = null;
+      }, HIGHLIGHT_HOLD_MS);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partnerPresent, activeBudgetId, items]);
+
+  // 개선3 보강: 내 편집마다 내 last-seen 을 전진시킨다 → 재방문 시 '내 편집'을 파트너 변경분으로 오강조하지 않음.
+  //   (부재 = 내가 편집 안 함 → lastSeen 정지 → 그 사이 파트너 변경분만 다음 open 에서 강조됨.)
+  //   editSignal 은 '활성 예산에 대한 내 성공 편집'에서만 +1 → 전환 시엔 미발화(스냅샷 effect 와 무경합).
+  // [CL-VULN-R6D-LASTSEEN-MONO-20260625] 스냅샷 effect(maxUpdatedAt)와 동일하게 '역행 금지(단조)' 가드 적용.
+  //   클라 시계가 서버보다 느리면 무가드 now 쓰기가 lastSeen 을 후퇴시켜 파트너 변경분이 재강조·중복보상되던 문제 차단.
+  useEffect(() => {
+    if (!partnerPresent || !activeBudgetId || editSignal === 0) return;
+    try {
+      const key = lastSeenKey(activeBudgetId);
+      const prev = localStorage.getItem(key);
+      const nowISO = new Date().toISOString();
+      // 더 큰(최신) 값으로만 전진 — 역행 금지(클라 시계 스큐로 인한 lastSeen 후퇴 차단)
+      if (!prev || Date.parse(nowISO) > Date.parse(prev)) {
+        localStorage.setItem(key, nowISO);
+      }
+    } catch { /* noop */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSignal]);
+
+  // 개선4: 마일스톤마다 회전 칭찬 토스트(은은) + 소량 점수. 매 편집이 아니라 점증 간격 → 피로 최소.
+  const praiseBagRef = useRef<PraiseBag | null>(null);
+  if (!praiseBagRef.current) praiseBagRef.current = makePraiseBag();
+  const lastPraisedRef = useRef(0);
+  useEffect(() => {
+    if (editSignal === 0) return;
+    // [CL-VULN-V9-MILESTONE-CROSS-20260624] 정확일치 대신 '범위 통과' — 배치 리렌더로 editSignal 이
+    //  마일스톤을 건너뛰어도(예: 6→8) 누락 없이 1회 보상. lastPraisedRef 는 '마지막 평가한 editSignal'.
+    const crossed = crossedMilestone(lastPraisedRef.current, editSignal);
+    lastPraisedRef.current = editSignal; // 다음 비교 base (통과 여부와 무관하게 항상 전진)
+    if (crossed === null) return;
+    const msg = praiseBagRef.current!.next();
+    toast({ title: `${msg.emoji} ${msg.title}`, description: msg.description });
+    addPoints(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editSignal]);
 
   // [CL-COEDIT-COPY-20260622-233012] 개선2+3: '복사하여 공동편집'은 탭 무관하게 항상 '우리' 옵션(shared:true)을 만든다.
   //  (기존 버그: shared 미전달 → 복사본이 개인탭에 떨어져 "우리로 안 됨".) 생성 후 우리탭 전환 +
@@ -653,6 +767,7 @@ export default function BudgetFlow() {
                 onCostSplitChange={updateCostSplit}
                 onAddCustomItem={addCustomItem}
                 onDeleteItem={deleteItem}
+                changedItemIds={changedItemIds}
               />
             ) : (
               <>
@@ -666,6 +781,7 @@ export default function BudgetFlow() {
                     onCostSplitChange={updateCostSplit}
                     onAddCustomItem={addCustomItem}
                     onDeleteItem={deleteItem}
+                    changedItemIds={changedItemIds}
                   />
                 </div>
 

@@ -332,3 +332,27 @@ describe('BudgetTable 안정성', () => {
     expect(true).toBe(true);
   });
 });
+
+// [CL-VULN-R6C-A11Y-20260625] 파트너 변경 강조가 '색상 단독'이 아니라 텍스트 단서도 동반(WCAG 1.4.1·색맹/SR 가시).
+describe('BudgetTable 파트너 변경 비색상 단서 (R6-C)', () => {
+  it('R6-C changedItemIds 에 든 행에 "파트너 변경" 텍스트 단서가 표시된다', () => {
+    const h = makeHandlers();
+    renderWithProviders(
+      <BudgetTable
+        items={[baseItem({ id: 'it-venue' })]}
+        onAmountChange={h.onAmountChange}
+        onTogglePaid={h.onTogglePaid}
+        onNotesChange={h.onNotesChange}
+        changedItemIds={new Set(['it-venue'])}
+      />,
+      { route: '/budget' },
+    );
+    expect(within(rowFor('대관료')).getByText('파트너 변경')).toBeInTheDocument();
+  });
+
+  it('R6-C2 changedItemIds 가 비면 단서 미표시(노이즈 0)', () => {
+    const h = makeHandlers();
+    renderTable([baseItem({ id: 'it-venue' })], h);
+    expect(screen.queryByText('파트너 변경')).toBeNull();
+  });
+});

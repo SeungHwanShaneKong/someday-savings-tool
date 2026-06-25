@@ -7,6 +7,34 @@
 
 ## 최신
 
+### [CL-VULN-AUDIT-R6-20260625] 사전-배포 적대 감사 — 6건 근본수정(데이터유실 차단 포함) + 배포 게이트
+- **맥락**: R5 이후 신규 변경(저장됨 인디케이터)+전체 미커밋 페이로드를 '커밋/푸시/배포 직전' 적대 감사. 14후보→8확정→6 distinct.
+- **A [impact5·최우선] 게이미피케이션 캐시 미로드 클로버**: `increment/append/update` 가 base 를 `qc.getQueryData ?? DEFAULT` 로 잡아, 쿼리 로드 前(BudgetFlow 스냅샷 effect 가 mount 직후 increment 호출) 호출되면 gamification_state JSONB '전체'를 DEFAULT+delta 로 덮어써 **스트릭·배지·퀘스트 영구 유실**. 근본수정 = `resolveBase()`(캐시→없으면 DB 최신 fetch→행없을때만 DEFAULT) 공유 + 배지 합집합을 mutationFn 안에서 fresh base 기준으로 수행 + 모든 write 동일 scope 직렬화. red→green(cold-cache repro: pending-first maybeSingle).
+- **B Resend 샌드박스 발신자**: `from: onboarding@resend.dev` 하드코딩 → 라이브에서 임의 수신자 403 → reserve-before-send 가 슬롯만 태우고 0% 발송. 근본수정 = `NOTIFY_FROM` env 외부화 + `isUnverifiedSharedSender` 가드로 미인증/샌드박스면 **예약 전에** `no_sender_domain` degrade(슬롯 미소진) + 403/422(설정성)면 예약행 회수(같은날 재발송 가능), 5xx 만 fail-closed.
+- **C 색상 단독 강조(WCAG 1.4.1)**: 파트너 변경행이 amber 틴트만 → 색맹/SR 비가시 + reduced-motion 시 시머 그라디언트 정적 잔존. 근본수정 = "파트너 변경" 텍스트 단서(아이콘+텍스트) 양 테이블 추가 + reduced-motion 에 `.partner-changed-row{background-image:none}`.
+- **D last-seen 클라 now 무가드**: 내 편집 effect 가 `now` 로 무가드 갱신 → 클라 시계 스큐로 lastSeen 후퇴 → 파트너 변경 재강조/중복보상. 근본수정 = 스냅샷 effect 와 동일 '역행 금지(단조)' 가드.
+- **E notify_day 스키마 미준비**: 마이그 130000 미적용 상태 배포 시 42703 → 500 폭주. 근본수정 = `mapReserveError`(42703/42P01→`schema_not_ready` 200 degrade) + 배포 순서 게이트 문서화(deployment.md).
+- **F 글로벌 캡 TOCTOU [수용]**: 100통/일 글로벌 캡은 check-then-act(비원자) — 서로 다른 페어 동시 invoke 시 미미 초과. impact/likelihood=1, per-pair 는 hard(유니크). **수용된 잔여 리스크**로 문서화(엄격 강제는 일별 카운터 RPC 필요, 사용자 적용).
+- **Edge/DB 테스트 전략**: Edge 결정/살균 로직을 순수 모듈 `_shared/notify-logic.ts` 로 추출(isUnverifiedSharedSender·isConfigErrorStatus·mapReserveError 추가)해 vitest red→green. 실 동시성·실발송은 사용자 라이브(마이그+NOTIFY_FROM+키+배포).
+- **신규 마이그**: `20260624130000_partner_notifications_hardening.sql`(notify_day+부분유니크). **교훈**: 워크플로 서브에이전트가 '읽기 전용' 지시를 어기고 working tree 에 probe 테스트 파일을 쓸 수 있음 → 커밋/스위트 전 stray 파일 전수 sweep 필수(git status `??` + find).
+- **검증**: tsc `-b` 0 · vitest **925**(R6 신규 8)×3 결정론 · build 19라우트 · secret 0 · 독립 verifier.
+
+### [CL-VULN-AUDIT-R5-20260624] 적대적 취약점 감사 — 치명 10건 근본수정(red→green) + 회귀 0
+- **방법**: 멀티에이전트 발견 워크플로(5차원×파인더 → 적대 검증관 dedup·재판정) 로 36후보→27확정→**10 distinct 근본원인**(임팩트×발생가능성 정렬). 각 건 '재현 테스트(red)→근본수정→green', 마지막 전수 스위트(917×3)+독립 verifier(생성≠검증) GO.
+- **10건 요지(근본수정)**: ①알림 미발송(no_provider/rate_limited)에도 보상 지급 → 클라가 서버 `sent===true` 단일 신뢰원천으로 게이트(usePartnerEditNotifier). ②레이트리밋 TOCTOU → **reserve-before-send**(partner_notifications 부분 유니크 `uq_partner_notif_pair_day` + 23505→rate_limited). ③게이미피케이션 lost-update(절대값 머지) → **increment(delta) read-modify-write + mutation scope 직렬화**(useGamificationState); BudgetFlow·**useBadgeUnlock** 보상까지 전부 increment 로 통일(절대값 클로버 잔존 0). ④budgetId 미검증 → `coerceBudgetId`(UUID)+소유/협업 확인 null 강등. ⑤발송실패 재시도 폭주 → reserve-before-send + **fail-closed**(예약 유지). ⑥재접속 last-seen 을 now 가 아닌 `maxUpdatedAt(스냅샷)`로 전진(늦게 온 파트너 변경 보존). ⑦onEdit 시계 역행 → 세션 재시작(영구 고착 방지). ⑧updateItem ACK 가 단조 게이트 우회 → `isNewer`로 게이트(에코 ack 기록은 게이트 밖 유지). ⑨마일스톤 정확일치 → `crossedMilestone` 범위통과(배치 리렌더 누락 0). ⑩이메일 제목/본문 미살균 → `escapeHtml`(5종)+`sanitizeHeaderText`(제어문자/개행).
+- **Edge/DB 테스트 전략(중요)**: Deno Edge·실 Postgres 는 vitest 불가 → 결정/살균/예약 로직을 **Deno-비종속 순수 모듈 `_shared/notify-logic.ts`** 로 추출(단일 진실원, Edge·vitest 공유)해 red→green. 동시성 TOCTOU 는 `DailyReservationLedger`(인메모리 유니크 모델)+`checkThenActAllowsSend`(버그 모델) 대조로 입증. **실 동시성/실발송은 마이그 적용+Edge 배포 후 사용자 라이브 검증**(정직 보고). 생성열 `GENERATED AS ((created_at AT TIME ZONE 'UTC')::date)` 는 immutable 아님 → 거부됨 → notify_day 는 일반 컬럼 + Edge 가 UTC 일자 명시 기록.
+- **RQ v5 동시 mutate 패턴**: 절대값 mutate 는 stale 클로저로 lost-update. 정답 = mutationFn 내 `qc.getQueryData` 최신 base 에 delta 누적 + `scope:{id}` 직렬화 + onMutate 이중적용 함정 회피(여기선 onMutate 생략·mutationFn 내 setQueryData 로 다음 직렬 base 갱신).
+- **검증**: tsc `-b` 0 · vitest **917**(신규 26)×3 결정론 · build:ssg 19라우트 · Resend 키 리터럴 0건 · 독립 verifier GO. **잔여(사용자)**: 마이그 130000 적용 + notify-partner 재배포 + RESEND 키.
+
+### [CL-COEDIT-NUDGE-20260624] 공동편집 리텐션 4종 — 방문유입·2분알림·오프라인시머·회전칭찬
+- **발생원인/목표**: 공동편집 리텐션·재방문 유도 + 운영 인사이트. ① 관리자 대시보드가 page_views 의 `referrer`/`utm_source`를 매 방문 저장하면서도 **first-touch 만 집계**(R4) → per-visit 유입 미가시 ② 부재 파트너 재유입 수단 전무(메일 0) ③ 재접속 시 파트너 변경분 비가시 ④ 적극 편집자 보상 부재.
+- **설계 핵심(순수로직 분리 → CI 검증 가능)**: 트리거·판정을 모두 **순수 함수**로 떼어내 단위테스트로 못박음 — `edit-session.onEdit(prev,now)`(2분 세션, idle 10분 리셋, 세션당 1회), `changed-since.computeChangedSince(items,lastSeen)`(`updated_at>lastSeen`=부재 중 파트너변경 추론, DB 컬럼 0추가), `praise-messages.makePraiseBag`(셔플백 무반복+사이클경계 비반복)·`isMilestone`(점증 간격 3,7,15,…). hook(`usePartnerEditNotifier`)은 `now` 주입 reducer 를 구독만 → fake-timer 로 완전 결정론 테스트.
+- **단일 신호원**: `useMultipleBudgets.updateItem` 성공부(`if(error)throw` **이후**)에서만 `editSignal++` → 개선2(알림)·개선4(칭찬)가 **하나의 신호**를 공유(중복 인프라 0). 실패 편집은 미카운트.
+- **degrade-safe 전면**: 신규 RPC/마이그/Resend 키 **미배포여도 앱 무영향** — visit RPC 부재→`[]`, `RESEND_API_KEY` 부재→`skipped:'no_provider'` 무발송. 마이그는 `IF NOT EXISTS`/`CREATE OR REPLACE`/`ON CONFLICT DO NOTHING` 멱등.
+- **개선3 시머 자가강조 함정(P2 수정)**: `updated_at>lastSeen`만으로는 **내 편집 → 다른 탭 → 복귀** 시 내 변경분이 '파트너 변경'으로 오강조됨. 해결 = **내 편집(editSignal++)마다 내 `lastSeen` 전진**(부재=내가 편집 안 함 → lastSeen 정지 → 그 사이 파트너 변경만 다음 open 강조). effect dep=`[editSignal]`만 둬서 예산전환 스냅샷 effect 와 무경합(전환은 editSignal 불변 → 미발화). 3분 유지 후 setTimeout 으로 class 제거 → CSS `transition` fade-out, 타이머는 전환/언마운트 시 clear.
+- **알려진 한계(P2, 비차단·후속)**: 게이미피케이션 점수는 `useGamificationState` 의 낙관적 절대값 머지라 **동일 틱 다중 부여 시 lost-update** 가능(장식적). 근본수정=서버 RPC 증분 또는 함수형 업데이트(단, 낙관적 onMutate 와 mutationFn 이중적용 주의 — delta 를 양쪽에 적용하면 2배). 본 변경의 신규 회귀 아님(기존 `addPoints` 패턴 상속).
+- **검증**: tsc `-b` 0 · vitest **891**(신규 PEN/ES/CS/PM 19) ×3 결정론 · build:ssg 19라우트 · 독립 skeptical-verifier GO(키 유출 0·JWT·레이트리밋 per-pair1/글로벌100·RLS admin-only·exhaustive switch·optional prop 무파손 확인). **실발송·마이그 실거동·라이브 다중클라 동시성은 사용자 환경(키+마이그+2계정) 필요 → 정직 보고.**
+
 ### [CL-DOMAIN-PROMOTE-20260621] apex 도메인 승격 — 이원화/좀비 완전 해결
 - **발생원인**: GitHub Pages로 호스팅 이전 시 `wedsem.` 서브도메인만 연결하고 apex(`moderninsightspot.com`)는 옛 Lovable/Cloudflare 배포를 가리킨 채 방치 → apex가 **구 Supabase(tnbo+qllsuou)에 붙는 좀비 CSR**를 서빙(AdSense 등록지인데 빈약). 라이브 `curl`/번들 grep(pnfjw=0·lovable=3)으로 확정.
 - **해결**: **apex 승격** — 런타임이 전부 `window.location.origin`(호스트 무관)이라 ① Gabia에서 apex A레코드를 GitHub Pages(185.199.108~111.153)로 재지정(→좀비 DNS 단절) ② 리포 `public/CNAME`=apex ③ SEO/canonical 단일소스 `src/config/site.ts`(`SITE_ORIGIN`) 도입 후 7곳 전환(useSEO·Breadcrumb·articles·prerender·index.html·robots·sitemap) ④ Supabase Redirect URLs에 apex 추가. wedsem→apex는 GitHub Pages가 자동 301(CNAME=apex)이라 기존 링크 보존.

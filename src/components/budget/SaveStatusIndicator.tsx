@@ -25,10 +25,20 @@ export function SaveStatusIndicator({ state, className }: SaveStatusIndicatorPro
         </span>
       )}
       {state === 'saved' && (
-        /* [CL-ANIM-SAVE-DOPAMINE-20260622-233012] 저장됨 — 도파민 강화 팝(개선9). 실패는 차분한 save-pop 유지. */
-        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 animate-save-dopamine">
-          <Check className="w-3.5 h-3.5" aria-hidden />
+        /* [CL-ANIM-SAVE-DOPAMINE2-20260625-000000] 저장됨 — 성공 칩(스프링) + 시머 스윕 + 체크배지 팝 + 3입자 스파클.
+           '그 순간'에만 짧게 터지고 자가소멸(절제). reduced-motion 시 정적 칩만. 실패는 차분한 save-pop 유지. */
+        <span className="relative inline-flex items-center gap-1.5 save-success-pill text-emerald-700 dark:text-emerald-300 font-semibold">
+          <span aria-hidden className="save-shimmer" />
+          <span
+            aria-hidden
+            className="save-check-badge inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500 text-white shrink-0"
+          >
+            <Check className="w-2.5 h-2.5" strokeWidth={3.5} aria-hidden />
+          </span>
           저장됨
+          <span aria-hidden className="save-spark save-spark-1" />
+          <span aria-hidden className="save-spark save-spark-2" />
+          <span aria-hidden className="save-spark save-spark-3" />
         </span>
       )}
       {state === 'error' && (

@@ -55,6 +55,8 @@ interface BudgetTableProps {
   onAddCustomItem?: (categoryId: string, name: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
+  /** [CL-PARTNER-DIFF-20260624-000000] 재접속 시 파트너가 바꾼 항목 id — 시머 강조(개선3) */
+  changedItemIds?: Set<string>;
 }
 
 // Sortable category component that handles the dragging logic
@@ -139,7 +141,8 @@ export function BudgetTable({
   onRenameItem,
   onAddCustomItem,
   onDeleteItem,
-  onCostSplitChange
+  onCostSplitChange,
+  changedItemIds
 }: BudgetTableProps) {
   const {
     orderedCategories,
@@ -358,7 +361,7 @@ export function BudgetTable({
     const isRenamingThis = editingName === item.id;
     const displayName = item.custom_name || subCat.name;
     const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
-    return <TableRow key={cellKey} className={cn("hover:bg-muted/50 transition-colors", isFirstInCategory && "border-t-2 border-primary/10")}>
+    return <TableRow key={cellKey} className={cn("hover:bg-muted/50 transition-colors", isFirstInCategory && "border-t-2 border-primary/10", changedItemIds?.has(item.id) && "partner-changed-row")}>
         {subIndex === 0 && <TableCell rowSpan={totalRowsForCategory} className="font-semibold bg-secondary/50 align-top pt-2 sm:pt-4 px-1 sm:px-4">
             <div className="flex flex-col items-center gap-1">
               <div {...dragHandleProps?.attributes || {}} {...dragHandleProps?.listeners || {}} className="cursor-grab active:cursor-grabbing p-1.5 rounded-md hover:bg-primary/10 transition-all touch-none" title="드래그하여 순서 변경">
@@ -394,6 +397,13 @@ export function BudgetTable({
               </Button>
             </div> : <div className="flex items-center gap-1 group">
               <span className="break-keep text-[10px] sm:text-base">{displayName}</span>
+              {/* [CL-VULN-R6C-A11Y-20260625] 파트너 변경 비색상 단서 — 색맹/SR 가시(WCAG 1.4.1). amber 틴트만으로 전달 금지. */}
+              {changedItemIds?.has(item.id) && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap flex-shrink-0">
+                  <Sparkles className="w-2.5 h-2.5 flex-shrink-0" aria-hidden />
+                  파트너 변경
+                </span>
+              )}
               {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
                 <AverageCostTooltip categoryId={category.id} subCategoryId={subCat.id} />
               )}

@@ -37,7 +37,10 @@ export type BadgeUnlockRule =
   | { type: 'ai_queries_total'; threshold: number }
   | { type: 'login_streak_days'; threshold: number }
   | { type: 'checklist_streak_days'; threshold: number }
-  | { type: 'days_before_wedding_action'; max_days_before: number };
+  | { type: 'days_before_wedding_action'; max_days_before: number }
+  // [CL-GAMIFY-COEDIT-20260623-230113] 공동편집 게이미피케이션(개선2·3)
+  | { type: 'coedit_nudges_sent'; threshold: number }
+  | { type: 'partner_reviews'; threshold: number };
 
 /** user_earned_badges 테이블 row */
 export interface UserEarnedBadge {
@@ -60,6 +63,9 @@ export interface GamificationState {
   last_score_card_generated_at: string | null; // ISO
   unlocked_badge_slugs: string[];
   opt_in_phases: Array<'streak' | 'passport' | 'score_card' | 'leaderboard'>;
+  // [CL-GAMIFY-COEDIT-20260623-230113] 파트너에게 보낸 편집 알림(nudge) 누계 / 재접속 변경 확인 누계
+  coedit_nudges_sent: number;
+  partner_reviews: number;
 }
 
 /** 초기 상태 (모든 신규 사용자 기본값) */
@@ -75,6 +81,8 @@ export const DEFAULT_GAMIFICATION_STATE: GamificationState = {
   last_score_card_generated_at: null,
   unlocked_badge_slugs: [],
   opt_in_phases: ['streak', 'passport', 'score_card', 'leaderboard'],
+  coedit_nudges_sent: 0,
+  partner_reviews: 0,
 };
 
 /** 뱃지 unlock을 판정할 때 rule-engine에 전달하는 이벤트 스냅샷 */
@@ -95,6 +103,9 @@ export interface BadgeEvaluationContext {
   checklist_streak_days: number;
   /** 오늘 D-day까지 남은 일수 (wedding_date - today, 없으면 null) */
   days_before_wedding: number | null;
+  /** [CL-GAMIFY-COEDIT-20260623-230113] 파트너 편집 알림 누계 / 재접속 변경 확인 누계 */
+  coedit_nudges_sent: number;
+  partner_reviews: number;
   /** 이미 획득한 뱃지 slug 목록 (중복 지급 방지) */
   already_unlocked_slugs: string[];
 }

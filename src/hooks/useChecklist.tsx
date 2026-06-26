@@ -215,7 +215,10 @@ export function useChecklist() {
         if (newCompleted) {
           setStreak((prev) => prev + 1);
 
-          const completedCount = items.filter((i) => i.is_completed).length + 1;
+          // [CL-AUDIT-PRAISE-RACE-20260626] 마일스톤 비교는 effect가 덮어쓰는 previousCompletedRef 대신
+          //  토글 진입 시점의 클로저 완료수(pre-toggle)를 직접 사용 → effect 경쟁으로 칭찬이 억제되던 D5 제거.
+          const prevCompleted = items.filter((i) => i.is_completed).length;
+          const completedCount = prevCompleted + 1;
 
           // Check streak message
           const streakMsg = getStreakMessage(streak + 1);
@@ -228,7 +231,7 @@ export function useChecklist() {
 
           // Check praise milestone
           const praise = getPraiseForCount(completedCount);
-          const prevPraise = getPraiseForCount(previousCompletedRef.current);
+          const prevPraise = getPraiseForCount(prevCompleted);
           if (
             praise &&
             (!prevPraise || praise.minCompleted > prevPraise.minCompleted)
@@ -245,18 +248,9 @@ export function useChecklist() {
           setStreak(0);
         }
       } catch (error: unknown) {
-        // Revert optimistic update
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === itemId
-              ? {
-                  ...i,
-                  is_completed: !newCompleted,
-                  completed_at: !newCompleted ? new Date().toISOString() : null,
-                }
-              : i
-          )
-        );
+        // [CL-AUDIT-CHECKLIST-ROLLBACK-20260626] 낙관적 롤백은 토글 진입 시점의 원본 스냅샷(item)을 '그대로' 복원.
+        //  과거: completed_at 을 재계산(new Date())해 실패한 '완료 해제' 롤백 시 원본 완료시각이 파괴되던 D2.
+        setItems((prev) => prev.map((i) => (i.id === itemId ? item : i)));
         toast({
           title: '업데이트 실패',
           description: error instanceof Error ? error.message : String(error),

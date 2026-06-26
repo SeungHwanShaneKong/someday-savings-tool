@@ -429,12 +429,15 @@ export function calculateDueDate(
 
   // [CL-QUALITY-DATE-20260621] setMonth day-overflow 방지: 월말(29~31일) 결혼이 짧은 달로 롤포워드되어
   // due date 가 의도한 이전 달이 아닌 결혼과 같은 달로 붕괴하던 버그. day=1 로 내린 뒤 월 이동, 대상 월 마지막날로 clamp.
+  // [CL-AUDIT-DUEDATE-UTC-20260626] new Date('YYYY-MM-DD')는 UTC자정 파싱인데 getDate/setMonth(로컬)와
+  //  toISOString(UTC)를 혼용하면 음수 오프셋 타임존(예: America/*)에서 due_date가 하루/한달 어긋남.
+  //  전 구간 UTC 메서드로 통일 → 타임존 불변(저장값이 사용자 환경에 종속되지 않음).
   const dueDate = new Date(wedding);
-  const targetDay = dueDate.getDate();
-  dueDate.setDate(1);
-  dueDate.setMonth(dueDate.getMonth() - Math.round(monthOffset));
-  const lastDay = new Date(dueDate.getFullYear(), dueDate.getMonth() + 1, 0).getDate();
-  dueDate.setDate(Math.min(targetDay, lastDay));
+  const targetDay = dueDate.getUTCDate();
+  dueDate.setUTCDate(1);
+  dueDate.setUTCMonth(dueDate.getUTCMonth() - Math.round(monthOffset));
+  const lastDay = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth() + 1, 0)).getUTCDate();
+  dueDate.setUTCDate(Math.min(targetDay, lastDay));
 
   return dueDate.toISOString().split('T')[0];
 }

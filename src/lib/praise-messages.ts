@@ -55,6 +55,11 @@ export function makePraiseBag(
   messages: readonly PraiseMessage[] = PRAISE_MESSAGES,
   rng: () => number = Math.random,
 ): PraiseBag {
+  // [CL-AUDIT-PRAISE-EMPTY-20260626] 빈 입력이면 next()가 undefined를 PraiseMessage로 거짓 캐스트 →
+  //  소비자(.emoji/.title)가 런타임 TypeError. fail-fast 로 타입 거짓을 원천 차단(next()의 non-null 계약 보장).
+  if (messages.length === 0) {
+    throw new Error('makePraiseBag: messages must contain at least one PraiseMessage');
+  }
   let bag: PraiseMessage[] = [];
   let last: PraiseMessage | null = null;
 

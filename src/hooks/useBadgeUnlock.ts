@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useGamificationState } from '@/hooks/useGamificationState';
-import { evaluateBadgeUnlocks } from '@/lib/gamification/rule-engine';
+import { evaluateBadgeUnlocks, selectAwardableBadges } from '@/lib/gamification/rule-engine';
 import type {
   BadgeDefinition,
   BadgeEvaluationContext,
@@ -96,37 +96,38 @@ export function useBadgeUnlock() {
           ...ctx,
         };
 
-        const { newly_unlocked, total_points_gained } = evaluateBadgeUnlocks(
-          definitions,
-          fullCtx,
-        );
+        const { newly_unlocked } = evaluateBadgeUnlocks(definitions, fullCtx);
         if (newly_unlocked.length === 0) return;
 
-        // DB에 한 번에 INSERT
-        const inserts = newly_unlocked.map((b) => ({
-          user_id: userId,
-          badge_id: b.id,
-        }));
-        const { error } = await supabase
+        // [CL-AUDIT-BADGE-IDEMPOTENT-20260626] DB에 멱등 삽입: ON CONFLICT DO NOTHING(ignoreDuplicates) +
+        //  .select() 로 '실제로 삽입된 행'만 회수 → 이미 획득(중복) 배지는 반환되지 않는다.
+        //  과거: insert 가 duplicate 면 fall-through 해 total_points 를 재지급(영구 인플레이션) + 배치 원자롤백 시
+        //  미기록 배지에도 보상하던 버그. 이제 '실제 삽입된 badge_id' 에만 점수/슬러그/모달을 부여(selectAwardableBadges).
+        const inserts = newly_unlocked.map((b) => ({ user_id: userId, badge_id: b.id }));
+        const { data: insertedRows, error } = await supabase
           .from('user_earned_badges')
-          .insert(inserts);
+          .upsert(inserts, { onConflict: 'user_id,badge_id', ignoreDuplicates: true })
+          .select('badge_id');
         if (error) {
-          // UNIQUE 위반은 무시 (이미 다른 세션에서 unlock됨)
-          if (!error.message?.includes('duplicate')) {
-            console.error('[useBadgeUnlock] insert error:', error);
-            return;
-          }
+          console.error('[useBadgeUnlock] upsert error:', error);
+          return;
         }
 
+        const insertedIds = new Set(
+          ((insertedRows ?? []) as { badge_id: string }[]).map((r) => r.badge_id),
+        );
+        const { badges: awardable, total_points_gained: awardedPoints, slugs: awardedSlugs } =
+          selectAwardableBadges(newly_unlocked, insertedIds);
+        if (awardable.length === 0) return; // 전부 이미 획득 → 보상·모달 스킵(멱등)
+
         // gamification_state 업데이트 — 점수는 증분(lost-update 방지), 슬러그는 합집합 병합(멱등)
-        const newSlugs = newly_unlocked.map((b) => b.slug);
-        if (total_points_gained > 0) increment({ total_points: total_points_gained });
-        appendUnlockedBadgeSlugs(newSlugs);
+        if (awardedPoints > 0) increment({ total_points: awardedPoints });
+        appendUnlockedBadgeSlugs(awardedSlugs);
         // 캐시 무효화
         qc.invalidateQueries({ queryKey: ['userEarnedBadges', userId] });
 
-        // 큐에 추가 → 모달 순차 노출
-        const items: PendingUnlock[] = newly_unlocked.map((b) => ({
+        // 큐에 추가 → 모달 순차 노출 (실제 신규 획득 배지만)
+        const items: PendingUnlock[] = awardable.map((b) => ({
           badge: b,
           points_gained: b.points_reward,
         }));

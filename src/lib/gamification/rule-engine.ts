@@ -83,6 +83,22 @@ export function evaluateBadgeUnlocks(
   return { newly_unlocked, total_points_gained };
 }
 
+/**
+ * [CL-AUDIT-BADGE-IDEMPOTENT-20260626] 실제 DB 삽입된 배지에만 보상 결정 — 순수 함수(멱등성 게이트).
+ * useBadgeUnlock 이 upsert(ignoreDuplicates).select() 로 받은 '실제 삽입된 badge_id' 집합을 넘기면,
+ * 그 집합에 든 배지에 대해서만 점수/슬러그/모달을 산출한다. 이미 획득(중복)·미삽입 배지는 보상에서 제외.
+ *  → 중복 fall-through 로 total_points 가 재지급되던 D1, 배치 원자롤백으로 미기록 배지에 보상되던 D4 를 함께 차단.
+ */
+export function selectAwardableBadges(
+  newlyUnlocked: ReadonlyArray<BadgeDefinition>,
+  insertedBadgeIds: ReadonlySet<string>,
+): { badges: BadgeDefinition[]; total_points_gained: number; slugs: string[] } {
+  const badges = newlyUnlocked.filter((b) => insertedBadgeIds.has(b.id));
+  const total_points_gained = badges.reduce((sum, b) => sum + (b.points_reward ?? 0), 0);
+  const slugs = badges.map((b) => b.slug);
+  return { badges, total_points_gained, slugs };
+}
+
 /** BadgeEvaluationContext 기본값 (모든 필드 안전한 0/null) */
 export function emptyBadgeEvaluationContext(): BadgeEvaluationContext {
   return {

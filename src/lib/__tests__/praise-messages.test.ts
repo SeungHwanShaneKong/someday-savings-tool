@@ -30,6 +30,12 @@ describe('praise-messages', () => {
     for (let i = 1; i < out.length; i++) expect(out[i]).not.toBe(out[i - 1]);
   });
 
+  // [CL-AUDIT-PRAISE-EMPTY-20260626] 빈 입력이면 next()가 undefined를 PraiseMessage로 거짓 캐스트 → 소비자 런타임 TypeError.
+  //  근본수정: 생성 시점에 fail-fast(throw)로 타입 거짓 제거.
+  it('PM.9 빈 메시지 배열로 생성 시 즉시 throw(undefined 캐스트 거짓 차단)', () => {
+    expect(() => makePraiseBag([])).toThrow();
+  });
+
   it('PM.4 메시지 12종 이상 + 필드 완전성', () => {
     expect(PRAISE_MESSAGES.length).toBeGreaterThanOrEqual(10);
     for (const m of PRAISE_MESSAGES) {

@@ -18,6 +18,7 @@ import { useCategoryOrder } from '@/hooks/useCategoryOrder';
 import { ExtendedBudgetItem, CostSplitType, COST_SPLIT_OPTIONS } from './BudgetTable';
 import { AverageCostTooltip } from './AverageCostTooltip';
 import { hasAverageCost } from '@/lib/average-costs';
+import { getEditorLabel } from '@/lib/collab/editor-label'; // [CL-EDITLABEL-20260626] 최근 편집자(나/파트너) 라벨
 
 interface BudgetTableMobileProps {
   items: ExtendedBudgetItem[];
@@ -30,6 +31,10 @@ interface BudgetTableMobileProps {
   onCostSplitChange?: (itemId: string, costSplit: CostSplitType) => void;
   /** [CL-PARTNER-DIFF-20260624-000000] 재접속 시 파트너가 바꾼 항목 id — 시머 강조(개선3) */
   changedItemIds?: Set<string>;
+  /** [CL-EDITLABEL-20260626] 최근 편집자 라벨용(additive·optional) — 미전달 시 미표시(회귀 0) */
+  myUserId?: string | null;
+  partnerName?: string | null;
+  showEditorLabels?: boolean;
 }
 
 // Sortable category for mobile
@@ -87,7 +92,10 @@ export function BudgetTableMobile({
   onAddCustomItem,
   onDeleteItem,
   onCostSplitChange,
-  changedItemIds
+  changedItemIds,
+  myUserId,
+  partnerName,
+  showEditorLabels
 }: BudgetTableMobileProps) {
   const { orderedCategories, reorderCategories } = useCategoryOrder();
   
@@ -417,12 +425,20 @@ export function BudgetTableMobile({
                                     )}>
                                       <span className="text-sm truncate">{displayName}</span>
                                       {/* [CL-VULN-R6C-A11Y-20260625] 파트너 변경 비색상 단서(색맹/SR 가시, WCAG 1.4.1) */}
-                                      {changedItemIds?.has(item.id) && (
+                                      {/* [CL-EDITLABEL-20260626] 단일 슬롯 상호배타: 변경분=amber 편집자명 승격, 그 외=정적 "최근:" 배지 */}
+                                      {changedItemIds?.has(item.id) ? (
                                         <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap flex-shrink-0">
                                           <Sparkles className="w-2.5 h-2.5 flex-shrink-0" aria-hidden />
-                                          파트너 변경
+                                          {partnerName?.trim() ? `${partnerName.trim()} 변경` : '파트너 변경'}
                                         </span>
-                                      )}
+                                      ) : showEditorLabels && getEditorLabel(item.last_edited_by, myUserId, partnerName) ? (
+                                        <span
+                                          className="inline-flex items-center text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0"
+                                          aria-label={`최근 편집: ${getEditorLabel(item.last_edited_by, myUserId, partnerName)}`}
+                                        >
+                                          최근: {getEditorLabel(item.last_edited_by, myUserId, partnerName)}
+                                        </span>
+                                      ) : null}
                                       {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
                                         <AverageCostTooltip
                                           categoryId={category.id}

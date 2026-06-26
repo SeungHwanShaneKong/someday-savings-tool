@@ -27,7 +27,7 @@ const NAV_TIMEOUT = 45000;
  *  marker = 본문(#root)에 반드시 존재해야 하는 텍스트 (페이지별 H1/리드)
  *  jsonLdType = useSEO가 #dynamic-jsonld 에 주입하는 @type (없으면 null) */
 const ROUTES = [
-  { path: '/',                          marker: '스마트 결혼 준비 플랫폼',          jsonLdType: null },
+  { path: '/',                          marker: '스마트 결혼 준비 플랫폼',          jsonLdType: null, requireTypes: ['WebApplication', 'WebSite', 'Organization'] },
   { path: '/guide/',                    marker: '결혼 예산 완벽 가이드',            jsonLdType: 'HowTo' },
   { path: '/faq/',                      marker: '자주 묻는 질문',                   jsonLdType: 'FAQPage' },
   { path: '/guide/2026-wedding-cost/',  marker: '2026 결혼 평균 비용 분석',         jsonLdType: 'Article' },
@@ -43,6 +43,9 @@ const ROUTES = [
   { path: '/guide/newlywed-home/',       marker: '신혼집 비용·대출 완벽 가이드',     jsonLdType: 'Article' },
   { path: '/guide/honsu-appliances/',    marker: '혼수 가전·가구 완벽 가이드',       jsonLdType: 'Article' },
   { path: '/guide/wedding-gift-money/',  marker: '축의금·하객수 완벽 가이드',        jsonLdType: 'Article' },
+  // [CL-SEO-ARTICLE-FAQ-20260626] T3 신규 아티클 2편(FAQPage 동반)
+  { path: '/guide/wedding-prep-timeline/',     marker: '결혼 준비 12개월 타임라인',        jsonLdType: 'Article' },
+  { path: '/guide/wedding-contract-checklist/', marker: '웨딩 계약서 작성·확인 체크리스트', jsonLdType: 'Article' },
   // [CL-ADSENSE-20260619-234411] 정책/정보 페이지 (AdSense 필수)
   { path: '/privacy/',                  marker: '개인정보처리방침',                 jsonLdType: null },
   { path: '/terms/',                    marker: '이용약관',                         jsonLdType: null },
@@ -60,12 +63,21 @@ function outFile(routePath) {
   return trimmed ? path.join(DIST, trimmed, 'index.html') : path.join(DIST, 'index.html');
 }
 
-function verify(routePath, html, marker, jsonLdType) {
+// [CL-SEO-JSONLD-GUARD-20260626] 정적 HTML 에 박혀야 하는 JSON-LD @type 를 '전부' 검증(Google 은 정적 HTML 을 읽음).
+//   - jsonLdType: useSEO 가 #dynamic-jsonld 에 주입하는 주 @type(대기/검증).
+//   - requireTypes: 그 외 정적 블록 포함 반드시 존재해야 하는 @type 배열(예: 홈의 WebApplication/WebSite/Organization).
+//   - Article/FAQPage/HowTo 페이지는 BreadcrumbList 를 동반 주입(Article.tsx/FAQ.tsx/Guide.tsx) → 자동 동반 검증.
+function verify(routePath, html, marker, jsonLdType, requireTypes) {
   const errs = [];
   if (!html.includes(marker)) errs.push(`본문 마커 "${marker}" 누락`);
   if (!/rel="canonical"/i.test(html)) errs.push('canonical 태그 누락');
   if (!html.includes(`${BASE_DOMAIN}${routePath}`)) errs.push(`canonical URL ${routePath} 불일치`);
-  if (jsonLdType && !html.includes(`"${jsonLdType}"`)) errs.push(`JSON-LD @type ${jsonLdType} 누락`);
+  const dynamic = jsonLdType ? [jsonLdType] : [];
+  if (['Article', 'FAQPage', 'HowTo'].includes(jsonLdType)) dynamic.push('BreadcrumbList');
+  const required = requireTypes ?? dynamic;
+  for (const t of required) {
+    if (!html.includes(`"${t}"`)) errs.push(`JSON-LD @type ${t} 누락(정적 HTML)`);
+  }
   return errs;
 }
 
@@ -138,7 +150,7 @@ async function run() {
       await new Promise((r) => setTimeout(r, 250));
 
       const html = await page.content();
-      const errs = verify(route.path, html, route.marker, route.jsonLdType);
+      const errs = verify(route.path, html, route.marker, route.jsonLdType, route.requireTypes);
       if (errs.length) {
         throw new Error(`검증 실패 [${route.path}]:\n  - ${errs.join('\n  - ')}`);
       }

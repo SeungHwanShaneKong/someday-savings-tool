@@ -28,6 +28,11 @@
     <meta property="og:title" content="웨딩셈 - 결혼 예산 계산기, 결혼 비용 계산기" />
     <meta property="og:description" content="결혼 준비의 시작, 결혼 예산 관리부터 결혼 체크 리스트까지 스마트하게! 결혼 비용, 웨딩 예산 계산기 '웨딩셈'으로 복잡한 결혼 비용을 항목별로 깔끔하게 정리하세요." />
     <meta property="og:image" content="https://moderninsightspot.com/og-image.png" />
+    <!-- [CL-SEO-OG-DIM-20260626] og:image 치수/타입 명시 — 소셜 카드 렌더 신뢰성(실제 1200x630) -->
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="웨딩셈 - 결혼 예산 계산기" />
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:site_name" content="웨딩셈" />
 
@@ -50,26 +55,54 @@
       gtag('config', 'G-VPYSMMP3YT');
     </script>
 
-    <!-- Schema.org JSON-LD -->
+    <!-- [CL-SEO-JSONLD-GRAPH-20260626] Organization + WebSite + WebApplication @graph (상호 @id 참조).
+         SearchAction 미포함: 내부 검색 라우트 부재 → 허위 선언 시 GSC 경고(검색 신설 시에만 추가). -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "웨딩셈",
-      "url": "https://moderninsightspot.com",
-      "description": "결혼 예산 계산기 - 결혼 준비의 시작, 예산 관리부터 체크리스트까지 스마트하게",
-      "applicationCategory": "FinanceApplication",
-      "operatingSystem": "Web",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "KRW"
-      },
-      "inLanguage": "ko",
-      "author": {
-        "@type": "Organization",
-        "name": "웨딩셈"
-      }
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://moderninsightspot.com/#organization",
+          "name": "웨딩셈",
+          "url": "https://moderninsightspot.com/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://moderninsightspot.com/favicon.png"
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "url": "https://moderninsightspot.com/contact/",
+            "availableLanguage": ["Korean"]
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://moderninsightspot.com/#website",
+          "name": "웨딩셈",
+          "url": "https://moderninsightspot.com/",
+          "description": "결혼 예산 계산기 - 결혼 준비의 시작, 예산 관리부터 체크리스트까지 스마트하게",
+          "inLanguage": "ko",
+          "publisher": { "@id": "https://moderninsightspot.com/#organization" }
+        },
+        {
+          "@type": "WebApplication",
+          "name": "웨딩셈",
+          "url": "https://moderninsightspot.com/",
+          "description": "결혼 예산 계산기 - 결혼 준비의 시작, 예산 관리부터 체크리스트까지 스마트하게",
+          "applicationCategory": "FinanceApplication",
+          "operatingSystem": "Web",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "KRW"
+          },
+          "inLanguage": "ko",
+          "author": { "@id": "https://moderninsightspot.com/#organization" },
+          "publisher": { "@id": "https://moderninsightspot.com/#organization" }
+        }
+      ]
     }
     </script>
   </head>

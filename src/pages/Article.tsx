@@ -13,6 +13,7 @@ import Footer from '@/components/Footer';
 import {
   getArticle,
   getArticleJsonLd,
+  getArticleFaqJsonLd,
   type Article as ArticleData,
   type ArticleBlock,
 } from '@/content/articles';
@@ -125,10 +126,15 @@ export default function Article() {
     [article]
   );
 
-  const jsonLd = useMemo(
-    () => (article ? [getBreadcrumbJsonLd(breadcrumbItems), getArticleJsonLd(article)] : undefined),
-    [article, breadcrumbItems]
-  );
+  const jsonLd = useMemo(() => {
+    if (!article) return undefined;
+    const faqLd = getArticleFaqJsonLd(article); // [CL-SEO-ARTICLE-FAQ-20260626] 있을 때만 FAQPage 추가
+    return [
+      getBreadcrumbJsonLd(breadcrumbItems),
+      getArticleJsonLd(article),
+      ...(faqLd ? [faqLd] : []),
+    ];
+  }, [article, breadcrumbItems]);
 
   useSEO({
     title: article?.seoTitle ?? '결혼 예산 가이드 | 웨딩셈',
@@ -187,6 +193,24 @@ export default function Article() {
               ))}
             </section>
           ))}
+
+          {/* [CL-SEO-ARTICLE-FAQ-20260626] 아티클 FAQ (있을 때만) — 본문 정적 렌더 + FAQPage 리치결과 동반 */}
+          {article.faqs && article.faqs.length > 0 && (
+            <section className="mb-10">
+              <h2 className="text-lg font-semibold text-foreground mb-4">자주 묻는 질문</h2>
+              <div className="space-y-3">
+                {article.faqs.map((faq, fi) => (
+                  <details key={fi} className="group bg-card border border-border/50 rounded-xl px-4 py-3">
+                    <summary className="text-sm font-semibold text-foreground cursor-pointer list-none flex items-center justify-between gap-2">
+                      <span>{faq.q}</span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform group-open:rotate-90" aria-hidden="true" />
+                    </summary>
+                    <p className="text-sm text-muted-foreground leading-relaxed mt-2">{faq.a}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* CTA */}
           <section className="text-center bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 mb-10">

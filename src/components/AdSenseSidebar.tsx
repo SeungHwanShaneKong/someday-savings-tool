@@ -77,6 +77,8 @@ export const AdSenseSidebar = forwardRef<HTMLDivElement, AdSenseSidebarProps>(fu
         }
       }}
       className={className}
+      // [CL-SEO-CLS-20260626] 라우트 변경 시 innerHTML 초기화로 컨테이너가 0높이로 붕괴하는 것을 방지(CLS 예약, ins minHeight 와 일치)
+      style={{ minHeight: '250px' }}
     />
   );
 });

@@ -794,6 +794,9 @@ export default function BudgetFlow() {
                 onAddCustomItem={addCustomItem}
                 onDeleteItem={deleteItem}
                 changedItemIds={changedItemIds}
+                myUserId={myUserId}
+                partnerName={partnerName}
+                showEditorLabels={partnerPresent}
               />
             ) : (
               <>
@@ -808,6 +811,9 @@ export default function BudgetFlow() {
                     onAddCustomItem={addCustomItem}
                     onDeleteItem={deleteItem}
                     changedItemIds={changedItemIds}
+                    myUserId={myUserId}
+                    partnerName={partnerName}
+                    showEditorLabels={partnerPresent}
                   />
                 </div>
 

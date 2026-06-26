@@ -9,6 +9,7 @@
  */
 
 import { SITE_ORIGIN } from '@/config/site';
+import { ARTICLE_FAQS, NEW_ARTICLES } from './articles-t3'; // [CL-SEO-ARTICLE-FAQ-20260626] T3 FAQ 맵 + 신규 아티클
 
 const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
 
@@ -41,6 +42,15 @@ export interface Article {
   sections: ArticleSection[];
   /** 관련 글 slug */
   related: string[];
+  /** [CL-SEO-ARTICLE-META-20260626] (이하 전부 optional·additive — 미설정 시 기존 동작 보존) */
+  /** Article.articleSection — 미설정 시 '결혼 준비 가이드' */
+  category?: string;
+  /** Article.keywords(SEO) */
+  keywords?: string[];
+  /** 아티클별 og/Article image 절대 또는 상대경로 — 미설정 시 /og-image.png 폴백 */
+  image?: string;
+  /** [CL-SEO-ARTICLE-FAQ-20260626] 본문 하단 FAQ + FAQPage 리치결과(아티클별). 미설정 시 미렌더 */
+  faqs?: { q: string; a: string }[];
 }
 
 /* ─── 아티클 데이터 ─── */
@@ -1063,6 +1073,12 @@ export const ARTICLES: Article[] = [
   },
 ];
 
+// [CL-SEO-ARTICLE-FAQ-20260626] T3 병합: 신규 아티클 추가 + 기존 아티클에 FAQ 부착(slug 기준, 인라인 faqs 우선).
+ARTICLES.push(...NEW_ARTICLES);
+for (const a of ARTICLES) {
+  if (!a.faqs && ARTICLE_FAQS[a.slug]) a.faqs = ARTICLE_FAQS[a.slug];
+}
+
 /* ─── 조회 헬퍼 ─── */
 export function getArticle(slug: string | undefined): Article | undefined {
   if (!slug) return undefined;
@@ -1073,9 +1089,27 @@ export function getAllArticleSlugs(): string[] {
   return ARTICLES.map((a) => a.slug);
 }
 
-/** Article + 의 mainEntityOfPage 구조화 데이터 */
+/** [CL-SEO-ARTICLE-META-20260626] 본문 글자수 합산(intro + 모든 블록 텍스트). 한국어 글자수 기준 근사. */
+export function countArticleWords(article: Article): number {
+  let n = (article.intro ?? '').length;
+  for (const sec of article.sections) {
+    n += (sec.heading ?? '').length;
+    for (const b of sec.blocks) {
+      if (b.type === 'paragraph' || b.type === 'callout') n += b.text.length;
+      else if (b.type === 'list') n += b.items.reduce((s, it) => s + it.length, 0);
+      else if (b.type === 'table') n += b.rows.reduce((s, r) => s + r.reduce((s2, c) => s2 + c.length, 0), 0);
+    }
+  }
+  if (article.faqs) n += article.faqs.reduce((s, f) => s + f.q.length + f.a.length, 0);
+  return n;
+}
+
+/** Article 의 mainEntityOfPage 구조화 데이터 (강화: wordCount·articleSection·keywords·아티클별 image) */
 export function getArticleJsonLd(article: Article) {
   const pageUrl = `${BASE_DOMAIN}/guide/${article.slug}/`;
+  const image = article.image
+    ? (article.image.startsWith('http') ? article.image : `${BASE_DOMAIN}${article.image}`)
+    : `${BASE_DOMAIN}/og-image.png`;
   return {
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -1084,6 +1118,9 @@ export function getArticleJsonLd(article: Article) {
     datePublished: article.datePublished,
     dateModified: article.dateModified,
     inLanguage: 'ko',
+    articleSection: article.category ?? '결혼 준비 가이드',
+    wordCount: countArticleWords(article),
+    ...(article.keywords && article.keywords.length ? { keywords: article.keywords.join(', ') } : {}),
     author: { '@type': 'Organization', name: '웨딩셈' },
     publisher: {
       '@type': 'Organization',
@@ -1091,6 +1128,20 @@ export function getArticleJsonLd(article: Article) {
       logo: { '@type': 'ImageObject', url: `${BASE_DOMAIN}/favicon.png` },
     },
     mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
-    image: `${BASE_DOMAIN}/og-image.png`,
+    image,
+  };
+}
+
+/** [CL-SEO-ARTICLE-FAQ-20260626] 아티클 FAQ → FAQPage 구조화데이터(있을 때만). 리치결과(아티클별 FAQ) 노출용. */
+export function getArticleFaqJsonLd(article: Article) {
+  if (!article.faqs || article.faqs.length === 0) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: article.faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
   };
 }

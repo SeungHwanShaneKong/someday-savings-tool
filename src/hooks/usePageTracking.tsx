@@ -24,7 +24,8 @@ function isMissingAcquisitionColumn(error: unknown): boolean {
 
 export function usePageTracking() {
   const location = useLocation();
-  const { user } = useAuth();
+  // [CL-AUDIT2-R2-AUTHGATE-20260628] loading 도 구독 — 익명/인증 분기를 'user 확정' 시점에 판정(F2).
+  const { user, loading: authLoading } = useAuth();
   const pageEntryTime = useRef<number>(Date.now());
   const currentPath = useRef<string>(location.pathname);
 
@@ -123,4 +124,24 @@ export function usePageTracking() {
       updateDuration();
     };
   }, [location.pathname, user?.id]);
+
+  // [CL-ANONVISIT-CLIENT-20260627-234656] 익명 방문 1회 기록 — Edge 'track-visit' 릴레이(서버 검증/캡/레이트리밋).
+  //   page_views 는 여전히 익명 0행(프라이버시 보존). 익명행은 anon_page_views 에만(user_id/IP/PII 없음).
+  //   로그인 유저는 위 인증 경로가 처리 → 여기서 제외(이중기록 방지). fire-and-forget(분석 비차단·무음 실패).
+  // [CL-AUDIT2-R2-AUTHGATE-20260628] authLoading 동안엔 발사 보류 — 인증 미확정(초기 user=null) 윈도우에서
+  //   로그인 유저를 익명으로 오집계하던 결함(F2) 차단. 인증 확정 후 정확히 한 경로만 실행.
+  useEffect(() => {
+    if (authLoading || user?.id) return; // 인증 미확정 보류 + 가입자는 기존 page_views 경로
+    const c = classifySource();
+    void supabase.functions
+      .invoke('track-visit', {
+        body: {
+          page_path: location.pathname,
+          session_id: getSessionId(), // 비영구 랜덤 UUID(sessionStorage) — 사용자 상관 불가
+          referrer: normalizeReferrer(typeof document !== 'undefined' ? document.referrer : ''),
+          utm_source: c.source,
+        },
+      })
+      .catch((err) => console.debug('Anon visit tracking failed:', err));
+  }, [location.pathname, user?.id, authLoading]);
 }

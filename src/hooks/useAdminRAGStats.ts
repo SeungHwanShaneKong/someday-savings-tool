@@ -1,8 +1,10 @@
 // [EF-RESILIENCE-20260308-041500] RAG 파이프라인 모니터링 통계 Hook
 // Admin 페이지에서 Edge Function(admin-rag-stats)을 호출하여 MECE 통계 반환
+// [CL-ADMIN-RQ-MIGRATION-20260627-234656] 수동 state → React Query 준실시간 폴링(ADMIN_PANEL).
 
-import { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { edgeFunctionFetch, getUserFriendlyError } from '@/lib/edge-function-fetch';
+import { ADMIN_PANEL } from '@/hooks/admin/adminQueryConfig';
 
 // ── 크롤링 파이프라인 ──
 export interface CrawlJob {
@@ -75,30 +77,18 @@ interface UseAdminRAGStatsResult {
   fetchRAGStats: () => Promise<void>;
 }
 
-const DEFAULT_STATS: RAGStats | null = null;
-
-export function useAdminRAGStats(): UseAdminRAGStatsResult {
-  const [ragStats, setRagStats] = useState<RAGStats | null>(DEFAULT_STATS);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchRAGStats = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await edgeFunctionFetch<RAGStats>({
-        functionName: 'admin-rag-stats',
-      });
-      setRagStats(data);
-    } catch (err) {
-      console.warn('[useAdminRAGStats] Fetch failed:', err);
-      setError(getUserFriendlyError(err));
-      // Keep previous stats on error to avoid UI flicker
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { ragStats, loading, error, fetchRAGStats };
+export function useAdminRAGStats(enabled = true): UseAdminRAGStatsResult {
+  const q = useQuery({
+    queryKey: ['admin', 'rag'],
+    queryFn: () => edgeFunctionFetch<RAGStats>({ functionName: 'admin-rag-stats' }),
+    enabled,
+    ...ADMIN_PANEL,
+  });
+  // RQ 가 직전 data 를 유지(실패 background refetch 시 flicker 방지) — 기존 'keep previous stats' 의도 보존.
+  return {
+    ragStats: q.data ?? null,
+    loading: q.isLoading,
+    error: q.error ? getUserFriendlyError(q.error) : null,
+    fetchRAGStats: async () => { await q.refetch(); },
+  };
 }

@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
@@ -78,20 +79,9 @@ export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const { kpiValues, trendData, topPages, summaryKPIs, impactSummary, acquisitionData, visitSourceData, visitHistogram, referralJoins, referralJoinsTotal, loading: dataLoading, fetchData } = useAdminKPI();
-  // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계 hook
-  const { ragStats, loading: ragLoading, fetchRAGStats } = useAdminRAGStats();
-
-  // [AGENT-TEAM-9-20260307] 4개 신규 에이전트 hooks
-  const { metrics: perfMetrics, loading: perfLoading, error: perfError, fetchMetrics } = usePerformanceSentinel();
-  const { result: dqResult, loading: dqLoading, error: dqError, runScan } = useDataQualityGuardian();
-  const { result: etResult, loading: etLoading, error: etError, analyze: analyzeEmbeddings } = useEmbeddingTuner();
-  const { content: seoContent, loading: seoLoading, error: seoError, generate: generateSEO } = useSEOAmplifier();
-  // [CL-ADMIN-FEATURE-REQ-20260403]
-  const { requests: featureRequests, loading: frLoading, error: frError, fetchRequests } = useFeatureRequests();
+  const qc = useQueryClient();
 
   const [period, setPeriod] = useState('30');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   // [EF-RESILIENCE-20260308-041500] Edge Function 서비스 상태
   const [efHealthy, setEfHealthy] = useState<boolean | null>(null);
 
@@ -100,6 +90,29 @@ export default function Admin() {
     const start = period === 'ytd' ? startOfYear(end) : subDays(end, parseInt(period));
     return { startDate: start, endDate: end };
   }, [period]);
+
+  // [CL-ADMIN-RQ-MIGRATION-20260627-234656] React Query 준실시간 — enabled:isAdmin 게이트.
+  //   폴링/포커스·재연결 갱신·탭숨김 정지는 RQ(ADMIN_HEAVY/PANEL)가 담당 → 과거 doFetch/setInterval 수동 플러밍 제거.
+  const {
+    kpiValues, trendData, topPages, summaryKPIs, impactSummary,
+    acquisitionData, visitSourceData, visitHistogram, referralJoins, referralJoinsTotal,
+    anonTrafficTrend, anonSourceData, anonTopPages,
+    // [CL-AUDIT2-R3-ERRSURFACE-20260628] error/isFetching/partialError 소비(F5/F9) — 무음 실패·스피너 미작동 해소.
+    loading: dataLoading, isFetching: kpiFetching, error: kpiError, partialError, dataUpdatedAt,
+  } = useAdminKPI(startDate, endDate, { enabled: isAdmin });
+  // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계 hook
+  const { ragStats, loading: ragLoading } = useAdminRAGStats(isAdmin);
+
+  // [AGENT-TEAM-9-20260307] 4개 신규 에이전트 hooks
+  const { metrics: perfMetrics, loading: perfLoading, error: perfError, fetchMetrics } = usePerformanceSentinel(isAdmin);
+  const { result: dqResult, loading: dqLoading, error: dqError, runScan } = useDataQualityGuardian();
+  const { result: etResult, loading: etLoading, error: etError, analyze: analyzeEmbeddings } = useEmbeddingTuner();
+  const { content: seoContent, loading: seoLoading, error: seoError, generate: generateSEO } = useSEOAmplifier();
+  // [CL-ADMIN-FEATURE-REQ-20260403]
+  const { requests: featureRequests, loading: frLoading, error: frError, fetchRequests } = useFeatureRequests(isAdmin);
+
+  // 마지막 성공 갱신 시각(React Query dataUpdatedAt 파생)
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   // [CL-ACQ-ADMIN-20260622-233012] 유입경로 표시 가공 — 한국어 라벨 + 비율(개선1)
   const acquisitionView = useMemo(() => {
@@ -125,45 +138,37 @@ export default function Admin() {
     return { total, rows };
   }, [visitSourceData]);
 
+  // [CL-ANONVISIT-ADMIN-20260627-234656] 전체 방문(익명 포함) 소스 표시 가공 — users 필드에 visits 매핑됨
+  const anonSourceView = useMemo(() => {
+    const total = anonSourceData.reduce((s, a) => s + a.users, 0);
+    const rows = anonSourceData.map((a) => ({
+      source: a.source,
+      label: sourceLabel(a.source),
+      visits: a.users,
+      percentage: total > 0 ? Math.round((a.users / total) * 1000) / 10 : 0,
+    }));
+    return { total, rows };
+  }, [anonSourceData]);
+
+  // [CL-ANONVISIT-ADMIN-20260627-234656] 익명 트래픽 총계(차트 빈상태 판별용)
+  const anonTotals = useMemo(() => {
+    const views = anonTrafficTrend.reduce((s, d) => s + d.views, 0);
+    const sessions = anonTrafficTrend.reduce((s, d) => s + d.sessions, 0);
+    return { views, sessions };
+  }, [anonTrafficTrend]);
+
   useEffect(() => {
     if (!authLoading && !user) { navigate('/auth'); return; }
     if (!adminLoading && !isAdmin) { navigate('/'); return; }
   }, [user, authLoading, isAdmin, adminLoading, navigate]);
 
-  // Fetch + record timestamp
-  // [ADMIN-RAG-MONITOR-2026-03-07] RAG 통계도 병렬 fetch
-  // [AGENT-TEAM-9-20260307] 성능 감시 자동 fetch 추가
-  const doFetch = useCallback(() => {
-    Promise.all([
-      fetchData(startDate, endDate),
-      fetchRAGStats(),
-      fetchMetrics(),
-      fetchRequests(),
-    ]).then(() => setLastUpdated(new Date()));
-  }, [fetchData, startDate, endDate, fetchRAGStats, fetchMetrics, fetchRequests]);
-
+  // [EF-RESILIENCE-20260308-041500] 초기 1회 Edge 헬스 체크(데이터 폴링은 React Query 가 자동 수행).
   useEffect(() => {
-    if (isAdmin) {
-      doFetch();
-      // [EF-RESILIENCE-20260308-041500] 초기 헬스 체크
-      checkEdgeFunctionHealth().then(setEfHealthy);
-    }
-  }, [isAdmin, doFetch]);
+    if (isAdmin) checkEdgeFunctionHealth().then(setEfHealthy);
+  }, [isAdmin]);
 
-  // 30-second auto-refresh, paused when tab is hidden
-  useEffect(() => {
-    if (!isAdmin) return;
-    const id = setInterval(() => {
-      if (document.visibilityState === 'visible') doFetch();
-    }, 30_000);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') doFetch();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
-  }, [isAdmin, doFetch]);
-
-  const handleRefresh = () => doFetch();
+  // [CL-ADMIN-RQ-MIGRATION-20260627-234656] 수동 새로고침 = 모든 admin 쿼리 무효화(일괄 refetch).
+  const handleRefresh = () => { qc.invalidateQueries({ queryKey: ['admin'] }); };
 
   if (authLoading || adminLoading) {
     return (
@@ -202,14 +207,37 @@ export default function Admin() {
                   갱신 {format(lastUpdated, 'HH:mm:ss')}
                 </span>
               )}
-              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading}>
-                <RefreshCw className={`h-4 w-4 ${dataLoading ? 'animate-spin' : ''}`} />
+              {/* [CL-AUDIT2-R3-ERRSURFACE-20260628] 스핀/disable 을 isFetching 에 바인딩 — keepPreviousData 로 첫 로드 후
+                  isLoading 은 영구 false 라 폴링/수동 새로고침 시 스피너가 안 돌던 회귀 수정(F5). */}
+              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading || kpiFetching}>
+                <RefreshCw className={`h-4 w-4 ${(dataLoading || kpiFetching) ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </div>
         </header>
 
         <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 sm:py-8 space-y-6 sm:space-y-8">
+          {/* [CL-AUDIT2-R3-ERRSURFACE-20260628] 코어 KPI 로드 실패/부분 degrade 를 명시 노출(F5/F7/F9) —
+              무음으로 '데이터 0/미배포'처럼 보이던 문제 차단. kpiError=쿼리 실패, partialError=일부 source degrade. */}
+          {(kpiError || partialError) && (
+            <Card className="p-3 border-amber-300 bg-amber-50 flex items-center gap-2">
+              <Info className="h-4 w-4 text-amber-600 shrink-0" />
+              <p className="text-sm text-amber-700">
+                {kpiError
+                  ? '핵심 지표를 불러오지 못했습니다(직전 데이터 표시 중). 잠시 후 자동 재시도됩니다.'
+                  : `일부 데이터 소스(${partialError})를 불러오지 못해 해당 지표가 축소되었습니다.`}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
+                onClick={handleRefresh}
+                disabled={kpiFetching}
+              >
+                새로고침
+              </Button>
+            </Card>
+          )}
           {/* [EF-RESILIENCE-20260308-041500] Edge Function 서비스 경고 배너 */}
           {efHealthy === false && (
             <Card className="p-3 border-amber-300 bg-amber-50 flex items-center gap-2">
@@ -517,6 +545,75 @@ export default function Admin() {
                 <p className="text-[11px] text-muted-foreground/70 mt-2">
                   파트너/추천 링크로 초대 수락해 합류한 사람(협업자 등록 기준) · 선택 기간 내.
                 </p>
+              </Card>
+
+              {/* [CL-ANONVISIT-ADMIN-20260627-234656] 전체 방문(익명 포함) — anon_page_views 집계.
+                  위 차트들은 '로그인 사용자 기준'(page_views)이라 실제 트래픽 대비 과소표시 → 이 카드가 익명 포함 실측. */}
+              <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow lg:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm sm:text-base font-semibold leading-relaxed">전체 방문 (익명 포함)</h3>
+                  <span className="text-xs sm:text-sm text-muted-foreground">방문 {anonTotals.views.toLocaleString()} · 세션 {anonTotals.sessions.toLocaleString()}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 mb-3">
+                  비로그인 방문자 포함 실제 트래픽(개인정보 비식별: user_id/IP 미수집). 위 '로그인 사용자' 지표와 구분.
+                </p>
+                {anonTotals.views > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* 익명 방문 추이 */}
+                    <div className="h-56 sm:h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={anonTrafficTrend}>
+                          <defs>
+                            <linearGradient id="gradAnonViews" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.18} />
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" interval="preserveStartEnd" />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
+                          <RechartsTooltip contentStyle={chartTooltipStyle} formatter={(value: number, name) => [`${value}`, name === 'sessions' ? '세션' : '방문']} />
+                          <Legend wrapperStyle={{ fontSize: '13px' }} formatter={(v) => (v === 'sessions' ? '세션' : '방문')} />
+                          <Area type="monotone" dataKey="views" name="views" stroke="#10b981" strokeWidth={2} fill="url(#gradAnonViews)" dot={false} activeDot={{ r: 5 }} />
+                          <Area type="monotone" dataKey="sessions" name="sessions" stroke="#0ea5e9" strokeWidth={2} fillOpacity={0} dot={false} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {/* 익명 방문 소스 + 인기 페이지 */}
+                    <div className="space-y-4">
+                      {anonSourceView.rows.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-muted-foreground mb-2">유입 소스 (전체 방문)</h4>
+                          <div className="space-y-1">
+                            {anonSourceView.rows.slice(0, 5).map((r) => (
+                              <div key={r.source} className="flex items-center justify-between text-xs">
+                                <span className="truncate">{r.label}</span>
+                                <span className="text-muted-foreground">{r.visits.toLocaleString()} ({r.percentage}%)</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {anonTopPages.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-muted-foreground mb-2">인기 페이지 (전체 방문)</h4>
+                          <div className="space-y-1">
+                            {anonTopPages.slice(0, 5).map((p) => (
+                              <div key={p.path} className="flex items-center justify-between text-xs">
+                                <span className="truncate max-w-[70%]" title={p.path}>{p.path}</span>
+                                <span className="text-muted-foreground">{p.views.toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-8 text-center">
+                    아직 익명 방문 데이터가 없어요. (track-visit Edge 함수 · anon_page_views 마이그 배포 후 수집)
+                  </p>
+                )}
               </Card>
 
               {/* 페이지뷰 추이 */}

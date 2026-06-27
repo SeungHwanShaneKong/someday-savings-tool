@@ -4,9 +4,17 @@
 //    되돌려도 순수 헬퍼 테스트만으론 침묵 통과 → 배선을 묶는 본 테스트로 차단.)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createElement, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminKPI } from '@/hooks/useAdminKPI';
 import { firstTrendBucketStart } from '@/lib/kpi-definitions';
+// [CL-ADMIN-RQ-MIGRATION-20260627-234656] useAdminKPI 가 React Query 사용 → renderHook 에 QueryClient 래퍼 필요.
+//   (단언은 그대로: fetchData shim 이 원시 적재를 1회 실행해 baseline .lt 배선을 검증)
+import { makeQueryClient } from '@/test/test-utils';
+
+const wrapper = ({ children }: { children: ReactNode }) =>
+  createElement(QueryClientProvider, { client: makeQueryClient() }, children);
 
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'admin' } }) }));
 
@@ -47,7 +55,7 @@ describe('useAdminKPI — 누적 baseline 컷오프 배선(경계 갭 회귀 가
     startDate.setDate(startDate.getDate() - 30);
     const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    const { result } = renderHook(() => useAdminKPI());
+    const { result } = renderHook(() => useAdminKPI(), { wrapper });
     await act(async () => {
       await result.current.fetchData(startDate, endDate);
     });

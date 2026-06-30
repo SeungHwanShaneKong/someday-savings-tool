@@ -9,7 +9,9 @@ import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
 import { withCumulativeSignups, firstTrendBucketStart } from '@/lib/kpi-definitions'; // [CL-ADMIN-SIGNUP-TREND-20260622]
 import { calculateImpact, type ImpactSummary, type BudgetForImpact } from '@/lib/impact-calculator';
 import { ADMIN_HEAVY } from '@/hooks/admin/adminQueryConfig';
-import { computeRetentionRate } from '@/lib/admin/retention'; // [CL-AUDIT2-R5-PERF-20260628]
+import { computeRetentionMeasure } from '@/lib/admin/retention'; // [CL-FACT-RETENTION-20260630] 관측가능 코호트 분모
+import { computeUsageRates, measureToKpiValue } from '@/lib/admin/kpi-compute'; // [CL-FACT-COMPUTE-20260630] 위조분모 정직화
+import { countSignupToBudget24h } from '@/lib/admin/conversion'; // [CL-AUDIT-R9-K09PERF-20260630] K09 인덱스화
 
 // 관리자 user_id — 모든 KPI 계산에서 제외
 const ADMIN_USER_ID = 'f628fbf6-5f2f-4ca1-86e0-21eb2395bc40';
@@ -120,7 +122,15 @@ async function fetchAllRows<T>(
 ): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
+  // [CL-AUDIT-R9-PAGECAP-20260630] 방어심화: 병리적 페이지네이션(범위 미전진 등)으로 인한 무한루프/OOM 차단.
+  //   정상 경로(data.length<PAGE_SIZE → break)는 불변. 1000페이지(=100만 행) 초과 시 안전 중단 + 경고.
+  const MAX_PAGES = 1000;
+  let pages = 0;
   while (true) {
+    if (++pages > MAX_PAGES) {
+      console.warn(`[useAdminKPI] fetchAllRows: MAX_PAGES(${MAX_PAGES}) 초과 — 안전 중단(부분 데이터 반환)`);
+      break;
+    }
     const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
     if (error) throw error;
     if (!data || data.length === 0) break;
@@ -160,10 +170,13 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   const prevStart = subDays(startDate, periodDays);
   const prevEnd = subDays(endDate, periodDays);
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const weekAgo = subDays(now, 7);
-  const monthAgo = subDays(now, 30);
+  // [CL-FACT-WINBOUNDS-20260630] DAU/WAU/MAU 를 'now'가 아니라 선택 기간 종료(endDate)에 앵커 + 상한(lte) 적용.
+  //   과거: now 앵커·상한 없음 → 폴링마다 값 드리프트, 선택 기간 무시(미래/기간외 행 포함). 결정론·기간정렬 회복.
+  const winEnd = endDate;
+  const winEndISO = winEnd.toISOString();
+  const todayStart = startOfDay(winEnd);
+  const weekAgo = subDays(winEnd, 7);
+  const monthAgo = subDays(winEnd, 30);
 
   const startISO = startDate.toISOString();
   const endISO = endDate.toISOString();
@@ -292,14 +305,15 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
     supabase.from('shared_budgets').select('id, budget_id, created_at').then(r => r.data || []),
     supabase.from('budget_snapshots').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).then(r => r.data || []),
     // DAU/WAU/MAU counts — paginated, admin excluded
+    // [CL-FACT-WINBOUNDS-20260630] endDate 상한(lte) 추가 → 선택 기간 밖/미래 행 제외, 폴링 결정론.
     safe('page_views_today', fetchAllRows<{ user_id: string | null }>(
-      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', todayStart.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
     ), []),
     safe('page_views_week', fetchAllRows<{ user_id: string | null }>(
-      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', weekAgo.toISOString()).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', weekAgo.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
     ), []),
     safe('page_views_month', fetchAllRows<{ user_id: string | null }>(
-      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', monthAgo.toISOString()).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', monthAgo.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
     ), []),
     // [CL-ADMIN-SIGNUP-TREND-20260622] 윈도우 이전 누적 가입자 수 = 진짜 누적의 baseline(소형 profiles 테이블, head count)
     // [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 컷오프=첫 일별 버킷 시작(startISO 아님) → 경계 갭(첫 부분일 가입 누락) 제거
@@ -331,27 +345,22 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
 
   const prevDAU = new Set(prevPageViews.filter(p => {
     const d = new Date(p.created_at);
-    return d >= startOfDay(subDays(now, periodDays)) && d <= endOfDay(subDays(now, periodDays));
+    return d >= startOfDay(subDays(winEnd, periodDays)) && d <= endOfDay(subDays(winEnd, periodDays));
   }).filter(p => p.user_id).map(p => p.user_id!)).size;
 
-  // K05: Stickiness
-  const stickiness = mau > 0 ? (dau / mau) * 100 : 0;
+  // K05/K13/K14/K18 위조분모(mau||1, max(totalAmount,1)) 제거 → 임팩트 산출 직후 computeUsageRates 로 정직 산출.
 
   // K06-K08: Retention
   const allProfiles = profiles;
-  // [CL-AUDIT2-R5-PERF-20260628] O(P×V) inline 중첩 스캔 → 순수 모듈 computeRetentionRate(O(P+V), 동치·골든 고정).
+  // [CL-AUDIT2-R5-PERF-20260628] O(P+V) 순수 모듈. [CL-FACT-RETENTION-20260630] 관측가능 코호트 분모(Measure 반환).
   //   비교마다 new Date() 생성하던 비용 제거(파싱 1회 인덱스). d1/d7/d30 결과는 기존과 비트 동일.
-  const d1Retention = computeRetentionRate(allProfiles, pageViews, 1);
-  const d7Retention = computeRetentionRate(allProfiles, pageViews, 7);
-  const d30Retention = computeRetentionRate(allProfiles, pageViews, 30);
+  // [CL-FACT-RETENTION-20260630] 관측 가능한 코호트(기념일 도래분)만 분모로 → deflate 제거. observableEnd=endDate.
+  const d1Retention = computeRetentionMeasure(allProfiles, pageViews, 1, endDate);
+  const d7Retention = computeRetentionMeasure(allProfiles, pageViews, 7, endDate);
+  const d30Retention = computeRetentionMeasure(allProfiles, pageViews, 30, endDate);
 
-  // K09: 가입→예산 생성(24h)
-  let k09Count = 0;
-  for (const p of allProfiles) {
-    const signupTime = new Date(p.created_at).getTime();
-    const has = budgets.some(b => b.user_id === p.user_id && new Date(b.created_at).getTime() - signupTime <= 86400000 && new Date(b.created_at).getTime() >= signupTime);
-    if (has) k09Count++;
-  }
+  // K09: 가입→예산 생성(24h) — [CL-AUDIT-R9-K09PERF-20260630] O(P×B) 중첩 스캔 → 인덱스 O(P+B)(동치·골든 고정).
+  const k09Count = countSignupToBudget24h(allProfiles, budgets);
   const k09 = allProfiles.length > 0 ? (k09Count / allProfiles.length) * 100 : 0;
 
   // K10: 가입→첫 금액 입력(24h) & K11: TTFV
@@ -395,19 +404,47 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const multiBudgetUsers = Object.values(userBudgetCount).filter(c => c >= 2).length;
   const k12 = totalBudgetUsers > 0 ? (multiBudgetUsers / totalBudgetUsers) * 100 : 0;
 
-  // K13: 공유 링크 생성률
-  const activeUsers = mau || 1;
+  // K13/K14 모수(공유·스냅샷 사용자) — 분모(MAU)는 computeUsageRates 가 정직 처리(위조 'mau || 1' 제거).
   const shareUsers = new Set(filteredSharedBudgets.map(sb => budgetUserMap[sb.budget_id]).filter(Boolean)).size;
-  const k13 = (shareUsers / activeUsers) * 100;
-
-  // K14: 스냅샷 사용률
   const snapshotUsers = new Set(snapshots.map(s => s.user_id)).size;
-  const k14 = (snapshotUsers / activeUsers) * 100;
 
   // K15: 예산 집행률 — uses period-filtered budget_items
   const totalAmount = filteredPeriodBudgetItems.reduce((s, i) => s + (i.amount || 0), 0);
   const paidAmount = filteredPeriodBudgetItems.filter(i => i.is_paid).reduce((s, i) => s + (i.amount || 0), 0);
   const k15 = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
+
+  // ─── Phase 4-A: 경제적 파급 효과 + 위조분모 정직화(개선1) ───
+  // [CL-FACT-COMPUTE-20260630] 임팩트를 values 배열 이전에 산출 → K18(예비비 준비율) 분모를
+  //   분자(예비비 총액)와 동일 스코프(전체 filteredBudgetItems 합)로 맞추고 정직 Measure 로 방출.
+  const monthlyActiveDegraded = failed.includes('page_views_month');
+  const budgetItemsDegraded = failed.includes('budget_items');
+  const totalBudgetAmount = filteredBudgetItems.reduce((s, i) => s + (i.amount || 0), 0);
+
+  let impactSummary: ImpactSummary = EMPTY_DATA.impactSummary;
+  try {
+    // Group budget_items by budget_id to build BudgetForImpact[]
+    const budgetItemsMap: Record<string, BudgetForImpact['items']> = {};
+    for (const bi of filteredBudgetItems) {
+      if (!budgetItemsMap[bi.budget_id]) budgetItemsMap[bi.budget_id] = [];
+      budgetItemsMap[bi.budget_id].push({
+        category: (bi as { category?: string }).category || '',
+        sub_category: (bi as { sub_category?: string }).sub_category || '',
+        amount: bi.amount,
+      });
+    }
+    const budgetsForImpact: BudgetForImpact[] = Object.entries(budgetItemsMap).map(([id, items]) => ({ id, items }));
+    impactSummary = calculateImpact(budgetsForImpact);
+  } catch (impactErr) {
+    console.warn('Impact calculation error (non-critical):', impactErr);
+  }
+
+  // [CL-FACT-COMPUTE-20260630] K05/K13/K14/K18 정직 산출(위조 분모 제거 단일 진실원).
+  const usage = computeUsageRates({
+    dau, mau, shareUsers, snapshotUsers,
+    contingencyFund: impactSummary.totalContingencyFund,
+    totalBudgetAmount,
+    monthlyActiveDegraded, budgetItemsDegraded,
+  });
 
   const calcChange = (current: number, prev: number) => {
     if (prev === 0) return current > 0 ? 100 : 0;
@@ -419,17 +456,21 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
     { id: 'K02', value: dau, change: calcChange(dau, prevDAU) },
     { id: 'K03', value: wau, change: 0 },
     { id: 'K04', value: mau, change: 0 },
-    { id: 'K05', value: Math.round(stickiness * 10) / 10, change: 0 },
-    { id: 'K06', value: Math.round(d1Retention * 10) / 10, change: 0 },
-    { id: 'K07', value: Math.round(d7Retention * 10) / 10, change: 0 },
-    { id: 'K08', value: Math.round(d30Retention * 10) / 10, change: 0 },
+    measureToKpiValue('K05', usage.stickiness),
+    measureToKpiValue('K06', d1Retention),
+    measureToKpiValue('K07', d7Retention),
+    measureToKpiValue('K08', d30Retention),
     { id: 'K09', value: Math.round(k09 * 10) / 10, change: 0 },
     { id: 'K10', value: Math.round(k10 * 10) / 10, change: 0 },
     { id: 'K11', value: ttfvMedian, change: 0 },
     { id: 'K12', value: Math.round(k12 * 10) / 10, change: 0 },
-    { id: 'K13', value: Math.round(k13 * 10) / 10, change: 0 },
-    { id: 'K14', value: Math.round(k14 * 10) / 10, change: 0 },
+    measureToKpiValue('K13', usage.shareRate),
+    measureToKpiValue('K14', usage.snapshotRate),
     { id: 'K15', value: Math.round(k15 * 10) / 10, change: 0 },
+    // K16/K17 = 임팩트 평균(분모 위조 없음) · K18 = 정직 비율(분자·분모 동일 스코프)
+    { id: 'K16', value: Math.round(impactSummary.avgSavingsRate * 10) / 10, change: 0 },
+    { id: 'K17', value: Math.round(impactSummary.avgHiddenCostsIdentified * 10) / 10, change: 0 },
+    measureToKpiValue('K18', usage.contingencyRatio),
   ];
 
   // Trend data: aggregate by day
@@ -565,38 +606,7 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const anonSourceData = await anonSourcePromise;
   const anonTopPages = await anonTopPagesPromise;
 
-  // ─── Phase 4-A: 경제적 파급 효과 계산 ───
-  let impactSummary: ImpactSummary = EMPTY_DATA.impactSummary;
-  try {
-    // Group budget_items by budget_id to build BudgetForImpact[]
-    const budgetItemsMap: Record<string, BudgetForImpact['items']> = {};
-    for (const bi of filteredBudgetItems) {
-      if (!budgetItemsMap[bi.budget_id]) {
-        budgetItemsMap[bi.budget_id] = [];
-      }
-      budgetItemsMap[bi.budget_id].push({
-        category: (bi as { category?: string }).category || '',
-        sub_category: (bi as { sub_category?: string }).sub_category || '',
-        amount: bi.amount,
-      });
-    }
-
-    const budgetsForImpact: BudgetForImpact[] = Object.entries(budgetItemsMap).map(
-      ([id, items]) => ({ id, items })
-    );
-
-    const impact = calculateImpact(budgetsForImpact);
-    impactSummary = impact;
-
-    // Add K16-K18 to kpiValues
-    values.push(
-      { id: 'K16', value: Math.round(impact.avgSavingsRate * 10) / 10, change: 0 },
-      { id: 'K17', value: Math.round(impact.avgHiddenCostsIdentified * 10) / 10, change: 0 },
-      { id: 'K18', value: impact.totalContingencyFund > 0 ? Math.round((impact.totalContingencyFund / Math.max(totalAmount, 1)) * 1000) / 10 : 0, change: 0 },
-    );
-  } catch (impactErr) {
-    console.warn('Impact calculation error (non-critical):', impactErr);
-  }
+  // [CL-FACT-COMPUTE-20260630] 임팩트 계산·K16~K18 방출은 values 배열 이전으로 이동(K18 분모 스코프 정합).
 
   return {
     kpiValues: values,

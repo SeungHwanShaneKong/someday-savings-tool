@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 // [CL-AI-HIERARCHY-20260308-163000]
-import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
 // [CL-TREE-REDESIGN-20260403] 긴급도 카운트용
@@ -198,10 +198,16 @@ export default function Checklist() {
                 setTimelineOpen(true);
               }
             }}
-            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 px-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-sm sm:text-base font-medium hover:from-blue-100 hover:to-indigo-100 transition-all active:scale-[0.98]"
+            // [CL-BTNPERFECT-20260629] 진행 중 비활성+스피너(체감 멈춤 제거) — 소스 in-flight 가드와 이중 안전.
+            disabled={timelineLoading}
+            aria-busy={timelineLoading || undefined}
+            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 px-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-sm sm:text-base font-medium hover:from-blue-100 hover:to-indigo-100 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
           >
-            <Sparkles className="w-4 h-4" />
-            AI 일정 최적화
+            {timelineLoading ? (
+              <><Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" /> 최적화 중…</>
+            ) : (
+              <><Sparkles className="w-4 h-4" /> AI 일정 최적화</>
+            )}
           </button>
         )}
 

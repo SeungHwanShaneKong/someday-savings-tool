@@ -17,7 +17,89 @@ import {
   type Article as ArticleData,
   type ArticleBlock,
 } from '@/content/articles';
-import { ArrowLeft, Sparkles, Lightbulb, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Sparkles, Lightbulb, ChevronRight, CalendarClock, ShieldCheck, ListChecks, BookOpen, ExternalLink } from 'lucide-react';
+
+/* ─── [CL-ADSENSE-CONTENT-20260630] E-E-A-T 바이라인 ─── */
+function Byline({ article }: { article: ArticleData }) {
+  const author = article.author ?? '웨딩셈 편집팀';
+  const reviewedBy = article.reviewedBy ?? '웨딩셈 편집팀';
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground border-y border-border/50 py-3 mt-4">
+      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+        <BookOpen className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> {author}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" /> {reviewedBy} 감수
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <CalendarClock className="w-3.5 h-3.5" aria-hidden="true" /> 최종 수정 {article.dateModified}
+      </span>
+      <Link to="/editorial/" className="inline-flex items-center gap-1 text-primary hover:underline">
+        편집·제작 원칙
+      </Link>
+    </div>
+  );
+}
+
+/* ─── [CL-ADSENSE-CONTENT-20260630] 목차(TOC) — 섹션 heading 기반 ─── */
+function TableOfContents({ sections }: { sections: ArticleData['sections'] }) {
+  if (sections.length < 3) return null; // 짧은 글은 생략
+  return (
+    <nav aria-label="목차" className="bg-secondary/40 rounded-xl p-4 mb-8">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground mb-2">
+        <ListChecks className="w-4 h-4 text-primary" aria-hidden="true" /> 목차
+      </p>
+      <ol className="space-y-1.5 list-decimal marker:text-muted-foreground pl-5">
+        {sections.map((s, i) => (
+          <li key={i} className="text-sm">
+            <a href={`#sec-${i}`} className="text-muted-foreground hover:text-primary transition-colors">
+              {s.heading}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/* ─── [CL-ADSENSE-CONTENT-20260630] 참고 자료(출처) + 방법론 ─── */
+function Sources({ article }: { article: ArticleData }) {
+  if ((!article.sources || article.sources.length === 0) && !article.methodology) return null;
+  return (
+    <section className="mb-10 bg-card border border-border/50 rounded-2xl p-5">
+      <h2 className="text-base font-semibold text-foreground mb-3 flex items-center gap-1.5">
+        <BookOpen className="w-4 h-4 text-primary" aria-hidden="true" /> 참고 자료 및 데이터 출처
+      </h2>
+      {article.sources && article.sources.length > 0 && (
+        <ul className="space-y-2 mb-3">
+          {article.sources.map((s, i) => (
+            <li key={i} className="text-sm text-muted-foreground leading-relaxed">
+              {s.url ? (
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="nofollow noopener noreferrer"
+                  className="text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  {s.title} <ExternalLink className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+                </a>
+              ) : (
+                <span className="text-foreground">{s.title}</span>
+              )}
+              {s.publisher && <span className="text-muted-foreground"> · {s.publisher}</span>}
+              {s.note && <span className="block text-xs text-muted-foreground/80 mt-0.5">{s.note}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {article.methodology && (
+        <p className="text-xs text-muted-foreground/90 leading-relaxed border-t border-border/50 pt-3">
+          <span className="font-medium text-foreground">데이터 산정 방법</span> · {article.methodology}
+        </p>
+      )}
+    </section>
+  );
+}
 
 /* ─── 본문 블록 렌더러 ─── */
 function Block({ block }: { block: ArticleBlock }) {
@@ -27,6 +109,13 @@ function Block({ block }: { block: ArticleBlock }) {
         <p className="text-sm text-muted-foreground leading-relaxed mb-3">
           {block.text}
         </p>
+      );
+    // [CL-ADSENSE-CONTENT-20260630] 소제목(H3) — pillar 본문 구조화
+    case 'heading3':
+      return (
+        <h3 className="text-base font-semibold text-foreground mt-5 mb-2 leading-snug">
+          {block.text}
+        </h3>
       );
     case 'list':
       return (
@@ -182,17 +271,25 @@ export default function Article() {
               {article.title}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">{article.intro}</p>
+            {/* [CL-ADSENSE-CONTENT-20260630] E-E-A-T 바이라인(저자·검수·최종수정·편집원칙) */}
+            <Byline article={article} />
           </div>
+
+          {/* [CL-ADSENSE-CONTENT-20260630] 목차 */}
+          <TableOfContents sections={article.sections} />
 
           {/* Sections */}
           {article.sections.map((section, si) => (
-            <section key={si} className="mb-10">
+            <section key={si} id={`sec-${si}`} className="mb-10 scroll-mt-20">
               <h2 className="text-lg font-semibold text-foreground mb-3">{section.heading}</h2>
               {section.blocks.map((block, bi) => (
                 <Block key={bi} block={block} />
               ))}
             </section>
           ))}
+
+          {/* [CL-ADSENSE-CONTENT-20260630] 참고 자료(출처) + 자체추정 방법론 */}
+          <Sources article={article} />
 
           {/* [CL-SEO-ARTICLE-FAQ-20260626] 아티클 FAQ (있을 때만) — 본문 정적 렌더 + FAQPage 리치결과 동반 */}
           {article.faqs && article.faqs.length > 0 && (

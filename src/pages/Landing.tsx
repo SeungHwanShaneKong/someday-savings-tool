@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, forwardRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+// [CL-ADSENSE-CONTENT-20260630] 홈 콘텐츠화 — 인기 가이드 카드용 아티클 레지스트리
+import { ARTICLES } from '@/content/articles';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -445,6 +447,90 @@ export default function Landing() {
             </button>
           )}
         </div>
+
+        {/* ─── [CL-ADSENSE-CONTENT-20260630] 공개 콘텐츠 섹션 (비로그인·크롤 가능·프리렌더) ─── */}
+        <section className="w-full max-w-lg mt-16 animate-fade-up" style={{ animationDelay: '0.45s' }}>
+          {/* 서비스 설명(실텍스트) */}
+          <h2 className="text-xl font-bold text-foreground mb-3">웨딩셈은 결혼 준비를 이렇게 도와드려요</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+            결혼 준비는 정보 비대칭이 큰 영역입니다. "결혼 비용이 얼마"라는 숫자는 신혼집 포함 여부에 따라 수천만 원에서 수억 원까지
+            갈리고, 무엇을 언제부터 해야 할지도 막막합니다. 웨딩셈은 <strong className="text-foreground">공개 통계와 실제 견적 사례</strong>를
+            바탕으로 항목별 예산을 투명하게 계획하고, D-day 기준 체크리스트와 AI 상담으로 준비 과정을 단계별로 안내합니다.
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-8">
+            아래는 한국소비자원·통계청·결혼정보회사의 공개 자료로 정리한 결혼 비용 개요입니다. 모든 수치는 범위로 보고
+            지역·시기·업체에 따라 달라질 수 있으니, 자세한 산정 기준은 <Link to="/guide/wedding-cost-data/" className="text-primary hover:underline">결혼 비용 데이터·방법론</Link> 페이지를 참고하세요.
+          </p>
+
+          {/* 결혼 비용 한눈에 (실데이터 스냅샷) */}
+          <h3 className="text-base font-semibold text-foreground mb-3">결혼 비용 한눈에 (공개 자료 기준)</h3>
+          <div className="overflow-x-auto mb-2">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left font-semibold text-foreground border-b border-border py-2 px-2">항목</th>
+                  <th className="text-left font-semibold text-foreground border-b border-border py-2 px-2">평균 (개요)</th>
+                  <th className="text-left font-semibold text-foreground border-b border-border py-2 px-2 whitespace-nowrap">자료</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['결혼식 비용(예식장+스드메)', '약 2,074만 원', '한국소비자원'],
+                  ['신혼집 제외 결혼 비용', '약 5,765만 원', '듀오 2024'],
+                  ['신혼집 포함 총비용', '약 3억 6,173만 원', '듀오 2024'],
+                  ['하객 1인 식대(중간값)', '약 5만 8천 원', '한국소비자원'],
+                  ['평균 하객 수', '약 279명', '듀오'],
+                  ['평균 축의금', '약 11만 7천 원', 'NH농협 2025'],
+                ].map((r) => (
+                  <tr key={r[0]}>
+                    <td className="text-muted-foreground border-b border-border/50 py-2 px-2 align-top">{r[0]}</td>
+                    <td className="text-foreground border-b border-border/50 py-2 px-2 align-top font-medium tabular-nums">{r[1]}</td>
+                    <td className="text-muted-foreground border-b border-border/50 py-2 px-2 align-top whitespace-nowrap">{r[2]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground/70 mb-8">
+            ※ 신혼집이 전체 비용의 약 84%를 차지합니다(듀오 2024). 출처와 산정 기준은 각 가이드 하단 "참고 자료"에 표기합니다.
+          </p>
+
+          {/* 인기 가이드 카드 */}
+          <h3 className="text-base font-semibold text-foreground mb-3">인기 결혼 준비 가이드</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            {ARTICLES.slice(0, 6).map((a) => (
+              <Link
+                key={a.slug}
+                to={`/guide/${a.slug}/`}
+                className="block p-4 rounded-xl bg-card border border-border/50 hover:border-primary/40 transition-colors"
+              >
+                <p className="text-sm font-semibold text-foreground mb-1 leading-snug">{a.title}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{a.description}</p>
+              </Link>
+            ))}
+          </div>
+          <Link to="/guide/" className="inline-flex items-center gap-1 text-sm text-primary hover:underline mb-8">
+            결혼 예산 가이드 전체 보기 →
+          </Link>
+
+          {/* FAQ 프리뷰 */}
+          <h3 className="text-base font-semibold text-foreground mb-3 mt-4">자주 묻는 질문</h3>
+          <div className="space-y-2 mb-3">
+            {[
+              ['결혼 비용은 보통 얼마인가요?', '신혼집을 제외한 결혼식·혼수 비용은 평균 약 2,100만~7,700만 원 범위이며, 신혼집을 포함하면 수도권 기준 수억 원에 이릅니다. 하객 규모와 신혼집 마련 방식이 총비용을 크게 좌우합니다.'],
+              ['결혼 준비는 무엇부터 시작하나요?', '예식일과 총예산을 먼저 정한 뒤 예식장 → 스드메 → 혼수·예단 순으로 진행하는 것이 일반적입니다. 웨딩셈의 D-day 체크리스트가 시기별 할 일을 자동으로 안내합니다.'],
+              ['스드메 비용은 어느 정도인가요?', '스튜디오·드레스·메이크업 패키지는 구성에 따라 차이가 크며, 한국소비자원 참가격 기준 전국 중간값은 약 292만 원 수준입니다. 헬퍼비·교통비 등 숨은 비용까지 견적서로 비교하는 것이 중요합니다.'],
+            ].map((qa) => (
+              <details key={qa[0]} className="group bg-card border border-border/50 rounded-xl px-4 py-3">
+                <summary className="text-sm font-semibold text-foreground cursor-pointer list-none">{qa[0]}</summary>
+                <p className="text-sm text-muted-foreground leading-relaxed mt-2">{qa[1]}</p>
+              </details>
+            ))}
+          </div>
+          <Link to="/faq/" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
+            자주 묻는 질문 더 보기 →
+          </Link>
+        </section>
       </main>
 
       {/* ─── Footer ─── */}

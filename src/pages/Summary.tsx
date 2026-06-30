@@ -72,6 +72,9 @@ export default function Summary() {
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [viewMode, setViewMode] = useState<'individual' | 'comparison'>('comparison');
   const [isDownloading, setIsDownloading] = useState(false);
+  // [CL-BTNPERFECT-20260629] 동기 더블서밋 게이트(state 는 async → 같은 틱 연타 누수). 공유/다운로드 레이스 차단.
+  const sharingRef = useRef(false);
+  const downloadingRef = useRef(false);
 
   const total = getTotal();
   const budgetsForComparison = getBudgetsForComparison();
@@ -122,10 +125,11 @@ export default function Summary() {
   }
 
   const handleDownloadImage = async () => {
-    if (!summaryRef.current || isDownloading) return;
-    
+    // [CL-BTNPERFECT-20260629] 동기 게이트 — html2canvas 렌더 중 연타로 중복 렌더/다운로드가 겹치는 것 차단.
+    if (!summaryRef.current || downloadingRef.current) return;
+    downloadingRef.current = true;
     setIsDownloading(true);
-    
+
     try {
       // Clone the element and add CTA footer for image export
       const originalElement = summaryRef.current;
@@ -198,15 +202,17 @@ export default function Summary() {
         variant: 'destructive',
       });
     } finally {
+      downloadingRef.current = false;
       setIsDownloading(false);
     }
   };
 
   const handleGenerateShareLink = async () => {
-    if (!activeBudgetId) return;
-    
+    // [CL-BTNPERFECT-20260629] 동기 게이트(ref) — 같은 틱 더블클릭이 select→insert 레이스로 중복 공유링크를 만드는 것 차단(state 는 async).
+    if (!activeBudgetId || sharingRef.current) return;
+    sharingRef.current = true;
     setIsGeneratingShare(true);
-    
+
     try {
       const { data: existing } = await supabase
         .from('shared_budgets')
@@ -239,6 +245,7 @@ export default function Summary() {
         variant: 'destructive',
       });
     } finally {
+      sharingRef.current = false;
       setIsGeneratingShare(false);
     }
   };

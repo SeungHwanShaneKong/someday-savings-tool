@@ -21,7 +21,8 @@ export interface LegalPageSection {
 }
 
 export interface LegalPage {
-  key: 'privacy' | 'terms' | 'about' | 'contact';
+  // [CL-ADSENSE-CONTENT-20260630] 'editorial'(편집·제작 원칙) 추가 — E-E-A-T 신뢰 신호
+  key: 'privacy' | 'terms' | 'about' | 'contact' | 'editorial';
   /** trailing-slash 라우트(프리렌더/canonical) */
   path: string;
   /** 검색 <title> */
@@ -300,11 +301,102 @@ const about: LegalPage = {
       ],
     },
     {
-      heading: '운영 주체',
+      heading: '운영팀과 편집팀',
       blocks: [
         {
           type: 'paragraph',
-          text: `본 서비스는 ${OPERATOR_NAME}가 운영합니다. 서비스 관련 문의는 문의 페이지를 통해 연락 주시기 바랍니다.`,
+          text: `본 서비스는 ${OPERATOR_NAME}가 운영합니다. 웨딩셈 편집팀은 결혼 준비 정보를 다루는 콘텐츠 제작·검수를 담당하며, 공개 통계와 실제 견적 사례를 교차 확인해 가이드를 작성합니다.`,
+        },
+        {
+          type: 'list',
+          items: [
+            '운영 주체: ' + OPERATOR_NAME,
+            '문의: ' + CONTACT_EMAIL + ' (서비스·제휴·개인정보)',
+            '콘텐츠 제작·검수: 웨딩셈 편집팀',
+            '콘텐츠 제작 기준과 데이터 출처 정책은 「편집·제작 원칙」 페이지에서 투명하게 공개합니다.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '콘텐츠 제작 방법론(요약)',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: '웨딩셈의 모든 비용 가이드는 ① 공개된 결혼 비용 통계·조사(검증 가능한 경우 출처를 본문에 링크), ② 실제 견적·후기 사례, ③ 웨딩셈이 자체적으로 정리한 추정 범위(기준·면책 명시)를 결합해 작성합니다. 특정 업체를 홍보하거나 근거 없는 수치를 임의로 만들지 않으며, 가격은 항상 "범위"로 제시하고 지역·시기·업체에 따른 편차를 함께 안내합니다.',
+        },
+      ],
+    },
+  ],
+};
+
+/* ════════════════ [CL-ADSENSE-CONTENT-20260630] 편집·제작 원칙 ════════════════ */
+const editorial: LegalPage = {
+  key: 'editorial',
+  path: '/editorial/',
+  seoTitle: '편집·제작 원칙 - 데이터 출처와 검수 기준 | 웨딩셈',
+  title: '편집·제작 원칙',
+  description:
+    '웨딩셈이 결혼 비용 가이드를 어떻게 제작·검수하는지, 데이터 출처와 갱신 주기, 정정 절차를 투명하게 공개합니다. 신뢰할 수 있는 정보를 위한 우리의 약속입니다.',
+  intro:
+    '웨딩셈은 결혼을 준비하는 분들이 믿고 참고할 수 있는 정보를 제공하기 위해 명확한 제작·검수 원칙을 따릅니다. 이 페이지는 우리가 콘텐츠를 어떻게 만들고, 어떤 데이터를 쓰며, 어떻게 갱신·정정하는지를 투명하게 설명합니다.',
+  showUpdated: true,
+  sections: [
+    {
+      heading: '콘텐츠 제작 원칙',
+      blocks: [
+        {
+          type: 'list',
+          items: [
+            '정확성 우선: 모든 비용은 단정적 숫자가 아니라 "범위"로 제시하고, 지역·시기·업체별 편차를 함께 안내합니다.',
+            '근거 기반: 가능한 경우 공개 통계·조사를 본문에 출처로 링크하고, 외부 근거가 없는 항목은 "웨딩셈 자체 추정"임을 명시합니다.',
+            '날조 금지: 존재하지 않는 출처나 임의로 부풀린 수치를 만들지 않습니다.',
+            '중립성: 특정 업체·브랜드를 광고하거나 대가를 받고 순위를 매기지 않습니다.',
+            '실용성: 체크리스트·표·사례 중심으로, 실제 준비에 바로 쓸 수 있게 구성합니다.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '데이터 출처 정책',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: '웨딩셈의 비용 범위는 세 가지 축으로 작성합니다.',
+        },
+        {
+          type: 'list',
+          items: [
+            '① 공개 통계·조사: 통계청 등 공공기관 자료, 결혼정보회사·소비자기관의 공개 발표 등 검증 가능한 자료(해당 글 하단 "참고 자료"에 링크).',
+            '② 실제 견적·후기 사례: 공개된 견적서·후기에서 반복적으로 확인되는 가격대.',
+            '③ 웨딩셈 자체 추정: 위 자료로 직접 커버되지 않는 항목은 보수적 범위로 추정하고, 그 사실과 기준을 본문에 명시합니다.',
+          ],
+        },
+        {
+          type: 'callout',
+          text: '모든 정보는 참고용입니다. 실제 계약 전에는 반드시 해당 업체·기관의 최신 공식 정보를 직접 확인하시기 바랍니다.',
+        },
+      ],
+    },
+    {
+      heading: '검수 절차',
+      blocks: [
+        {
+          type: 'list',
+          items: [
+            '작성: 웨딩셈 편집팀이 주제별로 자료를 모아 초안을 작성합니다.',
+            '교차 확인: 본문의 수치·주장을 공개 자료·사례와 대조해 검수합니다.',
+            '갱신: 시장 변화·통계 갱신에 맞춰 정기적으로 본문과 최종 수정일을 업데이트합니다.',
+          ],
+        },
+      ],
+    },
+    {
+      heading: '갱신과 정정',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: `각 가이드 상단에는 최종 수정일이 표시됩니다. 내용에 오류가 있거나 더 정확한 자료를 알고 계시다면 ${CONTACT_EMAIL} 으로 알려주세요. 확인 후 신속히 정정하고 수정 이력을 반영합니다.`,
         },
       ],
     },
@@ -362,6 +454,7 @@ export const LEGAL_PAGES: Record<LegalPage['key'], LegalPage> = {
   terms,
   about,
   contact,
+  editorial, // [CL-ADSENSE-CONTENT-20260630]
 };
 
 export function getLegalPage(key: string | undefined): LegalPage | undefined {
@@ -369,4 +462,4 @@ export function getLegalPage(key: string | undefined): LegalPage | undefined {
   return LEGAL_PAGES[key as LegalPage['key']];
 }
 
-export const LEGAL_PAGE_LIST: LegalPage[] = [privacy, terms, about, contact];
+export const LEGAL_PAGE_LIST: LegalPage[] = [privacy, terms, about, contact, editorial];

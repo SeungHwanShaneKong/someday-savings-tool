@@ -98,6 +98,10 @@ export default function Footer() {
             <Link to="/contact/" className="text-xs text-muted-foreground hover:text-primary transition-colors">
               문의
             </Link>
+            {/* [CL-ADSENSE-CONTENT-20260630] 편집·제작 원칙(E-E-A-T) */}
+            <Link to="/editorial/" className="text-xs text-muted-foreground hover:text-primary transition-colors">
+              편집·제작 원칙
+            </Link>
           </nav>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="flex items-center gap-2">

@@ -17,6 +17,9 @@ function Block({ block }: { block: ArticleBlock }) {
   switch (block.type) {
     case 'paragraph':
       return <p className="text-sm text-muted-foreground leading-relaxed mb-3">{block.text}</p>;
+    // [CL-ADSENSE-CONTENT-20260630] 소제목(H3) 지원
+    case 'heading3':
+      return <h3 className="text-base font-semibold text-foreground mt-5 mb-2 leading-snug">{block.text}</h3>;
     case 'list':
       return (
         <ul className="list-disc marker:text-primary pl-5 space-y-1.5 mb-3">

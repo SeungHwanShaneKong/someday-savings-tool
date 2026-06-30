@@ -1,3 +1,6 @@
+// [CL-BTNPERFECT-20260629] 성능: data/total useMemo + React.memo + ResponsiveContainer debounce.
+//   부모 리렌더마다 카테고리 집계 재계산·PieChart 재렌더(특히 리사이즈 폭주)를 제거. 행위/시각 불변.
+import { memo, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
 import { BudgetItem } from '@/hooks/useBudget';
@@ -7,8 +10,8 @@ interface BudgetDonutChartProps {
   items: BudgetItem[];
 }
 
-export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
-  const data = BUDGET_CATEGORIES.map((category, index) => {
+function BudgetDonutChartImpl({ items }: BudgetDonutChartProps) {
+  const data = useMemo(() => BUDGET_CATEGORIES.map((category, index) => {
     const categoryItems = items.filter(item => item.category === category.id);
     const total = categoryItems.reduce((sum, item) => sum + item.amount, 0);
     return {
@@ -17,9 +20,9 @@ export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
       icon: category.icon,
       color: CHART_COLORS[index % CHART_COLORS.length],
     };
-  }).filter(d => d.value > 0);
+  }).filter(d => d.value > 0), [items]);
 
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const total = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
 
   if (data.length === 0) {
     return (
@@ -31,7 +34,7 @@ export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
 
   return (
     <div className="relative">
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={280} debounce={150}>
         <PieChart>
           <Pie
             data={data}
@@ -82,3 +85,6 @@ export function BudgetDonutChart({ items }: BudgetDonutChartProps) {
     </div>
   );
 }
+
+// [CL-BTNPERFECT-20260629] items 참조 불변 시 리렌더 스킵(부모 빈번 리렌더 대비).
+export const BudgetDonutChart = memo(BudgetDonutChartImpl);

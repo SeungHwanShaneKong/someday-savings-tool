@@ -64,10 +64,18 @@ export function getStatusColor(status: KPIStatus) {
   }
 }
 
+// [CL-FACT-KPISTATE-20260630] 정직상태(개선1) — 분모 위조·무데이터·degrade 를 가짜 수치로 뭉개지 않도록
+//   KPIValue 에 가산형 측정상태를 부여. state 미지정 = 'ok'(기존 동작 100% 보존 → 회귀 0).
+export type KPIMeasureState = 'ok' | 'zero' | 'no-data' | 'degraded' | 'unmeasurable';
+
 export interface KPIValue {
   id: string;
   value: number;
   change: number; // 전기 대비 변화율 (%)
+  /** [CL-FACT-KPISTATE-20260630] 측정 정직상태. 미지정=ok(value 그대로 표시). 비 ok/zero 면 '측정불가/데이터없음/불러오기실패' 칩. */
+  state?: KPIMeasureState;
+  /** [CL-FACT-KPISTATE-20260630] 표본 커버리지(분자 n / 분모 m) — 리텐션·임팩트 등 '관측 N/M' 표기용. */
+  coverage?: { n: number; m: number };
 }
 
 export interface TrendDataPoint {

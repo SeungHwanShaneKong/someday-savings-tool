@@ -38,8 +38,10 @@ describe('StaticPage 렌더', () => {
 });
 
 describe('legal-pages 데이터 무결성', () => {
-  it('LP.1 4종 모두 존재 + 필수 필드 + trailing-slash path', () => {
-    expect(LEGAL_PAGE_LIST).toHaveLength(4);
+  it('LP.1 5종 모두 존재 + 필수 필드 + trailing-slash path', () => {
+    // [CL-ADSENSE-CONTENT-20260630] editorial(편집·제작 원칙) 추가 → 4→5
+    expect(LEGAL_PAGE_LIST).toHaveLength(5);
+    expect(getLegalPage('editorial')?.path).toBe('/editorial/');
     for (const p of LEGAL_PAGE_LIST) {
       expect(p.title).toBeTruthy();
       expect(p.path).toMatch(/^\/[a-z]+\/$/);

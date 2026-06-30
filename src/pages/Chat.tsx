@@ -5,6 +5,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAIChat } from '@/hooks/useAIChat';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { useSEO } from '@/hooks/useSEO';
+// [CL-BTNPERFECT-20260629] 대화 전체 삭제는 파괴적·비가역 → 확인 다이얼로그 + useAsyncAction(더블서밋 차단·실패 토스트)
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function Chat() {
   const navigate = useNavigate();
@@ -28,6 +34,11 @@ export default function Chat() {
     limitReached,
   } = useAIChat({ feature: 'qa' });
 
+  // [CL-BTNPERFECT-20260629] 대화 삭제 — 동기 게이트(더블서밋)+실패 시 표준 토스트
+  const clear = useAsyncAction(async () => { await clearMessages(); }, {
+    toastOnError: '대화 삭제에 실패했어요. 잠시 후 다시 시도해주세요.',
+  });
+
   if (!authLoading && !user) {
     return <Navigate to="/auth" replace />;
   }
@@ -46,15 +57,33 @@ export default function Chat() {
           <h1 className="text-base font-semibold text-foreground">
             💬 웨딩셈 Q&A
           </h1>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={clearMessages}
-            disabled={messages.length === 0}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                disabled={messages.length === 0 || clear.pending}
+                aria-label="대화 기록 삭제"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>대화 기록을 삭제할까요?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  지금까지의 모든 Q&amp;A 대화가 삭제돼요. 이 작업은 되돌릴 수 없어요.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>취소</AlertDialogCancel>
+                <AlertDialogAction onClick={() => clear.run()} className="bg-destructive hover:bg-destructive/90">
+                  삭제
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </header>
 

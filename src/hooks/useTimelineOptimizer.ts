@@ -35,9 +35,14 @@ export function useTimelineOptimizer() {
     completedItems: string[];
     budgetTotal?: number;
   } | null>(null);
+  // [CL-BTNPERFECT-20260629] 동기 in-flight 게이트 — 버튼/재시도 연타가 중복 AI 요청(비용·레이스)을 내는 것을 소스에서 차단.
+  //   setLoading 은 async 라 같은 틱 더블클릭을 못 막음 → ref 로 즉시 차단(AI 버튼·폴백/에러 재시도 모두 커버).
+  const inFlightRef = useRef(false);
 
   const optimize = useCallback(
     async (weddingDate: string, completedItems: string[], budgetTotal?: number): Promise<void> => {
+      if (inFlightRef.current) return; // 진행 중이면 무시(중복 호출 차단)
+      inFlightRef.current = true;
       setLoading(true);
       setError(null);
       setIsFallback(false);
@@ -64,6 +69,7 @@ export function useTimelineOptimizer() {
         setResult(fallback);
         setIsFallback(true);
       } finally {
+        inFlightRef.current = false;
         setLoading(false);
       }
     },

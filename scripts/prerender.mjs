@@ -46,11 +46,15 @@ const ROUTES = [
   // [CL-SEO-ARTICLE-FAQ-20260626] T3 신규 아티클 2편(FAQPage 동반)
   { path: '/guide/wedding-prep-timeline/',     marker: '결혼 준비 12개월 타임라인',        jsonLdType: 'Article' },
   { path: '/guide/wedding-contract-checklist/', marker: '웨딩 계약서 작성·확인 체크리스트', jsonLdType: 'Article' },
+  // [CL-ADSENSE-CONTENT-20260630] 데이터/방법론 허브(원본성·E-E-A-T)
+  { path: '/guide/wedding-cost-data/',          marker: '결혼 비용 데이터·산정 방법론',      jsonLdType: 'Article' },
   // [CL-ADSENSE-20260619-234411] 정책/정보 페이지 (AdSense 필수)
   { path: '/privacy/',                  marker: '개인정보처리방침',                 jsonLdType: null },
   { path: '/terms/',                    marker: '이용약관',                         jsonLdType: null },
   { path: '/about/',                    marker: '웨딩셈 소개',                       jsonLdType: null },
   { path: '/contact/',                  marker: '문의하기',                         jsonLdType: null },
+  // [CL-ADSENSE-CONTENT-20260630] 편집·제작 원칙(E-E-A-T 신뢰 신호)
+  { path: '/editorial/',                marker: '편집·제작 원칙',                   jsonLdType: null },
 ];
 
 // 프리렌더 중 abort 할 외부 도메인 (광고/애널리틱스) — 태그는 DOM에 남아 유저 런타임엔 정상 로드
@@ -69,7 +73,12 @@ function outFile(routePath) {
 //   - Article/FAQPage/HowTo 페이지는 BreadcrumbList 를 동반 주입(Article.tsx/FAQ.tsx/Guide.tsx) → 자동 동반 검증.
 function verify(routePath, html, marker, jsonLdType, requireTypes) {
   const errs = [];
-  if (!html.includes(marker)) errs.push(`본문 마커 "${marker}" 누락`);
+  // [CL-AUDIT-R9-MARKER-20260630] 본문 마커는 <main> 영역에서만 검증(근본수정).
+  //   과거: 전체 HTML includes → Footer 링크 텍스트('자주 묻는 질문'·'개인정보처리방침'·'이용약관'·'편집·제작 원칙')와
+  //   충돌해 페이지 본문 미렌더에도 통과할 수 있었음(검증 무력화). <main> 스코핑으로 페이지별 본문만 변별.
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  const mainHtml = mainMatch ? mainMatch[0] : html;
+  if (!mainHtml.includes(marker)) errs.push(`본문 마커 "${marker}" 누락(<main> 내)`);
   if (!/rel="canonical"/i.test(html)) errs.push('canonical 태그 누락');
   if (!html.includes(`${BASE_DOMAIN}${routePath}`)) errs.push(`canonical URL ${routePath} 불일치`);
   const dynamic = jsonLdType ? [jsonLdType] : [];
@@ -130,7 +139,8 @@ async function run() {
       // React 렌더 + useSEO 주입 완료를 AND 조건으로 대기
       await page.waitForFunction(
         (marker, expectedCanonical, jsonLdType) => {
-          const root = document.getElementById('root');
+          // [CL-AUDIT-R9-MARKER-20260630] 마커는 <main> 본문에서만 대기(Footer 충돌 제거). 폴백 #root.
+          const root = document.querySelector('main') || document.getElementById('root');
           if (!root || !root.innerText || !root.innerText.includes(marker)) return false;
           const canonical = document.querySelector('link[rel="canonical"]');
           if (!canonical || canonical.href !== expectedCanonical) return false;

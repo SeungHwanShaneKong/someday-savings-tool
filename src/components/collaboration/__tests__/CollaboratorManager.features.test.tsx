@@ -46,12 +46,15 @@ describe('CollaboratorManager — F5 참여자 이름 표시', () => {
     expect(screen.getAllByText(/파트너/).length).toBeGreaterThan(0);
   });
 
-  it('CMF.3 오너는 협업자(editor) 해제 X 노출 → 클릭 시 removeCollaborator(user_id)', () => {
+  // [CL-BTNPERFECT-20260629] 파괴적 액션 → 확인 다이얼로그 도입. 트리거만으론 호출 0, 확인(해제) 시에만 호출.
+  it('CMF.3 오너는 협업자(editor) 해제 X 노출 → 확인 다이얼로그 거쳐 removeCollaborator(user_id)', async () => {
     h.collaborators = [{ user_id: 'p9', role: 'editor', display_name: '서연', isMe: false }];
     renderWithProviders(<CollaboratorManager budgetId="b1" isOwner={true} />);
 
-    const removeBtn = screen.getByLabelText(/공동관리 해제/);
-    fireEvent.click(removeBtn);
+    fireEvent.click(screen.getByLabelText(/공동관리 해제/));
+    expect(h.removeCollaborator).not.toHaveBeenCalled(); // 확인 전엔 호출 안 됨(실수 제거 방지)
+
+    fireEvent.click(await screen.findByText('해제'));
     expect(h.removeCollaborator).toHaveBeenCalledWith('p9');
   });
 

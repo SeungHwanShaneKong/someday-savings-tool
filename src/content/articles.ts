@@ -10,12 +10,16 @@
 
 import { SITE_ORIGIN } from '@/config/site';
 import { ARTICLE_FAQS, NEW_ARTICLES } from './articles-t3'; // [CL-SEO-ARTICLE-FAQ-20260626] T3 FAQ 맵 + 신규 아티클
+import { ARTICLE_SOURCES, ARTICLE_METHODOLOGY } from './articles-sources'; // [CL-ADSENSE-CONTENT-20260630] 출처/방법론 맵(원본성)
+import { NEW_T4, ARTICLE_FAQS_T4 } from './articles-t4'; // [CL-ADSENSE-CONTENT-20260630] 데이터 허브 + 신규 pillar
 
 const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
 
 /* ─── 콘텐츠 블록 모델 ─── */
+// [CL-ADSENSE-CONTENT-20260630] heading3(소제목) 추가 — 길어진 pillar 본문의 구조·가독성·키워드 커버리지 강화(가산형).
 export type ArticleBlock =
   | { type: 'paragraph'; text: string }
+  | { type: 'heading3'; text: string }
   | { type: 'list'; items: string[] }
   | { type: 'table'; headers: string[]; rows: string[][] }
   | { type: 'callout'; text: string };
@@ -51,6 +55,15 @@ export interface Article {
   image?: string;
   /** [CL-SEO-ARTICLE-FAQ-20260626] 본문 하단 FAQ + FAQPage 리치결과(아티클별). 미설정 시 미렌더 */
   faqs?: { q: string; a: string }[];
+  /** [CL-ADSENSE-CONTENT-20260630] E-E-A-T·원본성 강화 필드 (전부 optional·additive — 미설정 시 기존 동작 보존) */
+  /** 저자(바이라인·JSON-LD author). 미설정 시 '웨딩셈 편집팀' */
+  author?: string;
+  /** 검수자 표기(바이라인). 미설정 시 '웨딩셈 편집팀 감수' */
+  reviewedBy?: string;
+  /** 참고 자료(검증 가능한 실제 공개 출처). 본문 '참고 자료' 섹션 + JSON-LD citation. */
+  sources?: { title: string; url?: string; publisher?: string; note?: string }[];
+  /** 자체 추정 방법론(외부 출처 없을 때 투명 공개 — 기준·표본·면책). 본문 callout. */
+  methodology?: string;
 }
 
 /* ─── 아티클 데이터 ─── */
@@ -1075,8 +1088,13 @@ export const ARTICLES: Article[] = [
 
 // [CL-SEO-ARTICLE-FAQ-20260626] T3 병합: 신규 아티클 추가 + 기존 아티클에 FAQ 부착(slug 기준, 인라인 faqs 우선).
 ARTICLES.push(...NEW_ARTICLES);
+ARTICLES.push(...NEW_T4); // [CL-ADSENSE-CONTENT-20260630] 데이터 허브 + 신규 pillar
 for (const a of ARTICLES) {
   if (!a.faqs && ARTICLE_FAQS[a.slug]) a.faqs = ARTICLE_FAQS[a.slug];
+  if (!a.faqs && ARTICLE_FAQS_T4[a.slug]) a.faqs = ARTICLE_FAQS_T4[a.slug]; // [CL-ADSENSE-CONTENT-20260630]
+  // [CL-ADSENSE-CONTENT-20260630] 원본성: 인라인 미설정 시 검증된 출처/방법론 맵을 부착(전 아티클 출처 보유).
+  if (!a.sources && ARTICLE_SOURCES[a.slug]) a.sources = ARTICLE_SOURCES[a.slug];
+  if (!a.methodology && ARTICLE_METHODOLOGY[a.slug]) a.methodology = ARTICLE_METHODOLOGY[a.slug];
 }
 
 /* ─── 조회 헬퍼 ─── */
@@ -1095,7 +1113,7 @@ export function countArticleWords(article: Article): number {
   for (const sec of article.sections) {
     n += (sec.heading ?? '').length;
     for (const b of sec.blocks) {
-      if (b.type === 'paragraph' || b.type === 'callout') n += b.text.length;
+      if (b.type === 'paragraph' || b.type === 'callout' || b.type === 'heading3') n += b.text.length;
       else if (b.type === 'list') n += b.items.reduce((s, it) => s + it.length, 0);
       else if (b.type === 'table') n += b.rows.reduce((s, r) => s + r.reduce((s2, c) => s2 + c.length, 0), 0);
     }
@@ -1121,12 +1139,25 @@ export function getArticleJsonLd(article: Article) {
     articleSection: article.category ?? '결혼 준비 가이드',
     wordCount: countArticleWords(article),
     ...(article.keywords && article.keywords.length ? { keywords: article.keywords.join(', ') } : {}),
-    author: { '@type': 'Organization', name: '웨딩셈' },
+    // [CL-ADSENSE-CONTENT-20260630] E-E-A-T: 저자/편집자/검수 명시(편집팀 기본) — '자동 생성 의심' 완화.
+    author: { '@type': 'Organization', name: article.author ?? '웨딩셈 편집팀' },
+    editor: { '@type': 'Organization', name: article.reviewedBy ?? '웨딩셈 편집팀' },
     publisher: {
       '@type': 'Organization',
       name: '웨딩셈',
       logo: { '@type': 'ImageObject', url: `${BASE_DOMAIN}/favicon.png` },
     },
+    // [CL-ADSENSE-CONTENT-20260630] 원본성: 참고 자료를 citation 으로 노출(있을 때만).
+    ...(article.sources && article.sources.length
+      ? {
+          citation: article.sources.map((s) => ({
+            '@type': 'CreativeWork',
+            name: s.title,
+            ...(s.url ? { url: s.url } : {}),
+            ...(s.publisher ? { publisher: { '@type': 'Organization', name: s.publisher } } : {}),
+          })),
+        }
+      : {}),
     mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
     image,
   };

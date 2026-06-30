@@ -25,6 +25,7 @@ import {
   KPI_DEFINITIONS, getKPIStatus, getStatusColor,
   type KPIValue
 } from '@/lib/kpi-definitions';
+import { kpiFact } from '@/lib/admin/kpi-compute'; // [CL-FACT-KPISTATE-20260630] 정직상태 표시(가짜 수치 차단)
 import type { SummaryKPIs } from '@/hooks/useAdminKPI';
 // [CL-ACQ-ADMIN-20260622-233012] 유입경로 소스 한국어 라벨(개선1)
 import { sourceLabel } from '@/lib/analytics/acquisition';
@@ -758,7 +759,9 @@ export default function Admin() {
                 const kv = kpiValues.find(k => k.id === def.id);
                 const value = kv?.value ?? 0;
                 const change = kv?.change ?? 0;
-                const status = getKPIStatus(def, value);
+                // [CL-FACT-KPISTATE-20260630] 정직상태 — 측정불가/데이터없음/불러오기실패면 가짜 수치 대신 라벨 + '참고' 칩.
+                const fact = kpiFact(kv?.state);
+                const status = fact.isFact ? getKPIStatus(def, value) : '참고';
                 const statusColor = getStatusColor(status);
 
                 return (
@@ -773,11 +776,13 @@ export default function Admin() {
                         </div>
                         <p className="text-sm sm:text-base font-medium truncate leading-relaxed">{def.name}</p>
                         <div className="flex items-end gap-1.5">
-                          <span className="text-2xl sm:text-3xl font-bold tabular-nums">
-                            {typeof value === 'number' ? (def.unit === '%' ? `${value}%` : value.toLocaleString()) : value}
+                          <span className={`font-bold tabular-nums ${fact.isFact ? 'text-2xl sm:text-3xl' : 'text-base sm:text-lg text-muted-foreground'}`}>
+                            {fact.isFact ? (def.unit === '%' ? `${value}%` : value.toLocaleString()) : fact.stateLabel}
                           </span>
-                          {def.unit !== '%' && <span className="text-xs sm:text-sm text-muted-foreground mb-0.5">{def.unit}</span>}
+                          {def.unit !== '%' && fact.isFact && <span className="text-xs sm:text-sm text-muted-foreground mb-0.5">{def.unit}</span>}
                         </div>
+                        {/* [CL-FACT-KPISTATE-20260630] 사실 측정값일 때만 전기 대비 변화 표시(비사실 지표는 변화율 무의미) */}
+                        {fact.isFact && (
                         <div className="flex items-center gap-1.5">
                           {change > 0 ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> :
                            change < 0 ? <TrendingDown className="h-3.5 w-3.5 text-red-500" /> :
@@ -787,6 +792,7 @@ export default function Admin() {
                           </span>
                           <span className="text-xs sm:text-sm text-muted-foreground">vs 전기</span>
                         </div>
+                        )}
                         <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{def.description}</p>
                       </Card>
                     </TooltipTrigger>
@@ -874,15 +880,17 @@ export default function Admin() {
                   {KPI_DEFINITIONS.map(def => {
                     const kv = kpiValues.find(k => k.id === def.id);
                     const value = kv?.value ?? 0;
-                    const status = getKPIStatus(def, value);
+                    // [CL-FACT-KPISTATE-20260630] 정직상태 — 비사실 지표는 현재값/상태를 라벨·'참고'로.
+                    const fact = kpiFact(kv?.state);
+                    const status = fact.isFact ? getKPIStatus(def, value) : '참고';
                     const sc = getStatusColor(status);
                     return (
                       <TableRow key={def.id} className="hover:bg-muted/50 transition-colors">
                         <TableCell className="text-sm font-mono">{def.id}</TableCell>
                         <TableCell className="text-sm font-medium">{def.name}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{def.formula}</TableCell>
-                        <TableCell className="text-sm text-right font-semibold tabular-nums">
-                          {def.unit === '%' ? `${value}%` : `${value.toLocaleString()}${def.unit}`}
+                        <TableCell className={`text-sm text-right font-semibold tabular-nums ${fact.isFact ? '' : 'text-muted-foreground'}`}>
+                          {fact.isFact ? (def.unit === '%' ? `${value}%` : `${value.toLocaleString()}${def.unit}`) : fact.stateLabel}
                         </TableCell>
                         <TableCell className="text-xs sm:text-sm text-muted-foreground">
                           {def.thresholds

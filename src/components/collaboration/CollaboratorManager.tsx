@@ -126,15 +126,32 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
                   {c.email && <span className="ml-1 text-[11px] text-muted-foreground/70">· {c.email}</span>}
                   <span className="ml-1 text-[11px] text-muted-foreground/60">· {roleLabel(c.role)}</span>
                 </span>
-                {/* 해제: 오너만, 협업자(오너 row 제외)만 */}
+                {/* 해제: 오너만, 협업자(오너 row 제외)만 — [CL-BTNPERFECT-20260629] 파괴적 액션 → 확인 다이얼로그(실수 제거 방지) */}
                 {isOwner && c.role !== 'owner' && (
-                  <button
-                    onClick={() => removeCollaborator(c.user_id)}
-                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                    aria-label={`${name} 공동관리 해제`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                        aria-label={`${name} 공동관리 해제`}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{name}님과의 공동관리를 해제할까요?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          해제하면 이 분은 더 이상 함께 편집할 수 없어요. 내가 만든 옵션은 그대로 보관돼요.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>취소</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => removeCollaborator(c.user_id)} className="bg-destructive hover:bg-destructive/90">
+                          해제
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </li>
             );

@@ -103,6 +103,8 @@ function AppRoutes() {
           <Route path="/terms" element={<StaticPage pageKey="terms" />} />
           <Route path="/about" element={<StaticPage pageKey="about" />} />
           <Route path="/contact" element={<StaticPage pageKey="contact" />} />
+          {/* [CL-ADSENSE-CONTENT-20260630] 편집·제작 원칙(E-E-A-T) */}
+          <Route path="/editorial" element={<StaticPage pageKey="editorial" />} />
           {/* [CL-COEDIT-E2E-20260620-130000] 공동 예산 초대 수락 (auth·동적 — 비프리렌더) */}
           <Route path="/invite/:token" element={<AcceptInvite />} />
           <Route path="*" element={<NotFound />} />

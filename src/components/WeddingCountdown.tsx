@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useWeddingDate } from '@/hooks/useWeddingDate';
 import { Button } from '@/components/ui/button';
+// [CL-BTNPERFECT-20260629] 저장/초기화 더블서밋 차단 + 진행 중 비활성·스피너(중복 DB write 방지)
+import { AsyncButton } from '@/components/ui/async-button';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -91,7 +94,9 @@ export function WeddingCountdown() {
     }
   }, [isOpen, weddingDate, weddingTime]);
 
-  const handleSave = async () => {
+  // [CL-BTNPERFECT-20260629] useAsyncAction: pendingRef 동기 게이트로 같은 틱 더블클릭 차단(중복 updateWeddingDate),
+  //   실패 시 표준 토스트, 진행 중 버튼 비활성+스피너. 성공 시에만 팝오버 닫기.
+  const save = useAsyncAction(async () => {
     if (!selectedDate) {
       await updateWeddingDate(null, null);
     } else {
@@ -100,14 +105,14 @@ export function WeddingCountdown() {
       await updateWeddingDate(dateStr, timeStr);
     }
     setIsOpen(false);
-  };
+  });
 
-  const handleClear = async () => {
+  const clear = useAsyncAction(async () => {
     await updateWeddingDate(null, null);
     setSelectedDate(undefined);
     setSelectedTime('12:00');
     setIsOpen(false);
-  };
+  });
 
   if (loading) {
     return (
@@ -168,9 +173,9 @@ export function WeddingCountdown() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleSave} className="flex-1">
+                <AsyncButton onClick={() => save.run()} pending={save.pending} loadingText="저장 중…" className="flex-1">
                   저장
-                </Button>
+                </AsyncButton>
               </div>
             </div>
           </PopoverContent>
@@ -237,12 +242,12 @@ export function WeddingCountdown() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleClear} className="flex-1">
+                  <AsyncButton variant="outline" onClick={() => clear.run()} pending={clear.pending} loadingText="처리 중…" className="flex-1">
                     초기화
-                  </Button>
-                  <Button onClick={handleSave} className="flex-1">
+                  </AsyncButton>
+                  <AsyncButton onClick={() => save.run()} pending={save.pending} loadingText="저장 중…" className="flex-1">
                     저장
-                  </Button>
+                  </AsyncButton>
                 </div>
               </div>
             </PopoverContent>

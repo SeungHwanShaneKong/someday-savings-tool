@@ -7,6 +7,21 @@
 
 ## 최신
 
+### [CL-CDN-PRELOAD-20260703] 외부 CDN preload URL 은 실HTTP 검증 후 커밋 (LCP 최적화가 404 로 역효과)
+- **발생원인**: Top20 P1 LCP 작업에서 Pretendard woff2 를 `<link rel=preload>` 로 선다운로드하려 했으나 URL(`.../dist/web/variable/woff2/...`)을 CSS 경로에서 추정해 넣음.
+- **기술내용**: 해당 경로는 CDN 404(curl -I 로 실증) → 브라우저가 무효 요청을 날리고 실제 폰트는 CSS(swap) 경로로만 늦게 도착 = LCP 최적화 의도가 오히려 낭비 요청. R50 회귀헌터가 적발.
+- **해결책**: Pretendard CSS 원문의 `@font-face` `url('../../../packages/...')` 상대경로를 절대화 → `.../packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2`(HTTP 200 검증) 로 교정. **규칙: 외부 preload/preconnect 대상 URL 은 `curl -sI` 200 확인 없이는 커밋 금지.**
+
+### [CL-GATE-FLAKY-20260703] 복합 게이트에서 vitest 종료코드 마스킹·플래키 오판 금지
+- **발생원인**: `tsc && vitest run 2>&1 | tail -4 && build:ssg && playwright` 한 줄 체인으로 최종 게이트 실행.
+- **기술내용**: ① `| tail -4` 가 vitest 종료코드를 tail 것으로 덮어 18 test 실패에도 체인이 build/playwright 로 진행(오탐 통과). ② singleFork(Windows OOM 방지) 하 1444 테스트 단일 프로세스 누적 메모리 + 복합 체인 리소스 경합으로 18건 플래키 실패 — 격리 재실행 2회 모두 1444/1444(결정론적 결함이면 매회 동일 실패 재현). 
+- **해결책**: **오라클은 파이프로 종료코드를 가리지 말 것**(`| tail` 은 별도 스텝). vitest 는 build/playwright 와 분리해 단독 격리 실행으로 green 판정. 플래키 의심 시 최소 2회 격리 재현으로 결정론 여부 확정 후 판정.
+
+### [CL-NOREGRESS-STORAGEKEY-20260703] 배포 사용자 상태 보호 — 스토리지 키 개명은 실질 퇴행
+- **발생원인**: R50 부족점 발굴이 허니문 온보딩 localStorage 키에 `_v2` 버전 접미사 추가(스키마 명료성)를 제안.
+- **기술내용**: 배포 중인 서비스의 기존 사용자는 구 키에 진행상태 저장 → 키 개명 시 즉시 고아화되어 온보딩 진행 소실 = "후퇴 금지" 위반. 기존 loadState 검증으로 이미 malformed 방어됨(검증관도 런타임 fix 불요 인정).
+- **해결책**: PM 이 기각. **규칙: 이미 배포된 스토리지/DB 키의 개명·버전업은 마이그레이션(구키→신키 복사) 없이는 금지.** 명료성만을 위한 개명은 사용자 상태 손실과 트레이드오프.
+
 ### [CL-AUDIT2-20260628] 관리자 대시보드+익명집계 적대 감사 — 16확정 중 상위 10건 근본수정 (회귀 0)
 - **방식**: Workflow 5차원(보안·안정성·성능·에러·엣지) 병렬 finder(독립 에이전트) → 발견별 적대적 반증 verify → 영향×발생 랭킹(24후보→16확정). 생성≠검증(독립 컨텍스트). stray sweep 통과(메인트리 0).
 - **R1[score16·보안] track-visit abuse**: IP 레이트리밋이 클라조작 X-Forwarded-For + per-isolate Map(스푸핑·희석)이라 무력 → 무인증 무제한 쓰기증폭·지표오염. 근본수정 = **DB 글로벌 일일 하드캡(reserve_anon_visit 원자 RPC, 마이그 20260628120000)** reserve-before-insert + 본문크기 가드(F13) + RateLimiter TTL스윕/엔트리캡(F12, Map 무한증가 차단). per-IP는 보조 1차 레이어로 강등. 순수로직(isBodyTooLarge/isOverDailyCap/RateLimiter) vitest 12.

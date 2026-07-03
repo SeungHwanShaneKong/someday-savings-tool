@@ -40,14 +40,16 @@ export function HiddenCostTrigger({
           type="button"
           aria-label={`${itemName} 숨은 비용 ${rules.length}건 보기`}
           className={cn(
-            'inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+            // [CL-TOP20-R50-UI-20260703-094000] 터치 타깃 확장 — 모바일 36px(h-9), md 이상 기존 20px 유지.
+            // 셀 내 배치(flex items-center gap-1, align-middle 셀) 확인: 행 높이만 유연하게 늘고 컬럼 붕괴 없음.
+            'inline-flex h-9 w-9 md:h-5 md:w-5 flex-shrink-0 items-center justify-center rounded-full',
             'bg-amber-500/15 text-amber-600 hover:bg-amber-500/25 dark:text-amber-400',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-1',
             'transition-colors touch-manipulation',
             className,
           )}
         >
-          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+          <AlertTriangle className="h-4 w-4 md:h-3 md:w-3" aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="z-50 w-72 p-3" side="top" align="start" collisionPadding={16}>

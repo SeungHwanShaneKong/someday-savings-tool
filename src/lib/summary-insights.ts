@@ -148,30 +148,47 @@ export function computeComparisonInsights(budgets: InsightBudget[]): ComparisonI
 }
 
 // ── AI 응답 sessionStorage 캐시 (예산 id 조합 키 — 순서 무관 안정) ──
+// [CL-TOP20-R50-UI-20260703-094000] TTL 도입 — cachedAt 봉투(envelope)로 저장, 10분 초과분은 스테일로 폐기.
+// 예산 금액이 바뀐 뒤에도 구 AI 조언이 세션 내내 살아있던 문제 방지. 봉투 없는 레거시 레코드는
+// 저장 시각을 알 수 없으므로 스테일로 취급(null) — 파싱/형태 방어는 기존 계약 그대로 유지.
 
 const INSIGHT_CACHE_PREFIX = 'wedsem_summary_ai_insight:';
+
+/** 캐시 유효 시간 — 10분 */
+export const INSIGHT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface InsightCacheEnvelope {
+  cachedAt: number;
+  value: unknown;
+}
 
 export function buildInsightCacheKey(budgetIds: string[]): string {
   return `${INSIGHT_CACHE_PREFIX}${[...budgetIds].sort().join(',')}`;
 }
 
-/** 캐시 읽기 — 파싱 실패/형태 불일치 시 null (방어적) */
+/** 캐시 읽기 — 파싱 실패/형태 불일치/TTL(10분) 초과 시 null (방어적) */
 export function readInsightCache<T extends { tips: unknown[] }>(cacheKey: string): T | null {
   try {
     const raw = sessionStorage.getItem(cacheKey);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as T;
-    if (!parsed || !Array.isArray(parsed.tips)) return null;
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<InsightCacheEnvelope> | null;
+    if (!parsed || typeof parsed !== 'object') return null;
+    // 봉투 형태·시각 검증 — cachedAt 없는 레거시/변조 레코드는 스테일 취급
+    if (typeof parsed.cachedAt !== 'number' || !Number.isFinite(parsed.cachedAt)) return null;
+    if (Date.now() - parsed.cachedAt > INSIGHT_CACHE_TTL_MS) return null;
+    const value = parsed.value as T | null | undefined;
+    if (!value || !Array.isArray(value.tips)) return null;
+    return value;
   } catch {
     return null;
   }
 }
 
-/** 캐시 쓰기 — 저장 실패(용량/프라이빗 모드)는 조용히 무시(기능 비필수) */
+/** 캐시 쓰기 — cachedAt 봉투로 저장. 실패(용량/프라이빗 모드)는 조용히 무시(기능 비필수) */
 export function writeInsightCache(cacheKey: string, value: unknown): void {
   try {
-    sessionStorage.setItem(cacheKey, JSON.stringify(value));
+    const envelope: InsightCacheEnvelope = { cachedAt: Date.now(), value };
+    sessionStorage.setItem(cacheKey, JSON.stringify(envelope));
   } catch {
     // no-op: 캐시는 최적화일 뿐, 실패해도 기능 저하 없음
   }

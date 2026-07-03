@@ -83,25 +83,26 @@ function LoadingSkeleton() {
   return (
     <div className="mt-4 space-y-5">
       {/* AI 로딩 메시지 영역 */}
-      <div className="rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 border border-blue-100 p-5 text-center">
+      {/* [CL-TOP20-R50-UI-20260703-094000] 하드코딩 blue 에 dark: 변형 추가(라이트 모습 불변) */}
+      <div className="rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-950 dark:via-indigo-950 dark:to-blue-950 border border-blue-100 dark:border-blue-900 p-5 text-center">
         {/* 아이콘 펄스 */}
         <div className="relative mx-auto w-14 h-14 mb-4 flex items-center justify-center">
-          <span className="absolute inset-0 rounded-full bg-blue-200/40 animate-ping" />
+          <span className="absolute inset-0 rounded-full bg-blue-200/40 dark:bg-blue-800/40 animate-ping" />
           <span className="relative text-3xl animate-bounce" style={{ animationDuration: '2s' }}>
             {current.icon}
           </span>
         </div>
 
         {/* 메시지 + 타이핑 dots */}
-        <p className="text-sm font-semibold text-blue-800 transition-all duration-500">
+        <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 transition-all duration-500">
           {current.text}{dots}
         </p>
-        <p className="text-xs text-blue-500/80 mt-1.5">
+        <p className="text-xs text-blue-500/80 dark:text-blue-400/80 mt-1.5">
           {slow ? '평소보다 조금 오래 걸리고 있어요 — 곧 완성돼요' : '잠시만 기다려 주세요'}
         </p>
 
         {/* 프로그레스 바 */}
-        <div className="mt-4 mx-auto max-w-[200px] h-1.5 rounded-full bg-blue-100 overflow-hidden">
+        <div className="mt-4 mx-auto max-w-[200px] h-1.5 rounded-full bg-blue-100 dark:bg-blue-900 overflow-hidden">
           <div
             className="h-full rounded-full bg-gradient-to-r from-blue-400 to-indigo-500"
             style={{
@@ -112,13 +113,14 @@ function LoadingSkeleton() {
       </div>
 
       {/* 스켈레톤 — 콘텐츠 프리뷰 힌트 */}
+      {/* [CL-TOP20-R50-UI-20260703-094000] dark: 변형 추가 */}
       <div className="space-y-3 opacity-40">
         {[1, 2].map((i) => (
           <div key={i} className="space-y-2">
-            <div className="h-4 w-28 rounded bg-blue-100 animate-pulse" />
-            <div className="rounded-lg border border-blue-50 p-3 space-y-1.5">
-              <div className="h-3.5 w-3/4 rounded bg-blue-50 animate-pulse" />
-              <div className="h-3 w-1/2 rounded bg-blue-50 animate-pulse" />
+            <div className="h-4 w-28 rounded bg-blue-100 dark:bg-blue-900 animate-pulse" />
+            <div className="rounded-lg border border-blue-50 dark:border-blue-950 p-3 space-y-1.5">
+              <div className="h-3.5 w-3/4 rounded bg-blue-50 dark:bg-blue-950 animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-blue-50 dark:bg-blue-950 animate-pulse" />
             </div>
           </div>
         ))}
@@ -140,40 +142,41 @@ function LoadingSkeleton() {
 function MonthSection({ monthData }: { monthData: TimelineMonth }) {
   const [expanded, setExpanded] = useState(true);
 
+  // [CL-TOP20-R50-UI-20260703-094000] 하드코딩 blue/white/gray 에 dark: 변형 추가(라이트 모습 불변)
   return (
-    <div className="border border-blue-100 rounded-lg overflow-hidden">
+    <div className="border border-blue-100 dark:border-blue-900 rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-150 transition-colors text-left"
+        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 hover:from-blue-100 hover:to-blue-150 dark:hover:from-blue-900 dark:hover:to-blue-800 transition-colors text-left"
       >
-        <span className="font-semibold text-blue-800 text-sm">
+        <span className="font-semibold text-blue-800 dark:text-blue-200 text-sm">
           {formatMonth(monthData.month)}
         </span>
-        <span className="text-blue-500 text-xs">
+        <span className="text-blue-500 dark:text-blue-400 text-xs">
           {monthData.tasks.length}개 항목 {expanded ? '▲' : '▼'}
         </span>
       </button>
 
       {expanded && (
-        <div className="p-3 space-y-2 bg-white">
+        <div className="p-3 space-y-2 bg-white dark:bg-gray-950">
           {monthData.tasks.map((task, idx) => {
             const priority = PRIORITY_STYLES[task.priority];
             return (
-              <Card key={idx} className="border-blue-50 shadow-sm">
+              <Card key={idx} className="border-blue-50 dark:border-blue-950 shadow-sm">
                 <CardContent className="p-3 space-y-1.5">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium text-sm text-gray-900">
+                    <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
                       {task.task}
                     </span>
                     <Badge className={`shrink-0 text-[10px] px-1.5 py-0.5 ${priority.className}`}>
                       {priority.label}
                     </Badge>
                   </div>
-                  <p className="text-xs text-gray-500 leading-relaxed">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                     {task.tip}
                   </p>
-                  <div className="flex items-center gap-1 text-[11px] text-blue-600 font-medium">
+                  <div className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
                     <span>📌</span>
                     <span>{formatDeadline(task.deadline)}</span>
                   </div>

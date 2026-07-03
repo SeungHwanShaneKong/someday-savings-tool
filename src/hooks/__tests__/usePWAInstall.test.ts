@@ -5,6 +5,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   usePWAInstall,
   isIOSDevice,
+  isInstallPromptSuppressed,
+  rememberInstallPromptDismissed,
+  PWA_INSTALL_DISMISS_KEY,
   _resetPWAInstallStateForTests,
   type BeforeInstallPromptEvent,
   type InstallPromptOutcome,
@@ -117,5 +120,46 @@ describe('usePWAInstall', () => {
 
     // 원복: own property 제거 → prototype getter 복원
     delete (window.navigator as { userAgent?: string }).userAgent;
+  });
+});
+
+// [CL-TOP20-R50-TEST-20260703-094000] 설치 배너 30일 억제 퍼시스턴스 — 스토리지 장애·경계 계약
+// 프라이빗 모드(getItem throw)·쿼터 초과(setItem throw)에서도 앱이 죽지 않고 안전 기본값으로
+// degrade 해야 하며, 30일 경계는 "미만(<)이면 억제"가 ±1ms 단위로 정확해야 한다.
+describe('설치 배너 30일 억제 — 스토리지 장애·30일 경계', () => {
+  const DISMISS_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.removeItem(PWA_INSTALL_DISMISS_KEY);
+  });
+
+  it('getItem throw(프라이빗 모드 등): throw 없이 false(미억제) 반환', () => {
+    vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError: The operation is insecure.');
+    });
+    expect(() => isInstallPromptSuppressed()).not.toThrow();
+    expect(isInstallPromptSuppressed()).toBe(false);
+  });
+
+  it('setItem throw(쿼터 초과 등): rememberInstallPromptDismissed 가 throw 없이 조용히 무시', () => {
+    const setSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    expect(() => rememberInstallPromptDismissed()).not.toThrow();
+    expect(setSpy).toHaveBeenCalledTimes(1); // 저장 시도는 했으나 실패를 삼킴
+  });
+
+  it('30일 경계(±1ms): 30일-1ms=억제 유지 / 정확히 30일·30일+1ms=억제 해제', () => {
+    const now = Date.now();
+    // 경계 직전(30일 - 1ms): 아직 억제
+    window.localStorage.setItem(PWA_INSTALL_DISMISS_KEY, String(now - (DISMISS_DURATION_MS - 1)));
+    expect(isInstallPromptSuppressed(now)).toBe(true);
+    // 정확히 30일: 미만(<) 조건이므로 억제 해제
+    window.localStorage.setItem(PWA_INSTALL_DISMISS_KEY, String(now - DISMISS_DURATION_MS));
+    expect(isInstallPromptSuppressed(now)).toBe(false);
+    // 경계 직후(30일 + 1ms): 억제 해제
+    window.localStorage.setItem(PWA_INSTALL_DISMISS_KEY, String(now - (DISMISS_DURATION_MS + 1)));
+    expect(isInstallPromptSuppressed(now)).toBe(false);
   });
 });

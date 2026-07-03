@@ -25,6 +25,8 @@ interface ChatContainerProps {
   showLimitCounter?: boolean;
   // [CL-TOP20-P4-AICHAT-20260703-040000] 빈 대화 시 노출되는 추천 질문 칩(클릭 → 즉시 전송)
   starterPrompts?: StarterPrompt[];
+  // [CL-TOP20-R50-CHAT-20260703-094000] 실패 메시지 재전송 콜백(useAIChat.retryMessage)
+  onRetryMessage?: (message: ChatMessageType) => void;
 }
 
 export function ChatContainer({
@@ -40,6 +42,8 @@ export function ChatContainer({
   limitReached = false,
   showLimitCounter = false,
   starterPrompts,
+  // [CL-TOP20-R50-CHAT-20260703-094000]
+  onRetryMessage,
 }: ChatContainerProps) {
   // [CL-TOP20-P4-AICHAT-20260703-040000] 잔여 ≤2 진입 시 1회 안내(세션 1회, sessionStorage)
   const lowQuota =
@@ -108,7 +112,8 @@ export function ChatContainer({
         )}
 
         {messages.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+          // [CL-TOP20-R50-CHAT-20260703-094000] 실패 메시지 재전송 콜백 전달
+          <ChatMessage key={i} message={msg} onRetry={onRetryMessage} />
         ))}
 
         {/* Loading indicator */}

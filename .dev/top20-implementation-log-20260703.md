@@ -27,4 +27,34 @@
 - Summary 검증 중 worktree 정션 사고 1회(즉시 frozen-lockfile 복구·재검증 완료) — worktree 제거 시 정션 선해제 교훈.
 
 ## 재현 오라클
-`pnpm exec tsc -b --noEmit` · `pnpm exec vitest run`(1400+) · `pnpm run build:ssg`(23라우트) · `pnpm exec playwright test e2e/visual.spec.ts`(12 스냅샷) · git 미커밋(push 는 사용자 명시 시).
+`pnpm exec tsc -b --noEmit` · `pnpm exec vitest run`(1400+) · `pnpm run build:ssg`(23라우트) · `pnpm exec playwright test e2e/visual.spec.ts`(12 스냅샷) · git 백업 커밋 `63d2523` + 브랜치 `backup/top20-20260703`(push 는 사용자 명시 시).
+
+---
+
+# R50 — 배포본(HEAD) 대비 퇴화·충돌 전수검토 + 부족점 50 발굴 (2026-07-03)
+
+목적: 배포본 대비 **후퇴 0** 보증. 워크플로 `wf_ce1bd2bc-cee`(80 에이전트: 회귀 헌터 11 + 부족점 발굴 10 + 적대검증 58) → 회귀후보 4·부족점후보 55 → **적대검증 통과 유효 25건**. 헌터 9/11 이 근거와 함께 "회귀 없음" 판정.
+
+## 진짜 회귀 2건 (PM 즉시 근본수정)
+- **[REG-1·sev4] 폰트 preload 404** (`index.html`): P1에서 추가한 woff2 preload URL `.../dist/web/variable/woff2/...` 가 CDN 404(curl 실증). LCP 최적화가 오히려 무효 요청 발생. **해결**: Pretendard CSS 원문의 `@font-face` 상대경로를 절대화한 실경로 `.../packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2`(200 검증)로 교정. **교훈: 외부 CDN preload URL 은 반드시 실HTTP 검증(curl -I) 후 커밋.**
+- **[REG-2·sev3] Article 앵커 오프셋** (`Article.tsx`): P2에서 페이지 헤더를 비스티키로 바꿨는데 AppHeader(sticky h-14) 추가로 총 오프셋이 56→112px 로 변했으나 `scroll-mt-20`(80px) 잔존 → 앵커 점프 시 제목 가림. **해결**: `scroll-mt-28`(112px).
+
+## 부족점 유효 23건 수정 (4팀 병렬, 파일 소유권 분리)
+- 다크모드 공백 3건(Checklist 타임라인 버튼·TimelinePanel 스켈레톤/월섹션 — 다크 토글 도입으로 실사용됨) → dark: 변형(라이트 불변)
+- a11y 4건(HiddenCostTrigger 터치 36px·ChatInput/ChatDrawer aria-label·BadgeChip 상태 라벨[기수정 확인])
+- 에러/로딩 상태 3건(챗 전송 실패 재시도 UI·NudgeBanner 저장 실패·챗 예산칩 로딩)
+- 계측 3건(signup_complete 근사·wizard_enter/apply — open 전이 1회 정정)
+- SEO 1건(/demo noindex — useSEO 대칭 슬롯)
+- 성능/수명 2건(Summary useNegotiateCoach 서브컴포넌트 한정·summary 인사이트 캐시 TTL 10분)
+- IME 1건(**SmartWonInput 스테일 pendingBlur 조기 커밋 — 뮤테이션 오라클로 실결함 재현 후 근본수정**)
+- 카피 1건(시뮬레이터 '실속 위주'→'비용 절감')·모바일 1건(BudgetTable min-w 480/sm:600)·KST 1건(MobileDesktopNotice)
+- 테스트 보강: 위저드 통합 3·챗 재시도 4·IME 3·PWA 스토리지 3·다크 스냅샷 4장(총 16장)
+
+## PM 기각 1건 (근거)
+- **[#24] 허니문 스토리지 키 v2 개명**: 배포 사용자의 기존 `honeymoon_onboarding_*` 저장 상태를 **고아로 만들어 진행상황 소실** = 실질 퇴행. "후퇴 금지" 원칙상 기각. 키 개명 대신 기존 loadState 검증으로 이미 안전(검증관도 "런타임 fix 불요" 인정).
+
+## 이슈: vitest 플래키 (18 failed → 재현 0)
+- **발생 원인**: 복합 게이트(`vitest→build:ssg→playwright` 체인)에서 vitest 18 failed 관측. **기술 내용**: singleFork(Windows OOM 방지) 하 1444 테스트 단일 프로세스 누적 메모리 + 복합 명령 리소스 경합. 격리 재실행 2회 모두 1444/1444 green(결정론적 결함이면 매회 동일 실패 재현돼야 하나 0건). 또 `| tail -4` 가 vitest 종료코드를 가려 체인이 오탐 통과. **해결**: 게이트를 vitest 단독 격리 실행으로 분리 판정, `| tail` 종료코드 마스킹 금지. **교훈 → CLAUDE.md.**
+
+## R50 최종 오라클
+tsc 0 · vitest 격리 **1444/1444** · build:ssg 23 · 시각 스냅샷 16(다크 4 추가) · 백업 커밋 2개(63d2523 + R50).

@@ -327,7 +327,7 @@ export default function Article() {
 
           {/* Sections */}
           {article.sections.map((section, si) => (
-            <section key={si} id={`sec-${si}`} className="mb-10 scroll-mt-20">
+            <section key={si} id={`sec-${si}`} className="mb-10 scroll-mt-28">
               {/* [CL-TOP20-P2-ARTICLE-20260703-020000] 섹션 앵커 복사 버튼 — 데스크톱은 hover/포커스 노출, 모바일(sm 미만)은 상시 노출 */}
               <div className="group flex items-start gap-1 mb-3">
                 <h2 className="text-lg font-semibold text-foreground">{section.heading}</h2>

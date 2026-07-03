@@ -37,11 +37,14 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePre
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string>('12:00');
   const [saving, setSaving] = useState(false);
+  // [CL-TOP20-R50-UI-20260703-094000] 저장 실패 무피드백 해소 — 에러 문구 state(재시도 시 클리어)
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (!selectedDate || !onSave) return;
 
     setSaving(true);
+    setSaveError(null); // [CL-TOP20-R50-UI-20260703-094000] 재시도 시 이전 에러 클리어
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const timeStr = `${selectedTime}:00`;
@@ -49,6 +52,8 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePre
       setPopoverOpen(false);
     } catch (err) {
       console.error('D-day save failed:', err);
+      // [CL-TOP20-R50-UI-20260703-094000] 실패를 사용자에게 표시(팝오버 유지 → 즉시 재시도 가능)
+      setSaveError('저장에 실패했어요. 네트워크 상태를 확인하고 다시 시도해주세요.');
     } finally {
       setSaving(false);
     }
@@ -143,6 +148,17 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePre
                   >
                     {saving ? '저장 중...' : '저장'}
                   </Button>
+
+                  {/* [CL-TOP20-R50-UI-20260703-094000] 저장 실패 에러 문구 — destructive 토큰 + role=alert(SR 즉시 낭독) */}
+                  {saveError && (
+                    <p
+                      role="alert"
+                      data-testid="dday-save-error"
+                      className="text-xs text-destructive leading-snug"
+                    >
+                      {saveError}
+                    </p>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>

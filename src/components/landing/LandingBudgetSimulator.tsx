@@ -56,7 +56,7 @@ interface StyleOption {
 }
 
 const STYLE_OPTIONS: StyleOption[] = [
-  { id: 'saving', label: '알뜰형', hint: '실속 위주', multiplier: 0.75 },
+  { id: 'saving', label: '알뜰형', hint: '비용 절감', multiplier: 0.75 },
   { id: 'standard', label: '표준형', hint: '전국 평균', multiplier: 1.0 },
   { id: 'premium', label: '프리미엄', hint: '호텔·하이엔드', multiplier: 1.4 },
 ];

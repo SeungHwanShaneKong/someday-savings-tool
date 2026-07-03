@@ -11,10 +11,26 @@ import {
   sumWizardPlan,
   WIZARD_DONE_KEY,
   WIZARD_DEFAULT_GUESTS,
+  WIZARD_GUESTS_MAX,
   type WizardCategoryGroup,
   type WizardPrefill,
 } from '@/lib/budget-wizard';
 import { formatKoreanWon } from '@/lib/budget-categories';
+
+/* [CL-TOP20-R50-TRACK-20260703-094000] funnel 계측 mock — Demo.test 컨벤션(호출 인자 직접 단언) */
+const funnel = vi.hoisted(() => ({
+  trackFunnel: vi.fn(),
+  trackFunnelOnce: vi.fn(),
+}));
+vi.mock('@/lib/analytics/funnel-events', () => ({
+  trackFunnel: funnel.trackFunnel,
+  trackFunnelOnce: funnel.trackFunnelOnce,
+}));
+
+beforeEach(() => {
+  funnel.trackFunnel.mockClear();
+  funnel.trackFunnelOnce.mockClear();
+});
 
 const allEnabled = (groups: readonly WizardCategoryGroup[]): Set<string> =>
   new Set(groups.map((g) => g.categoryId));
@@ -137,5 +153,85 @@ describe('BudgetSetupWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '이전' }));
     expect(screen.getByRole('button', { name: /프리미엄/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('결혼 예산, 1분 만에 밑그림 그리기')).toBeInTheDocument();
+  });
+
+  // [CL-TOP20-R50-TRACK-20260703-094000] W6~W8: 독립검증 결함 4번(통합 테스트 공백) 보강
+  it('W6 슬라이더 조정: 하객 수 변경이 리뷰 플랜 총액에 재계산 반영된다 (+ 노출 계측 1식)', () => {
+    setup();
+
+    // 노출 계측 — wizard_enter + signup_complete(가입 완료 근사, funnel-events.ts 주석 참조)
+    expect(funnel.trackFunnelOnce).toHaveBeenCalledWith('wizard_enter');
+    expect(funnel.trackFunnelOnce).toHaveBeenCalledWith('signup_complete');
+
+    // 키보드 End 로 슬라이더 최대치 이동 — jsdom 에서 결정적인 Radix Slider 조작 경로
+    fireEvent.keyDown(screen.getByRole('slider'), { key: 'End' });
+    expect(screen.getByText(`${WIZARD_GUESTS_MAX.toLocaleString()}명`)).toBeInTheDocument();
+
+    goToStep3();
+    const maxPlan = computeWizardPlan({
+      guests: WIZARD_GUESTS_MAX,
+      styleId: 'standard',
+      templateId: 'honsu',
+    });
+    const maxTotal = sumWizardPlan(maxPlan, allEnabled(maxPlan));
+    const defaultTotal = sumWizardPlan(defaultPlan(), allEnabled(defaultPlan()));
+    expect(maxTotal).not.toBe(defaultTotal); // 재계산 입증 가드(같으면 이 테스트는 무의미)
+    expect(screen.getByText(formatKoreanWon(maxTotal))).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`하객 ${WIZARD_GUESTS_MAX.toLocaleString()}명 · 표준형`)),
+    ).toBeInTheDocument();
+  });
+
+  it('W7 Escape/X 닫기: onApply 미호출·완료 플래그 설정(재노출 금지)·닫힘 전파', () => {
+    const { onOpenChange, onApply } = setup();
+
+    // Escape — Radix DismissableLayer 경유 → handleDialogOpenChange(false) 동일 경로
+    expect(localStorage.getItem(WIZARD_DONE_KEY)).toBeNull();
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(localStorage.getItem(WIZARD_DONE_KEY)).not.toBeNull();
+
+    // X 버튼(shadcn DialogContent 내장, sr-only "Close") — open 은 테스트에서 고정이므로
+    // 다이얼로그가 남아 있어 동일 인스턴스로 두 번째 닫기 경로까지 연속 검증 가능
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onOpenChange).toHaveBeenCalledTimes(2);
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('W8 느린 onApply: 중복 클릭·진행 중 닫기 모두 무시되어 정확히 1회 호출 + wizard_apply 계측', async () => {
+    const onOpenChange = vi.fn();
+    let resolveApply!: () => void;
+    const onApply = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveApply = resolve;
+        }),
+    );
+    render(<BudgetSetupWizard open onOpenChange={onOpenChange} onApply={onApply} />);
+    goToStep3();
+
+    fireEvent.click(screen.getByRole('button', { name: /이대로 채우기/ }));
+    // 진행 중: 라벨 전환 + disabled — 재클릭·Escape 닫기 모두 무시(중복 적용·유실 방지)
+    const pendingButton = screen.getByRole('button', { name: '채우는 중...' });
+    expect(pendingButton).toBeDisabled();
+    fireEvent.click(pendingButton);
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+
+    // 완료 후에도 총 1회 유지 + 적용 계측 payload(기본 선택: 예식+혼수·250명·표준형)
+    resolveApply();
+    expect(await screen.findByText('예산 밑그림 완성!')).toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(funnel.trackFunnel).toHaveBeenCalledTimes(1);
+    expect(funnel.trackFunnel).toHaveBeenCalledWith('wizard_apply', {
+      template: 'honsu',
+      guests: WIZARD_DEFAULT_GUESTS,
+      style: 'standard',
+    });
   });
 });

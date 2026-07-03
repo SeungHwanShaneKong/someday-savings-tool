@@ -6,6 +6,8 @@ interface SEOConfig {
   description?: string;
   path?: string;
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** [CL-TOP20-R50-TRACK-20260703-094000] true 시 robots noindex 메타 주입(체험성 라우트 색인 제외) */
+  noindex?: boolean;
 }
 
 const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
@@ -14,8 +16,10 @@ const DEFAULT_DESCRIPTION =
   '결혼 준비의 시작, 결혼 예산 관리부터 결혼 체크 리스트까지 스마트하게! 결혼 비용, 웨딩 예산 계산기 \'웨딩셈\'으로 복잡한 결혼 비용을 항목별로 깔끔하게 정리하세요.';
 
 const JSON_LD_ID = 'dynamic-jsonld';
+// [CL-TOP20-R50-TRACK-20260703-094000] SPA 라우트별 noindex 메타 전용 슬롯(id 로 단일 인스턴스 보장)
+const ROBOTS_ID = 'dynamic-robots';
 
-export function useSEO({ title, description, path, jsonLd }: SEOConfig) {
+export function useSEO({ title, description, path, jsonLd, noindex }: SEOConfig) {
   useEffect(() => {
     // Capture previous values for full cleanup on unmount
     const prevTitle = document.title;
@@ -86,6 +90,22 @@ export function useSEO({ title, description, path, jsonLd }: SEOConfig) {
       document.head.appendChild(script);
     }
 
+    // [CL-TOP20-R50-TRACK-20260703-094000] robots noindex — JSON-LD 와 동일한 주입/제거 대칭
+    // 패턴(기존 슬롯 제거 → 필요 시 재주입, 언마운트 시 제거). index.html 에 정적 robots 메타가
+    // 없으므로 '부재 = 색인 허용'이 기본값이고, 제거만으로 이전 상태가 정확히 복원된다.
+    const existingRobots = document.getElementById(ROBOTS_ID);
+    if (existingRobots) {
+      existingRobots.remove();
+    }
+
+    if (noindex) {
+      const robots = document.createElement('meta');
+      robots.id = ROBOTS_ID;
+      robots.setAttribute('name', 'robots');
+      robots.setAttribute('content', 'noindex, nofollow');
+      document.head.appendChild(robots);
+    }
+
     // Cleanup: restore ALL previous values + remove dynamic JSON-LD on unmount
     return () => {
       document.title = prevTitle;
@@ -100,6 +120,11 @@ export function useSEO({ title, description, path, jsonLd }: SEOConfig) {
       if (scriptToRemove) {
         scriptToRemove.remove();
       }
+      // [CL-TOP20-R50-TRACK-20260703-094000] noindex 메타도 대칭 제거(기본=색인 허용 복원)
+      const robotsToRemove = document.getElementById(ROBOTS_ID);
+      if (robotsToRemove) {
+        robotsToRemove.remove();
+      }
     };
-  }, [title, description, path, jsonLd]);
+  }, [title, description, path, jsonLd, noindex]);
 }

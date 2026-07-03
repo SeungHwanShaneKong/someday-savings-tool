@@ -521,7 +521,9 @@ export function BudgetTable({
   return <div className="w-full overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <SortableContext items={orderedCategories.map(c => c.id)} strategy={verticalListSortingStrategy}>
-          <Table className="min-w-[600px] sm:min-w-full text-xs sm:text-sm">
+          {/* [CL-TOP20-R50-UI-20260703-094000] 극소형(375px)에서 과도한 600px 강제 완화 — table-layout:auto 는 min-content 이하로
+              줄지 않으므로 480px 플로어에서도 6컬럼 붕괴 없음(고정폭 합 ~512px 이 실질 하한). sm 이상 기존 min-w-full 계약 불변. */}
+          <Table className="min-w-[480px] sm:min-w-full text-xs sm:text-sm">
             <TableHeader>
               <TableRow className="bg-primary/10 border-b-2 border-primary/20">
                 <TableHead className="font-bold text-foreground w-16 sm:w-24 px-1 sm:px-4 text-center text-sm sm:text-base">구분</TableHead>

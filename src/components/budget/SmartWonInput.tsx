@@ -66,15 +66,25 @@ export function SmartWonInput({
 
   const handleCompositionStart = () => {
     isComposingRef.current = true;
+    // [CL-TOP20-R50-TEST-20260703-094000] 이전 합성 세션의 보류 blur 가 compositionEnd 없이
+    // 소멸(브라우저별 합성 취소 시 이벤트 유실)한 뒤 스테일로 남으면, 다음 합성 종료에서
+    // 편집 중 조기 커밋을 유발 → 새 합성 시작 시 무효화.
+    pendingBlurRef.current = false;
   };
 
   const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
     isComposingRef.current = false;
     const clean = sanitizeWonText(e.currentTarget.value);
     setText(clean);
-    // 합성 중 발생했던 blur 를 최종 조합값으로 커밋(유실 0)
-    if (pendingBlurRef.current) {
-      pendingBlurRef.current = false;
+    // [CL-TOP20-R50-TEST-20260703-094000] 합성 중 포커스가 떠났다면(보류 blur, 또는 이벤트
+    // 순서상 플래그가 못 잡은 blur) 최종 조합값으로 커밋 — 플래그 단독 게이팅을 제거하고
+    // 실제 포커스 상태를 함께 판정. "정확히 1회"는 commit 내부 doneRef 가 보장(이중발화 0).
+    // ※ 합성 종료 무조건 커밋은 불가: Chrome 한글 IME 는 음절마다 compositionEnd 를 발화해
+    //   다음절 입력("만원" 등) 중 편집이 강제 종료된다.
+    const blurredDuringComposition =
+      pendingBlurRef.current || document.activeElement !== e.currentTarget;
+    pendingBlurRef.current = false;
+    if (blurredDuringComposition) {
       commit(clean);
     }
   };

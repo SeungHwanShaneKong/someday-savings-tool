@@ -76,6 +76,8 @@ export function ChatInput({
       <button
         onClick={handleSend}
         disabled={!value.trim() || isLoading || disabled}
+        // [CL-TOP20-R50-CHAT-20260703-094000] 아이콘 전용 버튼 접근성 이름
+        aria-label="메시지 전송"
         className={cn(
           'p-2.5 rounded-xl transition-all flex-shrink-0',
           value.trim() && !isLoading && !disabled

@@ -5,6 +5,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Monitor } from 'lucide-react';
+// [CL-TOP20-R50-UI-20260703-094000] 날짜 키 UTC→KST 통일 — 기존 KST 헬퍼 재사용(자정 경계 오표시 방지)
+import { toKSTDateString } from '@/lib/gamification/streak-calc';
 
 export function MobileDesktopNotice() {
   const { user } = useAuth();
@@ -17,7 +19,8 @@ export function MobileDesktopNotice() {
     const isMobileOrTablet = window.innerWidth < 1024;
     if (!isMobileOrTablet) return;
 
-    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    // [CL-TOP20-R50-UI-20260703-094000] KST 기준 YYYY-MM-DD (UTC toISOString 은 한국 아침 9시 전 '어제'로 판정됐음)
+    const today = toKSTDateString();
     const key = `desktop_notice_${user.id}_${today}`;
 
     if (localStorage.getItem(key)) return;

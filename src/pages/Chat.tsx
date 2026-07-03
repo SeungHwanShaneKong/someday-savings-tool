@@ -35,12 +35,17 @@ export default function Chat() {
     setBudgetContextOptIn(enabled);
   };
   // 읽기 전용 요약 훅(자동 생성/실시간 구독 없음) — OFF 면 조회 자체를 건너뜀
-  const { summary: budgetSummary } = useChatBudgetSummary({ enabled: budgetRefEnabled });
+  // [CL-TOP20-R50-CHAT-20260703-094000] loading 구독 — 로딩 중 뮤트 칩 표시
+  const { summary: budgetSummary, loading: budgetLoading } = useChatBudgetSummary({
+    enabled: budgetRefEnabled,
+  });
 
   const {
     messages,
     isLoading,
     sendMessage,
+    // [CL-TOP20-R50-CHAT-20260703-094000] 실패 메시지 재전송
+    retryMessage,
     clearMessages,
     messagesEndRef,
     // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터 (qa = 5/일)
@@ -123,7 +128,16 @@ export default function Chat() {
               켜면 총예산·상위 지출·결제 완료율 요약을 AI 답변에 참고합니다. 개인 식별 정보는 전송되지 않아요.
             </span>
           </div>
-          {budgetRefEnabled && budgetSummary && (
+          {/* [CL-TOP20-R50-CHAT-20260703-094000] 로딩 중 뮤트 칩(스켈레톤 톤) — 완료 후 사용 중 칩으로 전환 */}
+          {budgetRefEnabled && budgetLoading && (
+            <span
+              role="status"
+              className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground animate-pulse"
+            >
+              <span aria-hidden="true">⏳</span> 예산 불러오는 중…
+            </span>
+          )}
+          {budgetRefEnabled && !budgetLoading && budgetSummary && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
               <span aria-hidden="true">📊</span> 예산 맥락 사용 중
             </span>
@@ -147,6 +161,8 @@ export default function Chat() {
         showLimitCounter={true}
         // [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩
         starterPrompts={STARTER_PROMPTS}
+        // [CL-TOP20-R50-CHAT-20260703-094000] 전송 실패 복구(다시 시도)
+        onRetryMessage={retryMessage}
       />
     </div>
   );

@@ -32,6 +32,8 @@ export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function C
     messages,
     isLoading,
     sendMessage,
+    // [CL-TOP20-R50-CHAT-20260703-094000] 실패 메시지 재전송
+    retryMessage,
     clearMessages,
     messagesEndRef,
     // [CL-AI-CHAT-LIMIT5-20260408-100500] qa 5/일 카운터
@@ -71,8 +73,10 @@ export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function C
                 size="sm"
                 className="h-7 w-7 p-0"
                 onClick={clearMessages}
+                // [CL-TOP20-R50-CHAT-20260703-094000] 아이콘 전용 버튼 접근성 이름
+                aria-label="대화 삭제"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
               </Button>
             )}
             <Button
@@ -80,8 +84,10 @@ export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function C
               size="sm"
               className="h-7 w-7 p-0"
               onClick={handleFullScreen}
+              // [CL-TOP20-R50-CHAT-20260703-094000] 아이콘 전용 버튼 접근성 이름
+              aria-label="전체 화면으로 열기"
             >
-              <Maximize2 className="w-3.5 h-3.5" />
+              <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />
             </Button>
           </div>
         </SheetHeader>
@@ -102,6 +108,8 @@ export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function C
           showLimitCounter={true}
           // [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩
           starterPrompts={STARTER_PROMPTS}
+          // [CL-TOP20-R50-CHAT-20260703-094000] 전송 실패 복구(다시 시도)
+          onRetryMessage={retryMessage}
         />
       </SheetContent>
     </Sheet>

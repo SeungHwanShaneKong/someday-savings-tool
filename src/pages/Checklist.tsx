@@ -232,9 +232,10 @@ export default function Checklist() {
               }
             }}
             // [CL-BTNPERFECT-20260629] 진행 중 비활성+스피너(체감 멈춤 제거) — 소스 in-flight 가드와 이중 안전.
+            // [CL-TOP20-R50-UI-20260703-094000] 하드코딩 blue 에 dark: 변형 추가(라이트 모습 불변)
             disabled={timelineLoading}
             aria-busy={timelineLoading || undefined}
-            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 px-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 text-sm sm:text-base font-medium hover:from-blue-100 hover:to-indigo-100 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+            className="w-full flex items-center justify-center gap-2 py-3 sm:py-3.5 px-4 rounded-2xl border border-blue-200 dark:border-blue-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 text-blue-700 dark:text-blue-300 text-sm sm:text-base font-medium hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900 dark:hover:to-indigo-900 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
           >
             {timelineLoading ? (
               <><Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" /> 최적화 중…</>

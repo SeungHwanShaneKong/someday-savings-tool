@@ -23,7 +23,15 @@ export type FunnelEvent =
   | 'article_cta_click'           // 아티클 컨텍스추얼 CTA 클릭 (params.slug)
   // 가입 퍼널 종점
   | 'auth_view'                   // /auth 도달 (params.from)
-  | 'signup_complete';            // 가입 완료(웰컴 시점)
+  | 'signup_complete'             // 가입 완료(근사) — 발화 시점 근거는 아래 위저드 블록 주석
+  // 가입 직후 온보딩(첫 예산 위저드) — [CL-TOP20-R50-TRACK-20260703-094000]
+  // BudgetSetupWizard 노출 조건(본인 소유 예산·개인 모드·전 항목 0·custom 0·완료 플래그 없음,
+  // BudgetFlow.tsx 위저드 게이트)은 사실상 "가입 직후 첫 예산 진입"과 일치한다.
+  // → signup_complete 는 wizard_enter 와 함께 trackFunnelOnce 로 발화해 가입 완료를 근사 계측
+  //   (정적 SPA 에 전용 '가입 성공' 훅이 없어 관측 가능한 최선점. 드물게 '가입 후 입력 0 인
+  //   기존 계정의 재방문'이 포함될 수 있음 — 수용된 오차, 세션 중복은 once 가드가 차단).
+  | 'wizard_enter'                // 첫 예산 위저드 첫 노출(open 전이 시점·세션 1회)
+  | 'wizard_apply';               // 위저드 프리필 적용 (params.template/guests/style)
 
 type FunnelParams = Record<string, string | number | boolean>;
 

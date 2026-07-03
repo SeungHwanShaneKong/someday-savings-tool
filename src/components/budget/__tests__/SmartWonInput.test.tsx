@@ -145,4 +145,58 @@ describe('SmartWonInput — 입력·힌트·확정 계약', () => {
     setup({ averageAmount: 0 });
     expect(screen.queryByRole('button', { name: /평균 금액/ })).toBeNull();
   });
+
+  // [CL-TOP20-R50-TEST-20260703-094000] 한글 IME Backspace 복합문자 시나리오(S10~S12)
+  // input.focus() 로 실제 포커스 유지 상태를 재현 — compositionEnd 는 포커스 이탈이 없으면
+  // 커밋하지 않아야 하고(편집 계속), 확정은 이후 blur/Enter 에서 정확히 1회여야 한다.
+  it('S10 IME Backspace — 조합 중 "500만"→"500마" 자모 되돌림 후 blur 확정 시 잔여 숫자만 1회 커밋', () => {
+    const { input, onCommit } = setup();
+    input.focus();
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: '500만' } });
+    // Backspace: 복합문자 자모 분해("만"→"마") — 합성 중이므로 원문 보존(살균 금지)
+    fireEvent.change(input, { target: { value: '500마' } });
+    expect(input.value).toBe('500마');
+    // 포커스 유지 중 합성 종료 → 커밋 없음(편집 계속), 미완성 자모만 살균
+    fireEvent.compositionEnd(input);
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input.value).toBe('500');
+    fireEvent.blur(input);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(500);
+  });
+
+  it('S11 IME Backspace — 조합 문자 전체 삭제 후 blur → 0 커밋 정확히 1회(빈 입력 계약 보존)', () => {
+    const { input, onCommit } = setup();
+    input.focus();
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: 'ㅁ' } });
+    // Backspace 로 조합 중이던 문자 전체 삭제 → 빈 값으로 합성 종료
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.compositionEnd(input);
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent.blur(input);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(0);
+  });
+
+  it('S12 스테일 pendingBlur — compositionEnd 없이 소멸한 보류 blur 가 다음 합성 종료에서 조기 커밋을 유발하지 않는다', () => {
+    const { input, onCommit } = setup();
+    input.focus();
+    // 합성 세션 1: 합성 중 blur 보류 후 compositionEnd 유실(브라우저별 합성 취소)
+    fireEvent.compositionStart(input);
+    fireEvent.blur(input);
+    expect(onCommit).not.toHaveBeenCalled();
+    // 합성 세션 2 시작 — 세션 1의 스테일 보류 blur 는 무효화되어야 한다
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: '5' } });
+    fireEvent.compositionEnd(input);
+    // 구 코드 결함: 여기서 "5"(=5원)가 조기 커밋되어 편집이 강제 종료됨 — 수정 후 커밋 0
+    expect(onCommit).not.toHaveBeenCalled();
+    // 사용자가 이어서 입력을 완성하고 Enter 로 확정 → 정확히 1회 커밋
+    fireEvent.change(input, { target: { value: '500만' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(5_000_000);
+  });
 });

@@ -22,6 +22,9 @@ export interface ChatMessage {
   citations?: Citation[];        // RAG citations (assistant only)
   ragUsed?: boolean;             // Whether RAG was used for this response
   freshnessInfo?: FreshnessInfo; // [ZERO-COST-PIPELINE-2026-03-07] 신선도 메타
+  // [CL-TOP20-R50-CHAT-20260703-094000] 네트워크/서버 실패로 전송되지 못한 사용자 메시지 마킹.
+  // 429(쿼터 소진)는 마킹하지 않는다 — 재전송 유도가 오히려 해로움(한도 초과 재시도 방지).
+  failed?: boolean;
 }
 
 export type AIFeature = 'honeymoon' | 'qa' | 'budget';
@@ -131,8 +134,10 @@ export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions)
   }, [messages]);
 
   // Send message
-  const sendMessage = useCallback(
-    async (content: string) => {
+  // [CL-TOP20-R50-CHAT-20260703-094000] 베이스 메시지 주입형 내부 구현 —
+  // 재전송(retryMessage)이 실패 메시지를 제거한 배열 위에서 중복 없이 재전송할 수 있게 분리.
+  const sendMessageWithBase = useCallback(
+    async (content: string, baseMessages: ChatMessage[]) => {
       if (!user || !content.trim() || isLoading) return;
 
       const userMessage: ChatMessage = {
@@ -141,7 +146,7 @@ export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions)
         timestamp: new Date().toISOString(),
       };
 
-      const updatedMessages = [...messages, userMessage];
+      const updatedMessages = [...baseMessages, userMessage];
       setMessages(updatedMessages);
       setIsLoading(true);
 
@@ -299,7 +304,12 @@ export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions)
             content: `죄송해요, 응답 생성 중 오류가 발생했어요. ${friendlyMsg}`,
             timestamp: new Date().toISOString(),
           };
-          setMessages((prev) => [...prev, errorMessage]);
+          // [CL-TOP20-R50-CHAT-20260703-094000] 실패한 사용자 메시지에 failed 마킹(참조 동일성 매칭)
+          // → ChatMessage 가 "다시 시도" 버튼을 렌더한다. 429는 위 분기에서 처리(마킹 없음).
+          setMessages((prev) => [
+            ...prev.map((m) => (m === userMessage ? { ...m, failed: true } : m)),
+            errorMessage,
+          ]);
 
           toast({
             title: 'AI 응답 오류',
@@ -312,7 +322,36 @@ export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions)
       }
     },
     // [CL-TOP20-P4-AICHAT-20260703-040000] budgetContext 의존성 추가(옵트인 토글 반영)
-    [user, messages, isLoading, feature, context, budgetContext, conversationId, toast]
+    // [CL-TOP20-R50-CHAT-20260703-094000] messages 의존 제거 — 베이스는 파라미터로 주입
+    [user, isLoading, feature, context, budgetContext, conversationId, toast]
+  );
+
+  // 공개 API: 현재 대화를 베이스로 전송(기존 시그니처 불변)
+  const sendMessage = useCallback(
+    (content: string) => sendMessageWithBase(content, messages),
+    [messages, sendMessageWithBase]
+  );
+
+  // [CL-TOP20-R50-CHAT-20260703-094000] 실패 메시지 재전송 —
+  // 실패한 사용자 메시지(+바로 뒤에 붙은 오류 안내 assistant 말풍선)를 제거한 베이스로 재전송해
+  // 동일 내용이 두 번 쌓이지 않는다(중복 메시지 0 보장).
+  const retryMessage = useCallback(
+    (failedMessage: ChatMessage) => {
+      const idx = messages.findIndex(
+        (m) =>
+          m === failedMessage ||
+          (m.role === 'user' && !!m.failed && m.timestamp === failedMessage.timestamp)
+      );
+      if (idx === -1 || !messages[idx].failed) return;
+
+      const base = messages.filter((m, i) => {
+        if (i === idx) return false; // 실패한 사용자 메시지 제거(재전송으로 대체)
+        if (i === idx + 1 && m.role === 'assistant') return false; // 짝지어진 오류 안내 제거
+        return true;
+      });
+      return sendMessageWithBase(messages[idx].content, base);
+    },
+    [messages, sendMessageWithBase]
   );
 
   // Clear conversation
@@ -330,6 +369,8 @@ export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions)
     messages,
     isLoading,
     sendMessage,
+    // [CL-TOP20-R50-CHAT-20260703-094000] 실패 메시지 "다시 시도" 콜백
+    retryMessage,
     clearMessages,
     messagesEndRef,
     // [CL-AI-CHAT-LIMIT5-20260408-100500] 일일 한도 카운터

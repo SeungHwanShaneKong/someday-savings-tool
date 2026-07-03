@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, type RefObject } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSEO } from '@/hooks/useSEO';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,7 +7,7 @@ import { BudgetDonutChart } from '@/components/BudgetDonutChart';
 import { BUDGET_CATEGORIES, formatKoreanWon } from '@/lib/budget-categories';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Dialog,
   DialogContent,
@@ -16,10 +16,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { 
-  ArrowLeft, 
-  Download, 
-  Share2, 
-  Check,
+  ArrowLeft,
+  Download,
+  Share2,
   Copy,
   Link as LinkIcon,
   TrendingDown,
@@ -33,7 +32,7 @@ import { supabase } from '@/integrations/supabase/client';
 // [CL-PERF-HTML2CANVAS-20260418-230000] 동적 import로 전환 (99KB 절감)
 import { downloadImage } from '@/lib/download-image';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from 'recharts';
-import { COST_SPLIT_OPTIONS, CostSplitType } from '@/components/BudgetTable';
+import { COST_SPLIT_OPTIONS, type ExtendedBudgetItem } from '@/components/BudgetTable';
 import { CHART_COLORS, COST_SPLIT_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/chart-colors';
 // [AGENT-TEAM-9-20260307] P1 협상 코치 에이전트
 import { useNegotiateCoach } from '@/hooks/useNegotiateCoach';
@@ -43,6 +42,119 @@ import { NegotiationTips } from '@/components/planning/NegotiationTips';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ComparisonInsightsCard } from '@/components/summary/ComparisonInsightsCard';
 import { ComparisonCards } from '@/components/summary/ComparisonCards';
+
+// [CL-TOP20-R50-UI-20260703-094000] sev1 정리: useNegotiateCoach 이중 인스턴스 해소.
+// 개별 뷰 전용 협상 코치 상태(훅 + 카테고리 선택 + NegotiationTips Sheet)를 이 서브컴포넌트로 한정 —
+// 비교 뷰에서는 훅 초기화 자체가 없고, 비교 뷰 AI 조언은 ComparisonInsightsCard 내부 인스턴스가 단독 소유
+// (뷰별 정확히 1개 인스턴스 → 응답 크로스토크·중복 초기화 0). DOM 출력은 기존과 동일(회귀 0).
+interface IndividualSummaryViewProps {
+  budgets: { id: string; name: string }[];
+  activeBudgetId: string | null;
+  setActiveBudgetId: (id: string) => void;
+  items: ExtendedBudgetItem[];
+  total: number;
+  summaryRef: RefObject<HTMLDivElement>;
+  getCategoryTotal: (categoryId: string, budgetItems: ExtendedBudgetItem[]) => number;
+}
+
+function IndividualSummaryView({
+  budgets,
+  activeBudgetId,
+  setActiveBudgetId,
+  items,
+  total,
+  summaryRef,
+  getCategoryTotal,
+}: IndividualSummaryViewProps) {
+  // [AGENT-TEAM-9-20260307] P1 협상 코치 에이전트 — [CL-TOP20-R50-UI-20260703-094000] 개별 뷰 렌더 시에만 초기화
+  const { result: negotiateResult, loading: negotiateLoading, error: negotiateError, askCoach } = useNegotiateCoach();
+  const [negotiateOpen, setNegotiateOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('');
+
+  return (
+    <>
+      <div ref={summaryRef}>
+        {/* Budget tabs */}
+        <Tabs value={activeBudgetId || ''} onValueChange={setActiveBudgetId} className="mb-6">
+          <TabsList className="w-full justify-start overflow-x-auto">
+            {budgets.map(budget => (
+              <TabsTrigger key={budget.id} value={budget.id} className="min-w-fit">
+                {budget.name}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        <Card className="p-6 mb-6">
+          {/* Congrats message */}
+          <div className="text-center mb-6">
+            <span className="text-4xl mb-2 block">🎉</span>
+            <h2 className="text-heading text-foreground">
+              {budgets.find(b => b.id === activeBudgetId)?.name || '예산'} 요약
+            </h2>
+            <p className="text-body text-muted-foreground">예산 정리가 완료되었어요</p>
+          </div>
+
+          {/* Donut chart */}
+          <BudgetDonutChart items={items} />
+
+          {/* Category breakdown */}
+          <div className="mt-8 space-y-3">
+            {BUDGET_CATEGORIES.map(category => {
+              const categoryTotal = getCategoryTotal(category.id, items);
+              if (categoryTotal === 0) return null;
+
+              const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
+
+              return (
+                <div
+                  key={category.id}
+                  className="flex items-center justify-between p-3 bg-secondary rounded-xl cursor-pointer hover:bg-secondary/80 transition-colors group"
+                  onClick={() => {
+                    setSelectedCategory(category.name);
+                    askCoach(category.name, categoryTotal);
+                    setNegotiateOpen(true);
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{category.icon}</span>
+                    <span className="text-body font-medium">{category.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <span className="text-body font-semibold">{formatKoreanWon(categoryTotal)}</span>
+                      <span className="text-caption text-muted-foreground ml-2">({percentage}%)</span>
+                    </div>
+                    {/* [AGENT-TEAM-9-20260307] P1 협상 팁 아이콘 */}
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Total */}
+          <div className="mt-6 p-4 bg-primary/10 rounded-xl">
+            <div className="flex items-center justify-between">
+              <span className="text-body-lg font-medium text-primary">총 예상 비용</span>
+              <span className="text-heading font-bold text-primary">{formatKoreanWon(total)}</span>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* [AGENT-TEAM-9-20260307] P1 협상 코치 Sheet — Radix portal 렌더라 summaryRef 이미지 캡처에 비포함 */}
+      <NegotiationTips
+        open={negotiateOpen}
+        category={selectedCategory}
+        result={negotiateResult}
+        loading={negotiateLoading}
+        error={negotiateError}
+        onClose={() => setNegotiateOpen(false)}
+      />
+    </>
+  );
+}
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -65,10 +177,7 @@ export default function Summary() {
   } = useMultipleBudgets();
   const { toast } = useToast();
   const summaryRef = useRef<HTMLDivElement>(null);
-  // [AGENT-TEAM-9-20260307] P1 협상 코치 에이전트
-  const { result: negotiateResult, loading: negotiateLoading, error: negotiateError, askCoach } = useNegotiateCoach();
-  const [negotiateOpen, setNegotiateOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('');
+  // [CL-TOP20-R50-UI-20260703-094000] 협상 코치 훅/상태 → IndividualSummaryView 로 이동(개별 뷰 렌더 시에만 초기화)
   // [CL-REMOVE-SHARECARD-20260315-120000] 공유 카드 state 제거
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -598,76 +707,16 @@ export default function Summary() {
             </Card>
           </div>
         ) : (
-          /* Individual budget view */
-          <div ref={summaryRef}>
-            {/* Budget tabs */}
-            <Tabs value={activeBudgetId || ''} onValueChange={setActiveBudgetId} className="mb-6">
-              <TabsList className="w-full justify-start overflow-x-auto">
-                {budgets.map(budget => (
-                  <TabsTrigger key={budget.id} value={budget.id} className="min-w-fit">
-                    {budget.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-
-            <Card className="p-6 mb-6">
-              {/* Congrats message */}
-              <div className="text-center mb-6">
-                <span className="text-4xl mb-2 block">🎉</span>
-                <h2 className="text-heading text-foreground">
-                  {budgets.find(b => b.id === activeBudgetId)?.name || '예산'} 요약
-                </h2>
-                <p className="text-body text-muted-foreground">예산 정리가 완료되었어요</p>
-              </div>
-
-              {/* Donut chart */}
-              <BudgetDonutChart items={items} />
-
-              {/* Category breakdown */}
-              <div className="mt-8 space-y-3">
-                {BUDGET_CATEGORIES.map(category => {
-                  const categoryTotal = getCategoryTotal(category.id, items);
-                  if (categoryTotal === 0) return null;
-                  
-                  const percentage = total > 0 ? Math.round((categoryTotal / total) * 100) : 0;
-                  
-                  return (
-                    <div
-                      key={category.id}
-                      className="flex items-center justify-between p-3 bg-secondary rounded-xl cursor-pointer hover:bg-secondary/80 transition-colors group"
-                      onClick={() => {
-                        setSelectedCategory(category.name);
-                        askCoach(category.name, categoryTotal);
-                        setNegotiateOpen(true);
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl">{category.icon}</span>
-                        <span className="text-body font-medium">{category.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <span className="text-body font-semibold">{formatKoreanWon(categoryTotal)}</span>
-                          <span className="text-caption text-muted-foreground ml-2">({percentage}%)</span>
-                        </div>
-                        {/* [AGENT-TEAM-9-20260307] P1 협상 팁 아이콘 */}
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Total */}
-              <div className="mt-6 p-4 bg-primary/10 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-body-lg font-medium text-primary">총 예상 비용</span>
-                  <span className="text-heading font-bold text-primary">{formatKoreanWon(total)}</span>
-                </div>
-              </div>
-            </Card>
-          </div>
+          /* Individual budget view — [CL-TOP20-R50-UI-20260703-094000] 협상 코치 상태 포함 서브컴포넌트로 한정 */
+          <IndividualSummaryView
+            budgets={budgets}
+            activeBudgetId={activeBudgetId}
+            setActiveBudgetId={setActiveBudgetId}
+            items={items}
+            total={total}
+            summaryRef={summaryRef}
+            getCategoryTotal={getCategoryTotal}
+          />
         )}
 
         {/* Action buttons */}
@@ -704,15 +753,7 @@ export default function Summary() {
         {/* [CL-REMOVE-SHARECARD-20260315-120000] 공유 카드 기능 제거됨 */}
       </main>
 
-      {/* [AGENT-TEAM-9-20260307] P1 협상 코치 Sheet */}
-      <NegotiationTips
-        open={negotiateOpen}
-        category={selectedCategory}
-        result={negotiateResult}
-        loading={negotiateLoading}
-        error={negotiateError}
-        onClose={() => setNegotiateOpen(false)}
-      />
+      {/* [CL-TOP20-R50-UI-20260703-094000] NegotiationTips → IndividualSummaryView 내부로 이동 */}
 
       {/* Share dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>

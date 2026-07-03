@@ -6,7 +6,7 @@
 // 기존 updateAmount(낙관적+ACK) 경로를 onApply 콜백으로 재사용 — 새 DB 경로 없음.
 // 어떤 경로로 닫혀도(건너뛰기·X·ESC·적용) 완료 플래그를 설정해 재노출하지 않는다.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,8 @@ import {
   type WizardStyleId,
   type WizardTemplateId,
 } from '@/lib/budget-wizard';
+// [CL-TOP20-R50-TRACK-20260703-094000] 온보딩 퍼널 계측(wizard_enter/apply + signup_complete 근사)
+import { trackFunnel, trackFunnelOnce } from '@/lib/analytics/funnel-events';
 import { cn } from '@/lib/utils';
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -59,6 +61,17 @@ export function BudgetSetupWizard({ open, onOpenChange, onApply }: BudgetSetupWi
   );
   const [applying, setApplying] = useState(false);
   const [appliedCount, setAppliedCount] = useState(0);
+
+  // [CL-TOP20-R50-TRACK-20260703-094000] 노출 계측 — open 이 처음 true 가 되는 전이 시점 1회.
+  // 부모(BudgetFlow)는 이 위저드를 항상 마운트하고 open 으로만 제어하므로, 마운트가 아니라
+  // open 전이에서 발화해야 '미노출 사용자 오발화'가 없다(세션 중복은 trackFunnelOnce 가 차단).
+  // signup_complete 근사 근거: 노출 게이트(본인 소유·개인 모드·전 항목 0·custom 0·완료 플래그
+  // 없음)가 "가입 직후 첫 예산 진입"과 사실상 일치 — funnel-events.ts taxonomy 주석 참조.
+  useEffect(() => {
+    if (!open) return;
+    trackFunnelOnce('wizard_enter');
+    trackFunnelOnce('signup_complete');
+  }, [open]);
 
   const plan = useMemo(
     () => computeWizardPlan({ guests, styleId, templateId }),
@@ -108,6 +121,8 @@ export function BudgetSetupWizard({ open, onOpenChange, onApply }: BudgetSetupWi
     const prefills = flattenWizardPlan(plan, enabledCategoryIds);
     setApplying(true);
     markWizardDone(); // 적용 시작 시점에 즉시 완료 플래그(중간 이탈해도 재노출 금지)
+    // [CL-TOP20-R50-TRACK-20260703-094000] 적용 계측 — 선택 조합(PII 0: id·숫자만) 기록
+    trackFunnel('wizard_apply', { template: templateId, guests, style: styleId });
     try {
       // 실패는 부모의 기존 훅(updateItem)이 토스트·낙관적 롤백으로 처리 — 여기선 흐름만 유지.
       await onApply(prefills);

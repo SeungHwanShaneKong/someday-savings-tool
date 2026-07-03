@@ -98,6 +98,23 @@ describe('InstallPrompt', () => {
     expect(screen.getByRole('button', { name: '설치 안내 닫기' })).toBeInTheDocument();
   });
 
+  // [CL-TOP20-R50-TEST-20260703-094000] iOS 수동 안내 분기의 닫기 계약 — 설치 분기와 동일한
+  // 30일 억제가 iOS 분기에서도 작동해야 한다(시각 케이스는 UA 모킹 e2e 대신 결정론적 컴포넌트 테스트로 커버).
+  it('iOS 안내에서 닫기 → 동일 30일 억제 기록 + 배너 제거', () => {
+    setup({ isInstallable: false, isIOS: true });
+    renderWithProviders(<InstallPrompt />);
+
+    expect(screen.getByRole('complementary', { name: '웨딩셈 앱 설치 안내' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '설치 안내 닫기' }));
+
+    const stored = Number(window.localStorage.getItem(PWA_INSTALL_DISMISS_KEY));
+    expect(stored).toBeGreaterThan(0);
+    expect(Date.now() - stored).toBeLessThan(5_000);
+    expect(
+      screen.queryByRole('complementary', { name: '웨딩셈 앱 설치 안내' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('미노출 조건: 데스크톱(isMobile=false) / standalone / 미지원(이벤트 없음·iOS 아님) → null', () => {
     setup({}, { mobile: false });
     const desktop = renderWithProviders(<InstallPrompt />);

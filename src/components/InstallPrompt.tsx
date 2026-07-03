@@ -35,7 +35,9 @@ export function InstallPrompt() {
   return (
     <aside
       aria-label="웨딩셈 앱 설치 안내"
-      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 rounded-xl border border-border bg-card p-3 text-card-foreground shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300"
+      // [CL-MODAL-COORD-20260703-140000] z-40 로 낮춤 — 모달 Dialog(z-50)가 항상 위에 오게 해
+      //   설치 배너가 열린 모달의 버튼을 가리는 스택 충돌을 원천 차단(모달 열림 시 배경 inert).
+      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 rounded-xl border border-border bg-card p-3 text-card-foreground shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-300"
     >
       {isInstallable ? (
         <div className="flex items-center gap-2">

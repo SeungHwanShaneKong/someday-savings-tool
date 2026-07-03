@@ -1,6 +1,9 @@
 import "@testing-library/jest-dom";
-import { afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+// [CL-MODAL-COORD-20260703-140000] 전역 모달 슬롯 조율기는 모듈 스코프 싱글턴 → singleFork 에서 파일 간
+//   상태가 잔존해 오염된다. 매 테스트 전 슬롯 초기화 + 승계 지연 0(동기)으로 결정론·격리 보장.
+import { __resetNoticeSlot, __setNoticeHandoffDelay } from "@/hooks/useNoticeSlot";
 
 // [CL-QA100-BTN-20260531] Supabase 클라이언트 전역 모킹.
 // 거의 모든 페이지가 Footer→FeatureRequestButton 등으로 supabase 클라이언트를 import하며,
@@ -52,9 +55,18 @@ vi.mock("@/integrations/supabase/client", () => {
   return { supabase };
 });
 
+// [CL-MODAL-COORD-20260703-140000] 모든 테스트에서 슬롯 승계 지연 0(동기) — 타이머 잔존/플래키 방지
+__setNoticeHandoffDelay(0);
+
 // [CL-GAMIFY-QA50-20260418-224158] 테스트간 DOM 자동 정리 — getByRole 다중 매칭 방지
+// [CL-MODAL-COORD-20260703-140000] 전역 모달 슬롯 초기화(파일 간 싱글턴 오염 차단) + body 잠금 잔재 정리
+beforeEach(() => {
+  __resetNoticeSlot();
+});
 afterEach(() => {
   cleanup();
+  __resetNoticeSlot();
+  if (typeof document !== "undefined") document.body.style.pointerEvents = "";
 });
 
 // [CL-ONBOARDING-20260619-222424] jsdom localStorage 가 불완전(opaque origin) → 인메모리 폴리필.

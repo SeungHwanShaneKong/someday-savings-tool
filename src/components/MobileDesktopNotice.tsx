@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Monitor } from 'lucide-react';
 // [CL-TOP20-R50-UI-20260703-094000] 날짜 키 UTC→KST 통일 — 기존 KST 헬퍼 재사용(자정 경계 오표시 방지)
 import { toKSTDateString } from '@/lib/gamification/streak-calc';
+// [CL-MODAL-COORD-20260703-140000] 전역 자동 모달 상호배제 — UpdateNotice 등과 스택돼 버튼 가림 방지
+import { useNoticeSlot } from '@/hooks/useNoticeSlot';
 
 export function MobileDesktopNotice() {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [wantOpen, setWantOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -27,15 +29,18 @@ export function MobileDesktopNotice() {
 
     // 약간 지연 후 표시 (로그인 직후 자연스럽게)
     const timer = setTimeout(() => {
-      setOpen(true);
+      setWantOpen(true);
       localStorage.setItem(key, '1');
     }, 800);
 
     return () => clearTimeout(timer);
   }, [user]);
 
+  // [CL-MODAL-COORD-20260703-140000] 최저 우선순위 1 — 업데이트/온보딩이 있으면 그 뒤에 표시
+  const open = useNoticeSlot('mobile-desktop-notice', wantOpen, 1);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) setWantOpen(false); }}>
       <DialogContent className="max-w-sm mx-auto">
         <DialogHeader className="items-center text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -46,7 +51,7 @@ export function MobileDesktopNotice() {
             데스크톱 환경에서 가장 편리하게 보실 수 있어요^^
           </DialogDescription>
         </DialogHeader>
-        <Button onClick={() => setOpen(false)} className="w-full mt-2">
+        <Button onClick={() => setWantOpen(false)} className="w-full mt-2">
           확인
         </Button>
       </DialogContent>

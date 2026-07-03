@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, fireEvent, act } from '@/test/test-utils';
 import { MobileDesktopNotice } from '../MobileDesktopNotice';
+// [CL-MODAL-COORD-20260703-140000] 컴포넌트가 KST 날짜 키(toKSTDateString)로 조회하므로 테스트도 동일 함수로
+//   키를 생성해야 한다. 기존 UTC(toISOString)는 KST 자정~오전9시 창에서 날짜가 갈려 매일 플래키였다(선재 결함).
+import { toKSTDateString } from '@/lib/gamification/streak-calc';
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' }, session: null, isLoading: false }),
@@ -58,7 +61,7 @@ describe('MobileDesktopNotice', () => {
     vi.useFakeTimers();
     Object.defineProperty(window, 'innerWidth', { value: 375, writable: true, configurable: true });
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toKSTDateString();
     localStorage.setItem(`desktop_notice_user-1_${today}`, '1');
 
     renderWithProviders(<MobileDesktopNotice />);
@@ -75,8 +78,8 @@ describe('MobileDesktopNotice', () => {
     vi.useFakeTimers();
     Object.defineProperty(window, 'innerWidth', { value: 375, writable: true, configurable: true });
 
-    // Seed today's key explicitly
-    const today = new Date().toISOString().slice(0, 10);
+    // Seed today's key explicitly (KST — 컴포넌트와 동일 기준)
+    const today = toKSTDateString();
     localStorageStub[`desktop_notice_user-1_${today}`] = '1';
 
     renderWithProviders(<MobileDesktopNotice />);

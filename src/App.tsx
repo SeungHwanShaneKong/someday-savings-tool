@@ -11,6 +11,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AppHeader } from "@/components/layout/AppHeader";
 // [CL-TOP20-P5-PWA-20260703-053000] PWA 설치 배너(Top20 #19) — beforeinstallprompt 캡처·30일 억제
 import { InstallPrompt } from "@/components/InstallPrompt";
+// [CL-MODAL-COORD-20260703-140000] Radix 모달 잠금 미정리(페이지 클릭 불가) 자가 치유 가드
+import { PointerEventsGuard } from "@/components/PointerEventsGuard";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { AdSenseLayout } from "@/components/AdSenseLayout";
 import { MobileDesktopNotice } from "@/components/MobileDesktopNotice";
@@ -141,6 +143,8 @@ const App = () => (
         <Sonner />
         {/* [CL-TOP20-P5-PWA-20260703-053000] Router/Query 비의존 전역 오버레이 */}
         <InstallPrompt />
+        {/* [CL-MODAL-COORD-20260703-140000] body pointer-events 잠금 자가 치유(전역, 항상 마운트) */}
+        <PointerEventsGuard />
         <BrowserRouter
           future={{
             // [CL-PREVIEW-SYNC-20260403-120830] Silence React Router v7 migration warnings in preview

@@ -9,12 +9,14 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { ONBOARDING_SLIDES } from './onboarding-slides';
 import { hasSeenOnboarding, markOnboardingSeen } from '@/lib/onboarding';
+// [CL-MODAL-COORD-20260703-140000] 전역 자동 모달 상호배제 — 업데이트/데스크톱 안내와 스택 방지
+import { useNoticeSlot } from '@/hooks/useNoticeSlot';
 
 export function OnboardingCarousel() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [wantOpen, setWantOpen] = useState(false);
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   const count = ONBOARDING_SLIDES.length;
@@ -24,11 +26,14 @@ export function OnboardingCarousel() {
     if (pathname !== '/') return;
     if (hasSeenOnboarding()) return;
     const t = setTimeout(() => {
-      setOpen(true);
+      setWantOpen(true);
       markOnboardingSeen(); // 표시 즉시 기록 → 새로고침/강제종료해도 재노출 안 함
     }, 600);
     return () => clearTimeout(t);
   }, [pathname]);
+
+  // [CL-MODAL-COORD-20260703-140000] 온보딩 투어 최고 우선순위 3 — 다른 알림이 투어를 끊지 않게 먼저 점유
+  const open = useNoticeSlot('onboarding-carousel', wantOpen, 3);
 
   // embla 선택 동기화 (실브라우저). jsdom 등 레이아웃 없을 땐 아래 낙관적 setCurrent 가 진행 담당.
   useEffect(() => {
@@ -52,7 +57,7 @@ export function OnboardingCarousel() {
   const isLast = current >= count - 1;
 
   const finish = useCallback(() => {
-    setOpen(false);
+    setWantOpen(false);
     navigate(user ? '/budget' : '/auth');
   }, [navigate, user]);
 
@@ -70,7 +75,7 @@ export function OnboardingCarousel() {
   }, [isLast, finish, api, current, count]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) setWantOpen(false); }}>
       <DialogContent className="max-w-sm mx-auto rounded-2xl p-0 overflow-hidden border-0 [&>button]:hidden">
         <DialogTitle className="sr-only">웨딩셈 기능 안내</DialogTitle>
         <DialogDescription className="sr-only">
@@ -83,7 +88,7 @@ export function OnboardingCarousel() {
             variant="ghost"
             size="sm"
             className="h-8 text-muted-foreground"
-            onClick={() => setOpen(false)}
+            onClick={() => setWantOpen(false)}
           >
             건너뛰기
           </Button>

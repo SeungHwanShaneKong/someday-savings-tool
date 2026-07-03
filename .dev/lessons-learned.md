@@ -7,6 +7,16 @@
 
 ## 최신
 
+### [CL-MODAL-STACK-20260703] 조율 없는 전역 자동 모달은 스택돼 하위 버튼을 덮고 Radix body 잠금을 잔존시킨다
+- **발생원인**: UpdateNotice(500ms)·MobileDesktopNotice(800ms)·OnboardingCarousel(600ms) 등 전역 자동 Radix 모달이 겹쳐 열림(실기기: '확인' 버튼 클릭 불가 신고, 프리뷰 재현 dialogCount=2, elementFromPoint=상위 모달).
+- **기술내용**: ① 둘 다 z-50 → 나중에 열린 모달이 먼저 열린 모달 버튼을 덮음 ② Radix 모달이 `body{pointer-events:none}` 잠금을 걸고 닫힘 시 정리 못 하는 경우(애니 중단·빠른 open/close·백그라운드 탭) 페이지 전체가 클릭 불가.
+- **해결책(근본)**: ① `useNoticeSlot` 전역 단일 슬롯 조율기 — 한 번에 하나만 open(우선순위 tie-break·승계 지연 300ms로 종료애니 겹침 방지) ② `PointerEventsGuard` — "열린 모달 0 → body 상호작용 가능" 불변식을 MutationObserver+focus/visibility+1s 폴링으로 강제(자가 치유) ③ InstallPrompt z-40(모달 아래)·진행바 50ms setInterval→CSS 전이. 조율기는 모듈 싱글턴이라 test setup(setup.ts)에서 매 테스트 `__resetNoticeSlot`+지연0 으로 격리.
+
+### [CL-TESTFLAKY-KST-20260703] 컴포넌트가 KST 날짜 키를 쓰면 테스트도 KST 로 — UTC 로 만든 키는 매일 자정~9시 실패
+- **발생원인**: MobileDesktopNotice 는 `toKSTDateString()`(KST)로 localStorage 날짜 키를 조회하는데, 테스트(MN.3/MN.4)는 `new Date().toISOString()`(UTC)로 키를 생성 → **KST 자정~오전9시(UTC 전날) 창에서만 날짜가 갈려** 키 불일치로 모달이 뜨고 'dialog to be null' 실패. 세션 초반 green 이었던 건 그때가 창 밖이었기 때문(시간 의존 플래키).
+- **기술내용**: 모달 조율 작업이 이 로직을 건드리지 않았으나, 마침 KST 자정 이후 전체 스위트를 돌려 잠복 플래키가 발현. git show HEAD 로 선재 결함 확정.
+- **해결책**: 테스트의 날짜 키 생성을 **컴포넌트와 동일한 `toKSTDateString()`** 로 정렬(모달 코드 무변경). 규칙: **시간대 의존 키는 테스트와 소스가 반드시 동일 헬퍼를 공유**하고, 시각 고정(vi.setSystemTime)이 필요한 경계 테스트는 명시 고정.
+
 ### [CL-BTNAUDIT-RR-SLASH-20260703] 정적 버튼/라우트 감사는 프레임워크 동작을 오해해 대량 false-positive 를 낸다 — 라이브 실증 필수
 - **발생원인**: 버튼 기능 감사 워크플로가 "Footer 링크 `/faq/`(트레일링 슬래시) vs App.tsx `path="/faq"`(없음) → React Router 404" 를 9건 중 8건 '치명 고장(sev5)'으로 보고.
 - **기술내용**: React Router v6 는 매칭 시 **트레일링 슬래시를 정규화**해 `/faq/` 를 `path="/faq"` 에 매칭한다(404 아님). 프리뷰 라이브 렌더(/faq/·/editorial/ h1 정상)+기존 e2e(public-pages 트레일링 슬래시 통과)+이미 배포·작동 중이 반증. `/guide/wedding-cost-data/` 도 finder 가 articles.ts 만 보고 tier-3/4 레지스트리를 놓쳐 '없는 슬러그'로 오판(실제 렌더됨).

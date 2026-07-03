@@ -88,6 +88,22 @@ export default function Checklist() {
   // [CL-TOP20-P3-CHECK-20260703-030000] 긴급도 위계 요약 — 상단 오버듀 배너/스크롤 타깃
   const urgencySummary = useMemo(() => aggregateUrgency(items), [items]);
 
+  // [CL-SEC-AUDIT-20260703-101500] #1+#3 perf — 기간별 파생 배열을 items 참조 기준 memo.
+  //   기존엔 렌더 본문에서 매번 items.filter(...) 로 기간마다 새 배열을 만들어
+  //   ChecklistPeriodSection 의 items prop 참조가 상시 변해 하위 useMemo(카테고리 그룹핑·
+  //   긴급 카운트·긴급순 정렬)가 전부 캐시 미스했다. 여기서 한 번만 계산해 참조를 안정화한다.
+  //   시맨틱 100% 보존: PERIOD_ORDER 순서 · 빈 기간 제외 · visibleIndex(애니메이션 delay) 동일.
+  const periodGroups = useMemo(() => {
+    let visibleIndex = 0;
+    const groups: { period: ChecklistPeriod; items: typeof items; idx: number }[] = [];
+    for (const period of PERIOD_ORDER) {
+      const periodItems = items.filter((i) => i.period === period);
+      if (periodItems.length === 0) continue;
+      groups.push({ period, items: periodItems, idx: visibleIndex++ });
+    }
+    return groups;
+  }, [items]);
+
   // [CL-TOP20-P3-CHECK-20260703-030000] 대상 기간 섹션으로 스크롤 (reduced-motion 존중)
   const scrollToPeriod = useCallback(
     (period: ChecklistPeriod) => {
@@ -336,35 +352,27 @@ export default function Checklist() {
         {/* Period sections — staggered animation, 2-col grid on desktop */}
         {!loading && items.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
-            {(() => {
-              let visibleIndex = 0;
-              return PERIOD_ORDER.map((period) => {
-                const periodItems = items.filter((i) => i.period === period);
-                if (periodItems.length === 0) return null;
-
-                const idx = visibleIndex++;
-                return (
-                  <div
-                    key={period}
-                    id={`checklist-period-${period}`}
-                    className="animate-fade-up scroll-mt-20"
-                    style={{ animationDelay: `${idx * 0.08}s` }}
-                  >
-                    <ChecklistPeriodSection
-                      period={period}
-                      items={periodItems}
-                      isActive={period === activePeriod}
-                      forceExpand={globalExpand}
-                      urgencySort={urgencySort}
-                      onToggle={toggleItem}
-                      onDelete={deleteItem}
-                      onUpdateNotes={updateNotes}
-                      onBudgetLink={handleBudgetLink}
-                    />
-                  </div>
-                );
-              });
-            })()}
+            {/* [CL-SEC-AUDIT-20260703-101500] #1+#3 perf — memo 된 periodGroups 사용(참조 안정) */}
+            {periodGroups.map(({ period, items: periodItems, idx }) => (
+              <div
+                key={period}
+                id={`checklist-period-${period}`}
+                className="animate-fade-up scroll-mt-20"
+                style={{ animationDelay: `${idx * 0.08}s` }}
+              >
+                <ChecklistPeriodSection
+                  period={period}
+                  items={periodItems}
+                  isActive={period === activePeriod}
+                  forceExpand={globalExpand}
+                  urgencySort={urgencySort}
+                  onToggle={toggleItem}
+                  onDelete={deleteItem}
+                  onUpdateNotes={updateNotes}
+                  onBudgetLink={handleBudgetLink}
+                />
+              </div>
+            ))}
           </div>
         )}
       </main>

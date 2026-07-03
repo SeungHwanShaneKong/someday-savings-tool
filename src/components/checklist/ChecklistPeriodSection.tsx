@@ -73,7 +73,12 @@ export function ChecklistPeriodSection({
     !allDone && !isActive && !hasProgress && 'bg-muted-foreground/30'
   );
 
-  const categoryGroups = groupItemsByCategory(items);
+  // [CL-SEC-AUDIT-20260703-101500] #1+#3 perf — 카테고리 그룹핑을 items 참조 기준 memo.
+  //   기존엔 매 렌더 새 CategoryGroup 배열을 생성해 자식(ChecklistCategoryGroup)의
+  //   group.items 참조가 상시 바뀌어 내부 countUrgency/sortItemsByUrgency useMemo 가
+  //   전부 캐시 미스했다. items 불변 시 결과 참조를 유지해 하위 캐시를 살린다.
+  //   (groupItemsByCategory 는 새 배열을 정렬하므로 items 원본 불변 — memo 순수성 보존)
+  const categoryGroups = useMemo(() => groupItemsByCategory(items), [items]);
 
   // [CL-TOP20-P3-CHECK-20260703-030000] 섹션 긴급 카운트(미완료만) — 헤더 도트 + aria
   const urgency = useMemo(() => countUrgency(items), [items]);

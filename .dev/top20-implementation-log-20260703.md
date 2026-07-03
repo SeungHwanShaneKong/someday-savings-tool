@@ -58,3 +58,23 @@
 
 ## R50 최종 오라클
 tsc 0 · vitest 격리 **1444/1444** · build:ssg 23 · 시각 스냅샷 16(다크 4 추가) · 백업 커밋 2개(63d2523 + R50).
+
+---
+
+# SEC-AUDIT — 신규코드 5렌즈 적대 보안감사 (2026-07-03)
+
+목적: 배포 전 신규 코드(Top20+R50)의 보안·안정성·성능·에러·엣지 취약점 근절. 워크플로 `wf_d218a1f5-330`(28에이전트: 5렌즈 finder + 적대검증) → **22 후보 → 적대검증 통과 6건 확정**(false_positive 11·already_mitigated 5). **치명(sev4-5) 0건** — 9라운드 감사+Top20+R50 하드닝 결과. 취약점 억지 부풀리기 없이 실재 6건만 근본수정(TDD: 실패테스트 red→근본수정→green, 판별력 검증).
+
+## 확정 6건 근본수정 (증상무마 0 — 독립검증 GO)
+- **#1+#3 [perf·pri15/8] 체크리스트 불안정 items 참조 캐시 상시미스**: Checklist.tsx 기간필터 IIFE→`useMemo([items])` + ChecklistPeriodSection `groupItemsByCategory` memo → countUrgency/sortItemsByUrgency 캐시 복원(CategoryGroup 무수정). DOM 시맨틱 100% 보존. 판별력: memo 되돌리면 재실패 확인.
+- **#2 [데이터경계·pri12] /demo 가 실사용자 `budget-category-order` localStorage 양방향 오염**: useCategoryOrder 옵셔널 `storageKey`+모듈 오버라이드(`resolveStorageKey`: 인자>오버라이드>기본), Demo 전용키 `demo-category-order` 물리격리. BudgetTable no-arg 하위호환 100%. 언마운트 cleanup(누수0).
+- **#4 [error·pri6] NudgeBanner 저장 중 외부클릭 팝오버 닫힘→폼 유실**: `onOpenChange`에 `!next && saving` 가드. 성공 시 명시적 닫기로 우회.
+- **#5 [edge·pri6] isFirstBadgeUnlock(null) 오탐→첫배지 풀스크린 오발동**: null=미상→`==null` 종단 false 가드 + useGamificationState 상류 배열 정규화(이중방어). `[]`(진짜 0개)→true 보존.
+- **#6 [error·pri4] clearMessages 미처리 reject**: try/catch 로컬/서버 분리(UI 즉시삭제 보장·서버실패 격리·debug 관측성). R50 재시도 UI 무손상.
+
+## 잔여 리스크(문서화·수용)
+- useCategoryOrder.tsx 모듈 레벨 mutable 전역(`categoryOrderScopeOverride`)이 code-style §4 형식 상충. **실제 경쟁조건 없음**: 단일 쓰기주체(Demo뿐)·SPA 단일활성라우트(/demo↔/budget 동시마운트 불가)·언마운트 cleanup. 향후 개선안 = Context 기반 스코핑(BudgetTable prop-drilling 제약 해소 시). 소스 주석 명시.
+- 기각 16건: false_positive 11(ReadingProgress resize·SmartWon 오버플로/ReDoS·trackFunnel storage 등 — 이미 방어) + already_mitigated 5(챗 컨텍스트 옵트아웃 레이스·getUrgencyLevel UTC 등).
+
+## SEC-AUDIT 최종 오라클
+tsc 0 · vitest **1471/1471**(+27 보안테스트) · build:ssg 23 · 시각 16 green · 독립검증 GO(배치+#5+#6 서브검증). 커밋+푸시+GitHub Pages 배포 진행(사용자 명시 승인).

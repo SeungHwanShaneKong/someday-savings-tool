@@ -24,6 +24,7 @@ import {
 import { BudgetTable, type CostSplitType, type ExtendedBudgetItem } from '@/components/BudgetTable';
 import Footer from '@/components/Footer';
 import { useSEO } from '@/hooks/useSEO';
+import { setCategoryOrderScopeOverride } from '@/hooks/useCategoryOrder';
 import { formatKoreanWon } from '@/lib/budget-categories';
 import { trackFunnel, trackFunnelOnce } from '@/lib/analytics/funnel-events';
 import {
@@ -41,8 +42,27 @@ import {
   updateDemoNotes,
 } from '@/lib/demo-budget';
 
+// [CL-SEC-AUDIT-20260703-101500] 보안감사 취약점 #2 [데이터 경계] 근본수정.
+// /demo 가 재사용하는 BudgetTable 내부 useCategoryOrder() 는 no-arg 이므로 prop 으로
+// 스코프를 못 내린다. 데모 셸 렌더 본문에서 모듈 오버라이드를 데모 전용 키로 동기 설정하여
+// (자식 BudgetTable 의 첫 렌더보다 먼저 실행됨) 실사용자 키 'budget-category-order' 를
+// 상속·덮어쓰기 양쪽에서 물리적으로 격리한다. 언마운트 시 해제(누수 방지).
+const DEMO_CATEGORY_ORDER_KEY = 'demo-category-order';
+
 export default function Demo() {
   const navigate = useNavigate();
+
+  // 렌더 본문에서 동기 설정 — useEffect/useLayoutEffect 는 자식 렌더 이후라 늦다.
+  // 마운트 1회만 실행되도록 useState lazy init 에 부작용을 태운다(멱등).
+  useState(() => {
+    setCategoryOrderScopeOverride(DEMO_CATEGORY_ORDER_KEY);
+    return DEMO_CATEGORY_ORDER_KEY;
+  });
+  // 언마운트 시 오버라이드 해제 — /budget 등 실사용 경로로 이탈 시 기본키 복귀 보장.
+  useEffect(() => {
+    setCategoryOrderScopeOverride(DEMO_CATEGORY_ORDER_KEY);
+    return () => setCategoryOrderScopeOverride(null);
+  }, []);
 
   useSEO({
     title: '결혼 예산 체험하기 - 가입 없이 써보는 결혼 예산 계산기 | 웨딩셈',

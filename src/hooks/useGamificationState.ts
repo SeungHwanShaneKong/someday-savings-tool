@@ -21,7 +21,14 @@ type IncrementableKey = 'total_points' | 'coedit_nudges_sent' | 'partner_reviews
 function mergeGamificationState(
   partial: Partial<GamificationState> | null | undefined,
 ): GamificationState {
-  return { ...DEFAULT_GAMIFICATION_STATE, ...(partial ?? {}) };
+  const merged = { ...DEFAULT_GAMIFICATION_STATE, ...(partial ?? {}) };
+  // [CL-SEC-AUDIT-20260703-101500] 취약점 #5[edge] 방어심화 — DB JSONB 의 배열 필드가 null 로 새면
+  //  (partial.unlocked_badge_slugs === null 이 DEFAULT 의 [] 를 덮어씀) isFirstBadgeUnlock 이 null 을 받아
+  //  "첫 배지" 오판(풀스크린 오발동)한다. 비배열(null/undefined/객체)은 빈 배열로 정규화해 하류로 null 이 안 새게 한다.
+  //  주의: 이 정규화는 null→[] 만 교정하고 '실제 []'(신규 유저)는 그대로 [] → 정당한 첫 배지 축하는 유지된다.
+  if (!Array.isArray(merged.unlocked_badge_slugs)) merged.unlocked_badge_slugs = [];
+  if (!Array.isArray(merged.opt_in_phases)) merged.opt_in_phases = [...DEFAULT_GAMIFICATION_STATE.opt_in_phases];
+  return merged;
 }
 
 export function useGamificationState() {

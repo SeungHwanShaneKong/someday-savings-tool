@@ -355,13 +355,26 @@ export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions)
   );
 
   // Clear conversation
+  // [CL-SEC-AUDIT-20260703-101500] 보안감사 취약점 #6 — 미처리 promise reject 근본수정.
+  // 근본원인(수정 전): 서버 update 를 try/catch 없이 await → Supabase 실패(네트워크·auth·DB) 시
+  //   unhandled promise rejection 이 onClick 핸들러(ChatDrawer/Chat)로 전파(콘솔 미처리 거부·잠재 크래시).
+  // 근본수정 원칙 = 로컬/서버 분리:
+  //   ① 로컬 UI 상태 비우기(setMessages([]))는 서버와 무관하게 항상 먼저·항상 성공 → 사용자에겐 즉시 삭제로 보임.
+  //   ② 서버 삭제 실패는 try/catch 로 흡수(증상무마 빈 catch 아님 — debug 로깅으로 관측성 유지).
+  //      서버에 이전 메시지가 남아도 다음 sendMessage 의 update 가 finalMessages 로 덮어써 결국 정합화된다.
   const clearMessages = useCallback(async () => {
+    // 로컬은 항상 즉시 클리어(서버 실패와 분리 — UI 일관성 보장)
     setMessages([]);
-    if (conversationId) {
+    if (!conversationId || !dbAvailable.current) return;
+    try {
       await untypedSupabase
         .from('ai_conversations')
         .update({ messages: [], updated_at: new Date().toISOString() })
         .eq('id', conversationId);
+    } catch (error: unknown) {
+      // 서버 삭제 실패는 앱 흐름을 막지 않는다(로컬은 이미 비워짐). 관측용 debug 로깅만.
+      const e = error as { message?: string; code?: string };
+      console.debug('[useAIChat] clearMessages 서버 삭제 실패(로컬은 정상 클리어):', e?.message || e?.code || error);
     }
   }, [conversationId]);
 

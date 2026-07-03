@@ -1,8 +1,15 @@
 // [CL-TOP20-P1-DEMO-20260703-010000] /demo 게스트 체험 페이지 — 렌더·상호작용·전환 계측 검증
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { cleanup, renderHook } from '@testing-library/react';
 import { renderWithProviders, screen, fireEvent, within, currentPath } from '@/test/test-utils';
 import Demo from '../Demo';
 import { createDemoBudgetItems, getDemoTotal, DEMO_STORAGE_KEY } from '@/lib/demo-budget';
+import { BUDGET_CATEGORIES } from '@/lib/budget-categories';
+import { setCategoryOrderScopeOverride, useCategoryOrder } from '@/hooks/useCategoryOrder';
+
+// [CL-SEC-AUDIT-20260703-101500] 취약점 #2 [데이터 경계] — 실사용자 카테고리 순서 키
+const REAL_CATEGORY_ORDER_KEY = 'budget-category-order';
+const DEMO_CATEGORY_ORDER_KEY = 'demo-category-order';
 
 /* ─── funnel 계측 mock (hoisted) — 호출 인자·횟수를 직접 단언 ─── */
 const funnel = vi.hoisted(() => ({
@@ -114,5 +121,59 @@ describe('Demo — 게스트 체험 모드', () => {
     expect(screen.getByTestId('demo-total')).toHaveTextContent(
       `₩${defaultTotal.toLocaleString()}`,
     );
+  });
+});
+
+/* ─── [CL-SEC-AUDIT-20260703-101500] 취약점 #2 [데이터 경계] 격리 검증 ─── */
+describe('Demo — 실사용자 카테고리 순서 격리(취약점 #2 근본수정)', () => {
+  // 카테고리 헤더들의 화면 등장 순서(인덱스) — BudgetTable 은 orderedCategories 순서로 렌더
+  const renderedCategoryOrder = (): string[] => {
+    const names = BUDGET_CATEGORIES.map((c) => c.name);
+    const text = document.body.textContent ?? '';
+    return names
+      .map((name) => ({ name, at: text.indexOf(name) }))
+      .filter((x) => x.at >= 0)
+      .sort((a, b) => a.at - b.at)
+      .map((x) => x.name);
+  };
+
+  it('SEC1: 실키에 재정렬 순서가 있어도 데모는 상속하지 않는다(원본 기본순서 렌더)', () => {
+    // 실사용자가 첫 두 카테고리를 뒤집어 저장한 상태
+    const ids = BUDGET_CATEGORIES.map((c) => c.id);
+    [ids[0], ids[1]] = [ids[1], ids[0]];
+    localStorage.setItem(REAL_CATEGORY_ORDER_KEY, JSON.stringify(ids));
+
+    renderDemo();
+
+    const order = renderedCategoryOrder();
+    // 데모는 실키 상속 없이 원본 순서 → 첫 카테고리 = BUDGET_CATEGORIES[0]
+    expect(order[0]).toBe(BUDGET_CATEGORIES[0].name);
+    expect(order[1]).toBe(BUDGET_CATEGORIES[1].name);
+  });
+
+  it('SEC2: 데모 마운트 중 오버라이드=데모키, 언마운트 후 해제(실키 복귀)', () => {
+    // 초기 오버라이드 없음 보장
+    setCategoryOrderScopeOverride(null);
+    const { unmount } = renderDemo();
+
+    // 마운트 중: 데모 셸이 오버라이드를 데모 전용키로 설정 → BudgetTable 내부 no-arg 훅이 격리됨.
+    // (오버라이드 활성 증거: reorder 가 실키가 아닌 데모키에만 쓰이는지는 훅 단위테스트에서 커버.
+    //  여기선 데모가 실키를 절대 건드리지 않았음을 통합 레벨에서 단언.)
+    expect(localStorage.getItem(REAL_CATEGORY_ORDER_KEY)).toBeNull();
+
+    unmount();
+    cleanup();
+
+    // 언마운트 후 오버라이드 해제 → no-arg 훅(=실사용 /budget 경로)이 기본 실키로 복귀.
+    // 실키에 스왑 순서를 심고, 새 no-arg 훅이 그 실키를 상속하면 override 누수 없음이 입증됨.
+    const ids = BUDGET_CATEGORIES.map((c) => c.id);
+    [ids[0], ids[1]] = [ids[1], ids[0]];
+    localStorage.setItem(REAL_CATEGORY_ORDER_KEY, JSON.stringify(ids));
+    const { result } = renderHook(() => useCategoryOrder());
+    // 실키(스왑) 상속 = override 가 데모키로 남아있지 않음(누수 0)
+    expect(result.current.orderedCategories[0].id).toBe(BUDGET_CATEGORIES[1].id);
+    expect(result.current.orderedCategories[1].id).toBe(BUDGET_CATEGORIES[0].id);
+    // 데모키는 이 흐름에서 생성되지 않음
+    expect(localStorage.getItem(DEMO_CATEGORY_ORDER_KEY)).toBeNull();
   });
 });

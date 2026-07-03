@@ -1,7 +1,7 @@
 // [CL-AI-HIERARCHY-20260308-163000]
 // [DDAY-INLINE-PICKER-2026-03-07] 인라인 날짜 선택기 Popover 통합
 // [CL-TOP20-P3-CHECK-20260703-030000] D-day 실시간 프리뷰 카드 + 빈 상태 샘플 스켈레톤
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarIcon, X, CalendarDays, Clock } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
@@ -39,6 +39,17 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePre
   const [saving, setSaving] = useState(false);
   // [CL-TOP20-R50-UI-20260703-094000] 저장 실패 무피드백 해소 — 에러 문구 state(재시도 시 클리어)
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // [CL-SEC-AUDIT-20260703-101500] #4 저장 진행 중 외부클릭/ESC 로 팝오버가 닫히면
+  //   진행 중 폼 상태(선택 날짜·시간)와 실패 에러가 유실된다. saving 중 close(false) 를
+  //   무시해 요청이 끝날 때까지 팝오버를 고정한다(성공 시 handleSave 가 명시적으로 닫음).
+  const handleOpenChange = useCallback(
+    (next: boolean) => {
+      if (!next && saving) return; // 저장 진행 중 닫기 시도 무시 → 폼/에러 보존
+      setPopoverOpen(next);
+    },
+    [saving],
+  );
 
   const handleSave = async () => {
     if (!selectedDate || !onSave) return;
@@ -82,7 +93,7 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePre
 
           {/* [DDAY-INLINE-PICKER-2026-03-07] 인라인 날짜 선택기 Popover */}
           {useInlinePicker && actionLabel && (
-            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <Popover open={popoverOpen} onOpenChange={handleOpenChange}>
               <PopoverTrigger asChild>
                 <Button
                   size="sm"

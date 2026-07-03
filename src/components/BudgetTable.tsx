@@ -8,16 +8,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Check, X, Users, Trash2, GripVertical, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Check, X, Users, Trash2, GripVertical, Sparkles, AlertTriangle } from 'lucide-react';
 import { openHoneymoon } from '@/lib/external-links'; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+// [CL-TOP20-P0-20260703-004000] 드래그 핸들 props 의 선재 any 4건 → dnd-kit 정식 타입으로 근본 수정(lint 클린)
+import type { DraggableAttributes } from '@dnd-kit/core';
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useCategoryOrder } from '@/hooks/useCategoryOrder';
 import { AverageCostTooltip } from './AverageCostTooltip';
-import { hasAverageCost } from '@/lib/average-costs';
-import { getEditorLabel } from '@/lib/collab/editor-label'; // [CL-EDITLABEL-20260626] 최근 편집자(나/파트너) 라벨
+import { hasAverageCost, getAverageCost } from '@/lib/average-costs';
+import { getEditorLabel, formatRelativeTime } from '@/lib/collab/editor-label'; // [CL-EDITLABEL-20260626] 최근 편집자(나/파트너) 라벨 + [CL-TOP20-P4-COLLAB-20260703-040000] 상대시간
+import { SmartWonInput } from './budget/SmartWonInput'; // [CL-TOP20-P3-INPUT-20260703-030000] 스마트 금액 입력(만/억·힌트·평균 1탭)
+import { HiddenCostTrigger } from './budget/HiddenCostTrigger'; // [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 배선
+import { countCategoryHiddenCosts } from '@/lib/hidden-cost-map'; // [CL-TOP20-P3-HIDDEN-20260703-030000]
 // Export types for mobile component
 export type CostSplitType = 'groom' | 'bride' | 'together' | '-';
 
@@ -77,8 +83,8 @@ function SortableCategory({
 }: {
   category: Category;
   children: (props: {
-    attributes: Record<string, any>;
-    listeners: Record<string, any> | undefined;
+    attributes: DraggableAttributes;
+    listeners: SyntheticListenerMap | undefined;
   }) => React.ReactNode;
   isAnyDragging: boolean;
   categoryItemsCount: number;
@@ -160,7 +166,6 @@ export function BudgetTable({
     reorderCategories
   } = useCategoryOrder();
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [tempValue, setTempValue] = useState<string>('');
   const [editingName, setEditingName] = useState<string | null>(null);
   const [tempName, setTempName] = useState<string>('');
   const [addingToCategory, setAddingToCategory] = useState<string | null>(null);
@@ -274,28 +279,17 @@ export function BudgetTable({
   const parseNumericInput = (value: string): string => {
     return value.replace(/[^0-9]/g, '');
   };
-  const handleAmountClick = (categoryId: string, subCategoryId: string, currentAmount: number) => {
-    const cellKey = `${categoryId}-${subCategoryId}`;
-    setEditingCell(cellKey);
-    setTempValue(currentAmount > 0 ? currentAmount.toString() : '');
+  // [CL-TOP20-P3-INPUT-20260703-030000] 금액 임시버퍼(tempValue)는 SmartWonInput 내부 상태로 이동.
+  // 여기선 편집 셀 열기/커밋/취소만 담당 — Enter/Escape/blur 확정 흐름은 SmartWonInput 이 동일 계약으로 보존.
+  const handleAmountClick = (categoryId: string, subCategoryId: string) => {
+    setEditingCell(`${categoryId}-${subCategoryId}`);
   };
-  const handleAmountChange = (value: string) => {
-    const numericValue = parseNumericInput(value);
-    setTempValue(numericValue);
-  };
-  const handleAmountBlur = (categoryId: string, subCategoryId: string) => {
-    const amount = parseInt(tempValue) || 0;
+  const handleAmountCommit = (categoryId: string, subCategoryId: string, amount: number) => {
     onAmountChange(categoryId, subCategoryId, amount);
     setEditingCell(null);
-    setTempValue('');
   };
-  const handleKeyDown = (e: React.KeyboardEvent, categoryId: string, subCategoryId: string) => {
-    if (e.key === 'Enter') {
-      handleAmountBlur(categoryId, subCategoryId);
-    } else if (e.key === 'Escape') {
-      setEditingCell(null);
-      setTempValue('');
-    }
+  const handleAmountCancel = () => {
+    setEditingCell(null);
   };
   const handleStartRename = (itemId: string, currentName: string) => {
     setEditingName(itemId);
@@ -364,14 +358,19 @@ export function BudgetTable({
     return categoryItems;
   };
   const renderItemRow = (category: Category, subCat: SubCategory, subIndex: number, totalRowsForCategory: number, item: ExtendedBudgetItem, isFirstInCategory: boolean, dragHandleProps?: {
-    attributes: Record<string, any>;
-    listeners: Record<string, any> | undefined;
+    attributes: DraggableAttributes;
+    listeners: SyntheticListenerMap | undefined;
   }) => {
     const cellKey = `${category.id}-${subCat.id}`;
     const isEditing = editingCell === cellKey;
     const isRenamingThis = editingName === item.id;
     const displayName = item.custom_name || subCat.name;
     const isMealCostItem = category.id === 'main-ceremony' && subCat.id === 'meal-cost';
+    // [CL-TOP20-P3-HIDDEN-20260703-030000] 카테고리 헤더(rowSpan 셀) 집계 배지용 — 첫 행에서만 계산
+    const categoryHiddenCount = subIndex === 0 ? countCategoryHiddenCosts(category.id, items) : 0;
+    // [CL-TOP20-P4-COLLAB-20260703-040000] transient "{파트너} 변경" 배지 상대시간(방금/N분 전) — 변경 행에서만 계산.
+    //   updated_at 미상(레거시)이면 null → 시간 병기 생략(오표시 0). 정적 "최근:" 배지는 불변.
+    const changedAgo = changedItemIds?.has(item.id) ? formatRelativeTime(item.updated_at, Date.now()) : null;
     return <TableRow key={cellKey} className={cn("hover:bg-muted/50 transition-colors", isFirstInCategory && "border-t-2 border-primary/10", changedItemIds?.has(item.id) && "partner-changed-row")}>
         {subIndex === 0 && <TableCell rowSpan={totalRowsForCategory} className="font-semibold bg-secondary/50 align-top pt-2 sm:pt-4 px-1 sm:px-4">
             <div className="flex flex-col items-center gap-1">
@@ -389,10 +388,18 @@ export function BudgetTable({
                   추천
                 </button>
               )}
+              {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 집계 배지 — 금액 입력된 항목이 트리거한 룰 수(N>0 시만) */}
+              {categoryHiddenCount > 0 && (
+                <span className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                  <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" aria-hidden="true" />
+                  숨은 비용 {categoryHiddenCount}건
+                </span>
+              )}
             </div>
           </TableCell>}
         <TableCell className="text-center px-1 sm:px-2">
-          <Checkbox checked={item.is_paid || false} onCheckedChange={() => onTogglePaid(item.id)} className="data-[state=checked]:bg-success data-[state=checked]:border-success h-4 w-4 sm:h-5 sm:w-5" />
+          {/* [CL-TOP20-P0-20260703-002000] a11y: 시각 라벨 없는 체크박스에 한국어 aria-label(WCAG 4.1.2) */}
+          <Checkbox checked={item.is_paid || false} onCheckedChange={() => onTogglePaid(item.id)} aria-label={`${displayName} 결제 완료`} className="data-[state=checked]:bg-success data-[state=checked]:border-success h-4 w-4 sm:h-5 sm:w-5" />
         </TableCell>
         <TableCell className="text-xs sm:text-sm px-1 sm:px-2">
           {isRenamingThis ? <div className="flex items-center gap-1">
@@ -414,6 +421,8 @@ export function BudgetTable({
                 <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap flex-shrink-0">
                   <Sparkles className="w-2.5 h-2.5 flex-shrink-0" aria-hidden />
                   {partnerName?.trim() ? `${partnerName.trim()} 변경` : '파트너 변경'}
+                  {/* [CL-TOP20-P4-COLLAB-20260703-040000] 상대시간 병기 — 중첩 span(부모 직계 텍스트 노드 불변 → 기존 getByText 계약 보존) */}
+                  {changedAgo && <span className="font-normal opacity-80">· {changedAgo}</span>}
                 </span>
               ) : showEditorLabels && getEditorLabel(item.last_edited_by, myUserId, partnerName) ? (
                 <span
@@ -426,6 +435,8 @@ export function BudgetTable({
               {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
                 <AverageCostTooltip categoryId={category.id} subCategoryId={subCat.id} />
               )}
+              {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 트리거 — 룰 매칭+금액 입력(>0) 시 amber 아이콘 */}
+              <HiddenCostTrigger categoryId={category.id} subCategoryId={subCat.id} amount={item.amount || 0} itemName={displayName} className="flex-shrink-0" />
               {onRenameItem && <Button size="icon" variant="ghost" className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 flex-shrink-0" onClick={() => handleStartRename(item.id, displayName)}>
                   <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                 </Button>}
@@ -460,13 +471,14 @@ export function BudgetTable({
                   <div className="space-y-3">
                     <div className="text-sm font-medium">인원수 계산</div>
                     <div className="space-y-2">
+                      {/* [CL-TOP20-P0-20260703-002000] a11y: label-input 프로그래매틱 연결(htmlFor/id, WCAG 1.3.1) */}
                       <div>
-                        <label className="text-xs text-muted-foreground">1인당 비용 (₩)</label>
-                        <Input type="text" inputMode="numeric" value={tempUnitPrice} onChange={e => setTempUnitPrice(parseNumericInput(e.target.value))} placeholder="65000" className="h-8" />
+                        <label htmlFor={`unit-price-${cellKey}`} className="text-xs text-muted-foreground">1인당 비용 (₩)</label>
+                        <Input id={`unit-price-${cellKey}`} type="text" inputMode="numeric" value={tempUnitPrice} onChange={e => setTempUnitPrice(parseNumericInput(e.target.value))} placeholder="65000" className="h-8" />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">예상 인원 (명)</label>
-                        <Input type="text" inputMode="numeric" value={tempQuantity} onChange={e => setTempQuantity(parseNumericInput(e.target.value))} placeholder="300" className="h-8" />
+                        <label htmlFor={`quantity-${cellKey}`} className="text-xs text-muted-foreground">예상 인원 (명)</label>
+                        <Input id={`quantity-${cellKey}`} type="text" inputMode="numeric" value={tempQuantity} onChange={e => setTempQuantity(parseNumericInput(e.target.value))} placeholder="300" className="h-8" />
                       </div>
                       {tempUnitPrice && tempQuantity && <div className="text-sm font-medium text-primary">
                           = {formatKoreanWon((parseInt(tempUnitPrice) || 0) * (parseInt(tempQuantity) || 0))}
@@ -478,7 +490,8 @@ export function BudgetTable({
                   </div>
                 </PopoverContent>
               </Popover>}
-            {isEditing ? <Input type="text" inputMode="numeric" value={tempValue} onChange={e => handleAmountChange(e.target.value)} onBlur={() => handleAmountBlur(category.id, subCat.id)} onKeyDown={e => handleKeyDown(e, category.id, subCat.id)} className="h-6 sm:h-8 text-right text-[11px] sm:text-sm w-20 sm:w-28" autoFocus placeholder="금액 입력" /> : <button onClick={() => handleAmountClick(category.id, subCat.id, item.amount || 0)} className={cn("text-right px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-muted transition-colors text-[11px] sm:text-sm", item.amount ? "text-foreground font-medium" : "text-muted-foreground/60 italic")}>
+            {isEditing ? /* [CL-TOP20-P3-INPUT-20260703-030000] 스마트 금액 입력(만/억 인식·실시간 힌트·평균 1탭) — Enter/Escape/blur 흐름 보존 */
+            <SmartWonInput value={item.amount || 0} onCommit={amount => handleAmountCommit(category.id, subCat.id, amount)} onCancel={handleAmountCancel} averageAmount={!item.is_custom ? getAverageCost(category.id, subCat.id)?.amount ?? null : null} className="h-6 sm:h-8 text-right text-[11px] sm:text-sm w-20 sm:w-28" aria-label={`${displayName} 금액`} autoFocus placeholder="금액 입력" /> : <button onClick={() => handleAmountClick(category.id, subCat.id)} className={cn("text-right px-1 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-muted transition-colors text-[11px] sm:text-sm", item.amount ? "text-foreground font-medium" : "text-muted-foreground/60 italic")}>
                 {item.amount ? `₩${item.amount.toLocaleString()}` : '금액 입력'}
               </button>}
           </div>
@@ -488,7 +501,8 @@ export function BudgetTable({
         </TableCell>
         <TableCell className="w-14 sm:w-20 px-1 sm:px-4">
           {onCostSplitChange && <Select value={item.cost_split || '-'} onValueChange={(value: CostSplitType) => onCostSplitChange(item.id, value)}>
-              <SelectTrigger className="h-6 sm:h-8 text-[11px] sm:text-xs w-full px-1 sm:px-3">
+              {/* [CL-TOP20-P0-20260703-002000] a11y: 라벨 없는 Select 에 한국어 aria-label */}
+              <SelectTrigger aria-label={`${displayName} 분담 방식`} className="h-6 sm:h-8 text-[11px] sm:text-xs w-full px-1 sm:px-3">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -499,7 +513,7 @@ export function BudgetTable({
             </Select>}
         </TableCell>
         <TableCell className="px-1 sm:px-4">
-          <Input type="text" value={tempNotes[item.id] !== undefined ? tempNotes[item.id] : item.notes || ''} onChange={e => handleNotesChange(item.id, e.target.value)} onFocus={() => handleNotesFocus(item.id, item.notes)} onBlur={() => handleNotesBlur(item.id, item.notes)} onCompositionStart={() => handleCompositionStart(item.id)} onCompositionEnd={() => handleCompositionEnd(item.id)} className="h-6 sm:h-8 text-[11px] sm:text-sm border-0 bg-transparent focus:bg-background" placeholder="메모..." />
+          <Input type="text" value={tempNotes[item.id] !== undefined ? tempNotes[item.id] : item.notes || ''} onChange={e => handleNotesChange(item.id, e.target.value)} onFocus={() => handleNotesFocus(item.id, item.notes)} onBlur={() => handleNotesBlur(item.id, item.notes)} onCompositionStart={() => handleCompositionStart(item.id)} onCompositionEnd={() => handleCompositionEnd(item.id)} aria-label={`${displayName} 메모`} className="h-6 sm:h-8 text-[11px] sm:text-sm border-0 bg-transparent focus:bg-background" placeholder="메모..." />
         </TableCell>
       </TableRow>;
   };

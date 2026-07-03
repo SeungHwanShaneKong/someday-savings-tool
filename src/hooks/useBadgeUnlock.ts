@@ -9,6 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useGamificationState } from '@/hooks/useGamificationState';
 import { evaluateBadgeUnlocks, selectAwardableBadges } from '@/lib/gamification/rule-engine';
+// [CL-TOP20-P4-GAMIFY-20260703-040000] 생애 첫 배지 판별(순수 함수) — 풀스크린 축하 트리거
+import { isFirstBadgeUnlock } from '@/lib/gamification/first-badge';
 import type {
   BadgeDefinition,
   BadgeEvaluationContext,
@@ -36,6 +38,12 @@ function useBadgeDefinitions() {
 export interface PendingUnlock {
   badge: BadgeDefinition;
   points_gained: number;
+  /**
+   * [CL-TOP20-P4-GAMIFY-20260703-040000] 사용자 생애 첫 배지 여부 — true 면
+   * BadgeUnlockModal 을 풀스크린 변형으로 노출. 평가 시점의 already_unlocked_slugs
+   * (기존 상태 데이터)만으로 판별 — DB 신규 조회 없음.
+   */
+  is_first_badge?: boolean;
 }
 
 /**
@@ -127,9 +135,11 @@ export function useBadgeUnlock() {
         qc.invalidateQueries({ queryKey: ['userEarnedBadges', userId] });
 
         // 큐에 추가 → 모달 순차 노출 (실제 신규 획득 배지만)
-        const items: PendingUnlock[] = awardable.map((b) => ({
+        // [CL-TOP20-P4-GAMIFY-20260703-040000] 첫 배지 = 기존 획득 슬러그 0 + 배치 첫 항목(1회만)
+        const items: PendingUnlock[] = awardable.map((b, i) => ({
           badge: b,
           points_gained: b.points_reward,
+          is_first_badge: isFirstBadgeUnlock(fullCtx.already_unlocked_slugs, i),
         }));
         queueRef.current.push(...items);
         if (!pendingUnlock) showNextFromQueue();

@@ -21,3 +21,25 @@ export function getEditorLabel(
   if (lastEditedBy === myUserId) return '나';
   return partnerName?.trim() || '파트너'; // 파트너 — 이름 없으면 폴백
 }
+
+// [CL-TOP20-P4-COLLAB-20260703-040000] transient "{파트너} 변경" 배지에 병기할 상대시간(순수·결정론).
+//   now 를 주입받아 CI 완전 검증 가능. 시계 스큐(미래 updated_at)는 "방금"으로 안전 폴백.
+/**
+ * updated_at(ISO) → 한국어 상대시간 문자열.
+ * @param iso   서버 updated_at (ISO 8601). null/미상/파싱불가 → null(표시 안 함)
+ * @param nowMs 기준 시각(epoch ms) — 호출측이 Date.now() 주입
+ * @returns "방금"(60초 미만·미래 포함) | "N분 전" | "N시간 전" | "N일 전" | null
+ */
+export function formatRelativeTime(
+  iso: string | null | undefined,
+  nowMs: number,
+): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const diff = nowMs - t;
+  if (diff < 60_000) return '방금'; // 음수(미래·스큐)도 "방금"으로 흡수
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}분 전`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}시간 전`;
+  return `${Math.floor(diff / 86_400_000)}일 전`;
+}

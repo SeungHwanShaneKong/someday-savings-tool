@@ -39,6 +39,10 @@ import { CHART_COLORS, COST_SPLIT_COLORS, CHART_TOOLTIP_STYLE } from '@/lib/char
 import { useNegotiateCoach } from '@/hooks/useNegotiateCoach';
 import { NegotiationTips } from '@/components/planning/NegotiationTips';
 // [CL-REMOVE-SHARECARD-20260315-120000] 공유 카드 기능 제거
+// [CL-TOP20-P3-SUMMARY-20260703-030000] 비교 의사결정 지원(로컬 인사이트+AI 버튼) + 비교표 모바일 카드화
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ComparisonInsightsCard } from '@/components/summary/ComparisonInsightsCard';
+import { ComparisonCards } from '@/components/summary/ComparisonCards';
 
 export default function Summary() {
   const navigate = useNavigate();
@@ -72,6 +76,8 @@ export default function Summary() {
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [viewMode, setViewMode] = useState<'individual' | 'comparison'>('comparison');
   const [isDownloading, setIsDownloading] = useState(false);
+  // [CL-TOP20-P3-SUMMARY-20260703-030000] 모바일 분기(768px 미만) — early return 이전에 호출(훅 규칙)
+  const isMobile = useIsMobile();
   // [CL-BTNPERFECT-20260629] 동기 더블서밋 게이트(state 는 async → 같은 틱 연타 누수). 공유/다운로드 레이스 차단.
   const sharingRef = useRef(false);
   const downloadingRef = useRef(false);
@@ -238,10 +244,11 @@ export default function Summary() {
       }
       
       setShareDialogOpen(true);
-    } catch (error: any) {
+    } catch (error) {
+      // [CL-TOP20-P3-SUMMARY-20260703-030000] lint: no-explicit-any 해소(동작 불변 — 메시지 표시만)
       toast({
         title: '공유 링크 생성 중 오류가 발생했어요',
-        description: error.message,
+        description: error instanceof Error ? error.message : undefined,
         variant: 'destructive',
       });
     } finally {
@@ -274,16 +281,56 @@ export default function Summary() {
   }));
 
   // Category comparison data — [CL-FULL-QA-20260315-170000] budgetLabels 사용
+  // [CL-TOP20-P3-SUMMARY-20260703-030000] lint: any → string|number (타입 전용, 런타임 불변)
   const categoryComparisonData = BUDGET_CATEGORIES.map(category => {
-    const result: Record<string, any> = { category: category.name, icon: category.icon };
+    const result: Record<string, string | number> = { category: category.name, icon: category.icon };
     budgetsForComparison.forEach((budget, i) => {
       result[budgetLabels[i]] = getCategoryTotal(category.id, budget.items);
     });
     return result;
   }).filter(data => {
     // Filter out categories with all zeros
-    return budgetLabels.some(label => data[label] > 0);
+    return budgetLabels.some(label => (data[label] as number) > 0);
   });
+
+  // [CL-TOP20-P3-SUMMARY-20260703-030000] 인사이트 카드 + 모바일 비교 카드 공용 데이터
+  //  (데스크톱 표 로직·JSX 는 무변경 — 회귀 0)
+  const comparisonColumns = budgetsForComparison.map((budget, i) => ({
+    id: budget.id,
+    label: budgetLabels[i],
+    color: CHART_COLORS[i % CHART_COLORS.length],
+  }));
+  const insightBudgets = budgetsForComparison.map((budget, i) => ({
+    id: budget.id,
+    label: budgetLabels[i],
+    items: budget.items,
+  }));
+  const categoryCardRows = categoryComparisonData.map(row => ({
+    key: row.category as string,
+    label: row.category as string,
+    icon: row.icon as string,
+    values: budgetLabels.map(label => row[label] as number),
+  }));
+  const splitCardRows = COST_SPLIT_OPTIONS.filter((splitOpt) => {
+    if (splitOpt.value !== '-') return true;
+    return budgetsForComparison.some(budget =>
+      budget.items.filter(item => (item.cost_split || '-') === '-').reduce((s, i) => s + i.amount, 0) > 0
+    );
+  }).map((splitOpt) => ({
+    key: splitOpt.value,
+    label: splitOpt.label,
+    icon: (
+      <span
+        className="inline-block w-3 h-3 rounded-full"
+        style={{ backgroundColor: COST_SPLIT_COLORS[splitOpt.value] }}
+      />
+    ),
+    values: budgetsForComparison.map(budget =>
+      budget.items
+        .filter(item => (item.cost_split || '-') === splitOpt.value)
+        .reduce((sum, item) => sum + item.amount, 0)
+    ),
+  }));
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -365,6 +412,11 @@ export default function Summary() {
               ))}
             </div>
 
+            {/* [CL-TOP20-P3-SUMMARY-20260703-030000] 비교 의사결정 지원 — 로컬 인사이트 즉시 + AI 는 버튼으로만 */}
+            {budgetsForComparison.length > 1 && (
+              <ComparisonInsightsCard budgets={insightBudgets} />
+            )}
+
             {/* Difference highlight */}
             {budgets.length > 1 && difference > 0 && (
               <Card className="p-4 bg-gradient-to-r from-primary/5 to-primary/10">
@@ -407,8 +459,20 @@ export default function Summary() {
             </Card>
 
             {/* Category breakdown comparison */}
+            {/* [CL-TOP20-P3-SUMMARY-20260703-030000] 모바일=아코디언 카드 / 데스크톱=기존 표(무변경) */}
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">카테고리별 비교</h3>
+              {isMobile ? (
+                <ComparisonCards
+                  columns={comparisonColumns}
+                  rows={categoryCardRows}
+                  highlightMinMax
+                  totalRow={{
+                    label: '💰 총합',
+                    values: budgetsForComparison.map(budget => getBudgetTotal(budget.items)),
+                  }}
+                />
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -437,7 +501,7 @@ export default function Summary() {
                           const label = budgetLabels[budgetIdx];
                           const value = row[label] as number;
                           const maxInRow = Math.max(...budgetLabels.map(l => row[l] as number));
-                          const minInRow = Math.min(...budgetLabels.filter(l => row[l] > 0).map(l => row[l] as number));
+                          const minInRow = Math.min(...budgetLabels.filter(l => (row[l] as number) > 0).map(l => row[l] as number));
                           const isMax = value === maxInRow && budgets.length > 1;
                           const isMin = value === minInRow && value > 0 && budgets.length > 1 && maxInRow !== minInRow;
 
@@ -471,11 +535,16 @@ export default function Summary() {
                   </tbody>
                 </table>
               </div>
+              )}
             </Card>
 
             {/* Cost Split Summary */}
+            {/* [CL-TOP20-P3-SUMMARY-20260703-030000] 모바일=아코디언 카드 / 데스크톱=기존 표(무변경) */}
             <Card className="p-6">
               <h3 className="text-lg font-semibold mb-4">분담별 비용 비교</h3>
+              {isMobile ? (
+                <ComparisonCards columns={comparisonColumns} rows={splitCardRows} />
+              ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -525,6 +594,7 @@ export default function Summary() {
                   </tbody>
                 </table>
               </div>
+              )}
             </Card>
           </div>
         ) : (

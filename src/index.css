@@ -68,6 +68,12 @@
     --chart-3: 145 65% 42%;
     --chart-4: 38 92% 50%;
     --chart-5: 262 83% 58%;
+
+    /* [CL-TOP20-P1-TOKENS-20260703-011500] 웨딩 무드 웜톤 토큰 — Top20 #4.
+       Toss Blue(primary) 위에 얹는 보조 감성축: 로즈(따뜻함)·골드(축하). 남용 금지 — 히어로/축하 표면 전용. */
+    --wedding-rose: 346 60% 60%;
+    --wedding-rose-soft: 348 100% 97%;
+    --wedding-gold: 40 92% 56%;
   }
 
   .dark {
@@ -119,6 +125,11 @@
     --chart-3: 145 60% 50%;
     --chart-4: 38 85% 55%;
     --chart-5: 262 83% 65%;
+
+    /* [CL-TOP20-P1-TOKENS-20260703-011500] 웨딩 웜톤 다크모드 변형 */
+    --wedding-rose: 346 65% 68%;
+    --wedding-rose-soft: 345 30% 14%;
+    --wedding-gold: 42 90% 60%;
   }
 }
 

@@ -27,8 +27,10 @@ import {
   copyToClipboard,
   getAppSpecificGuide,
 } from '@/lib/kakao-browser';
+// [CL-TOP20-P4-COLLAB-20260703-040000] 수락 성공 시 토스트 직행 대신 축하 화면 경유(자동/버튼 이동)
+import { AcceptCelebration } from '@/components/collaboration/AcceptCelebration';
 
-type Phase = 'checking' | 'accepting' | 'error';
+type Phase = 'checking' | 'accepting' | 'celebration' | 'error';
 
 export default function AcceptInvite() {
   const { token } = useParams();
@@ -50,6 +52,15 @@ export default function AcceptInvite() {
     const ok = await copyToClipboard(window.location.href);
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 2000); }
   }, []);
+
+  // [CL-TOP20-P4-COLLAB-20260703-040000] 축하 화면 → /budget 이동(자동 타이머·버튼 공용) 1회 가드.
+  //   타이머 만료와 버튼 클릭이 겹쳐도 navigate 는 정확히 1회(QF.2 replace 내비 1회 계약 유지).
+  const navigatedRef = useRef(false);
+  const goToBudget = useCallback(() => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    navigate('/budget', { replace: true });
+  }, [navigate]);
 
   useSEO({ title: '공동 예산 초대 - 웨딩셈', description: '파트너의 공동 예산 초대를 수락합니다.', path: '/invite' });
 
@@ -94,7 +105,9 @@ export default function AcceptInvite() {
             try { localStorage.setItem(WORKSPACE_MODE_KEY, 'shared'); } catch { /* noop */ }
             // [CL-COEDIT-NICK-20260621] 닉네임 권유는 /budget 진입 후 BudgetFlow(우리 모드)에서 인-컨텍스트로 노출
             //   (수락 흐름을 막지 않음 → 더 단순·자연스러움).
-            navigate('/budget', { replace: true });
+            // [CL-TOP20-P4-COLLAB-20260703-040000] 즉시 내비 대신 축하 화면 경유 —
+            //   자동(비 reduced-motion)/버튼으로 goToBudget(1회 가드) 호출. 토스트·shared 저장 계약은 불변.
+            setPhase('celebration');
             break;
           case 'owner':
             toast({ title: '본인이 만든 예산이에요', description: '내 예산에서 바로 관리할 수 있어요.' });
@@ -162,6 +175,11 @@ export default function AcceptInvite() {
         </div>
       </div>
     );
+  }
+
+  // [CL-TOP20-P4-COLLAB-20260703-040000] 수락 성공 → 축하 풀스크린(자동/버튼 이동, reduced-motion 정적 폴백)
+  if (phase === 'celebration') {
+    return <AcceptCelebration onContinue={goToBudget} />;
   }
 
   if (phase === 'error') {

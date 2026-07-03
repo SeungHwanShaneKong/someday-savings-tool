@@ -64,6 +64,12 @@ export interface Article {
   sources?: { title: string; url?: string; publisher?: string; note?: string }[];
   /** 자체 추정 방법론(외부 출처 없을 때 투명 공개 — 기준·표본·면책). 본문 callout. */
   methodology?: string;
+  /**
+   * [CL-TOP20-P2-ARTICLE-20260703-020000] 콘텐츠→앱 브리지 맞춤 CTA (optional·additive).
+   * 슬러그 의미에 맞는 목적지(/budget·/checklist·/demo)로 연결. 미설정 시 기존 공통 CTA 그대로 유지(회귀 0).
+   * label = 버튼 텍스트(액션형) · description = CTA 박스 안내 문구 · to = 내부 라우트 경로.
+   */
+  contextualCta?: { label: string; description: string; to: string };
 }
 
 /* ─── 아티클 데이터 ─── */
@@ -257,6 +263,13 @@ export const ARTICLES: Article[] = [
       },
     ],
     related: ['2026-wedding-cost', 'wedding-prep-order', 'budget-10million'],
+    // [CL-TOP20-P2-ARTICLE-20260703-020000] 스드메 견적 확인 직후 → 예산 시뮬레이터 브리지
+    contextualCta: {
+      label: '스드메 견적, 예산에 넣어 계산하기',
+      description:
+        '방금 확인한 스드메 견적을 웨딩셈 시뮬레이터에 입력하면 평균 대비 과지출 여부를 바로 확인할 수 있어요.',
+      to: '/budget',
+    },
   },
 
   /* ═══════════════ 3) 예산 1,000만원 결혼 준비 ═══════════════ */
@@ -327,6 +340,13 @@ export const ARTICLES: Article[] = [
       },
     ],
     related: ['2026-wedding-cost', 'sdm-checklist', 'wedding-prep-order'],
+    // [CL-TOP20-P2-ARTICLE-20260703-020000] 1,000만원 배분 예시 → 가입 없는 데모 체험 브리지
+    contextualCta: {
+      label: '가입 없이 예산 배분 체험하기',
+      description:
+        '이 글의 1,000만 원 배분 예시를 데모 예산에서 직접 조절해보세요. 회원가입 없이 바로 체험할 수 있어요.',
+      to: '/demo',
+    },
   },
 
   /* ═══════════════ 4) 결혼 준비 순서 ═══════════════ */
@@ -429,6 +449,13 @@ export const ARTICLES: Article[] = [
       },
     ],
     related: ['2026-wedding-cost', 'sdm-checklist', 'budget-10million'],
+    // [CL-TOP20-P2-ARTICLE-20260703-020000] 시기별 타임라인 → 체크리스트 브리지
+    contextualCta: {
+      label: '시기별 체크리스트 시작하기',
+      description:
+        'D-12개월부터 D-day까지, 이 글의 타임라인을 웨딩셈 체크리스트로 하나씩 챙겨보세요.',
+      to: '/checklist',
+    },
   },
 
   /* ═══════════════ 5) 예식장 유형별 비용 ═══════════════ */
@@ -513,6 +540,13 @@ export const ARTICLES: Article[] = [
       },
     ],
     related: ['2026-wedding-cost', 'small-wedding', 'wedding-gift-money'],
+    // [CL-TOP20-P2-ARTICLE-20260703-020000] 예식장 총비용 비교 → 예산 시뮬레이터 브리지
+    contextualCta: {
+      label: '예식장 비용, 내 예산과 비교하기',
+      description:
+        '후보 예식장의 대관료·식대·보증인원을 웨딩셈에 입력하면 유형별 총비용을 평균과 비교할 수 있어요.',
+      to: '/budget',
+    },
   },
 
   /* ═══════════════ 6) 스몰웨딩 완벽 가이드 ═══════════════ */
@@ -1083,6 +1117,13 @@ export const ARTICLES: Article[] = [
       },
     ],
     related: ['wedding-venue-types', '2026-wedding-cost', 'wedding-prep-order'],
+    // [CL-TOP20-P2-ARTICLE-20260703-020000] 축의금(수입)·식대(지출) 균형 → 가입 없는 데모 체험 브리지
+    contextualCta: {
+      label: '축의금·식대 밸런스 계산해보기',
+      description:
+        '하객 수와 식대를 넣으면 예상 축의금 대비 실제 자기부담금을 가입 없이 바로 확인할 수 있어요.',
+      to: '/demo',
+    },
   },
 ];
 
@@ -1120,6 +1161,14 @@ export function countArticleWords(article: Article): number {
   }
   if (article.faqs) n += article.faqs.reduce((s, f) => s + f.q.length + f.a.length, 0);
   return n;
+}
+
+/**
+ * [CL-TOP20-P2-ARTICLE-20260703-020000] 읽기 시간 추정(분) — 순수 함수.
+ * countArticleWords(한국어 글자수 근사)를 재사용, 한국어 평균 독해 속도 250자/분 기준 올림. 최소 1분 보장.
+ */
+export function estimateReadingMinutes(article: Article): number {
+  return Math.max(1, Math.ceil(countArticleWords(article) / 250));
 }
 
 /** Article 의 mainEntityOfPage 구조화 데이터 (강화: wordCount·articleSection·keywords·아티클별 image) */

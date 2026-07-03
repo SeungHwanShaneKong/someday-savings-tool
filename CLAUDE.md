@@ -81,6 +81,7 @@ src/
 - **프로젝트 규칙**: `.claude/rules/deployment.md`(GitHub Pages·Gabia DNS·도메인 토폴로지·cutover 순서) · `.claude/rules/seo-ssg.md`(canonical/sitemap/prerender·SITE_ORIGIN). 일반 규칙은 전역 `~/.claude/rules/`(orchestration·verification·testing·security·code-style·data-governance·communication) 상속.
 - **교훈 전체 아카이브**: `.dev/lessons-learned.md` — **신규 교훈은 여기 적재**(CLAUDE.md엔 Top 5만). AI 작업 로그·트러블슈팅도 `.dev/`.
 - **골든/회귀 1급 자산**: `tests/golden/`(예: canonical 도메인 회귀 가드).
+- **Top 20 UX 로드맵(승인·진행 중)**: `.dev/top20-upgrade-roadmap-20260702.md` — P0~P5 Phase·항목별 근거(file:line)·DoD. 방문자 퍼널 계측=`src/lib/analytics/funnel-events.ts`, 시각 회귀=`e2e/visual.spec.ts`(visual-* 프로젝트).
 
 ## Lessons Learned (Top 5 — 전체는 `.dev/lessons-learned.md`)
 - **[CL-DOMAIN-PROMOTE-20260621]** 정식 도메인=apex `moderninsightspot.com`(GitHub Pages 직접 서빙), `wedsem.…`→apex 자동 301. 런타임은 `window.location.origin`(호스트 무관), SEO 절대URL만 `src/config/site.ts`(`SITE_ORIGIN`) 단일소스(7곳). **AdSense는 등록지=서빙지 일치가 안전**(리다이렉트로 빼지 말 것). 컷오버=**DNS(Gabia A→GitHub) 먼저 → push 나중**(반대면 좀비로 튕김). [CL-ADSENSE]의 'apex→wedsem 301' 권고 대체.

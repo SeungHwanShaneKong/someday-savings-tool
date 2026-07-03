@@ -63,6 +63,7 @@ import { CollaboratorManager } from '@/components/collaboration/CollaboratorMana
 // [CL-COEDIT-NICK-20260621] 파트너 이름 표출 + 닉네임 권유
 import { useCollaboration } from '@/hooks/useCollaboration';
 import { NicknameDialog } from '@/components/collaboration/NicknameDialog';
+import { PartnerActivityChip } from '@/components/collaboration/PartnerActivityChip'; // [CL-TOP20-P4-COLLAB-20260703-040000]
 import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
 import { useToast } from '@/hooks/use-toast'; // [CL-AUDIT-R3-SHARE-20260623-000000] 자동공유 실패 안내
 // [CL-COEDIT-NUDGE-20260624-000000] 개선2/3/4: 파트너 2분 편집 알림 · 오프라인 변경 시머 · 회전 칭찬
@@ -70,6 +71,9 @@ import { usePartnerEditNotifier } from '@/hooks/usePartnerEditNotifier';
 import { useGamificationState } from '@/hooks/useGamificationState';
 import { computeChangedSince, lastSeenKey, HIGHLIGHT_HOLD_MS, maxUpdatedAt } from '@/lib/collab/changed-since';
 import { crossedMilestone, makePraiseBag, type PraiseBag } from '@/lib/praise-messages';
+// [CL-TOP20-P3-WIZARD-20260703-030000] 첫 예산 생성 위저드(Top 20 P3 #11) — 신규 사용자 빈 표 마찰 제거
+import { BudgetSetupWizard } from '@/components/budget/BudgetSetupWizard';
+import { isWizardDone, type WizardPrefill } from '@/lib/budget-wizard';
 
 export default function BudgetFlow() {
   const navigate = useNavigate();
@@ -300,6 +304,35 @@ export default function BudgetFlow() {
     addPoints(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editSignal]);
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // [CL-TOP20-P3-WIZARD-20260703-030000] 첫 예산 생성 위저드 노출 게이트.
+  //   개인 모드 && 로딩 완료 && 활성 개인 예산의 항목이 로드됨 && 전 항목 amount=0 && custom 0
+  //   && 완료 플래그(wedsem_wizard_done_v1) 미설정일 때만 1회 노출. 공유(우리) 모드에선 절대 미노출.
+  //   items.length>0 + budget_id 일치 가드 = 항목 로딩 완료 판별(빈 배열/전환 직후 stale 로 오판 방지).
+  //   세션당 1회만 평가(decidedRef) — 값 입력 후 다시 지워도 재팝업하지 않음(피로 방지).
+  // ────────────────────────────────────────────────────────────────────────────
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const wizardDecidedRef = useRef(false);
+  useEffect(() => {
+    if (wizardDecidedRef.current || wizardOpen) return;
+    if (budgetLoading || !user) return;
+    if (mode !== 'personal') return; // 공유(coedit) 모드 절대 미노출
+    if (!activeBudget || activeBudget.isShared || activeBudget.user_id !== user.id) return;
+    if (items.length === 0 || items[0].budget_id !== activeBudget.id) return; // 항목 로딩 완료 대기
+    wizardDecidedRef.current = true;
+    if (isWizardDone()) return;
+    const untouched = items.every(i => (i.amount ?? 0) === 0 && !i.is_custom);
+    if (untouched) setWizardOpen(true);
+  }, [wizardOpen, budgetLoading, user, mode, activeBudget, items]);
+
+  // 위저드 적용 = 기존 낙관적 업데이트·ACK 경로(updateAmount→updateItem) 순회 재사용. 새 DB 경로 없음.
+  // 개별 실패는 updateItem 이 토스트+롤백으로 처리 → 앱은 항상 정상.
+  const handleWizardApply = async (prefills: WizardPrefill[]) => {
+    for (const p of prefills) {
+      await updateAmount(p.category, p.subCategory, p.amount);
+    }
+  };
 
   // [CL-COEDIT-COPY-20260622-233012] 개선2+3: '복사하여 공동편집'은 탭 무관하게 항상 '우리' 옵션(shared:true)을 만든다.
   //  (기존 버그: shared 미전달 → 복사본이 개인탭에 떨어져 "우리로 안 됨".) 생성 후 우리탭 전환 +
@@ -565,6 +598,8 @@ export default function BudgetFlow() {
                   ? `${partnerName}님과 함께 보는 예산`
                   : '파트너와 함께 보는 예산'}
             </span>
+            {/* [CL-TOP20-P4-COLLAB-20260703-040000] 파트너 최근 활동 칩(2분) — 기존 items 재사용, 신규 구독 0 */}
+            <PartnerActivityChip items={items} myUserId={myUserId} partnerName={partnerName} active={partnerPresent} />
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 py-2 sm:py-3 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
               {visibleBudgets.map((budget) => (
@@ -847,6 +882,9 @@ export default function BudgetFlow() {
       {/* Coffee Donation */}
       <CoffeeDonationFab onClick={() => setShowDonation(true)} />
       <CoffeeDonationModal open={showDonation} onOpenChange={setShowDonation} />
+
+      {/* [CL-TOP20-P3-WIZARD-20260703-030000] 첫 예산 생성 위저드 — 신규 사용자(전 항목 0)에게 1회 */}
+      <BudgetSetupWizard open={wizardOpen} onOpenChange={setWizardOpen} onApply={handleWizardApply} />
 
       {/* [CL-COEDIT-NICK-20260621] 소유자 닉네임 권유 — 상대에게 '파트너' 대신 이름 표시 */}
       {user && (

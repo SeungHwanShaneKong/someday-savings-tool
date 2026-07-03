@@ -26,7 +26,13 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // 기능 E2E(기존) — 시각 스냅샷 spec 은 전용 프로젝트에서만 실행
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /visual\.spec\.ts/ },
+    // [CL-TOP20-P0-20260703-002500] 시각 회귀 안전망 — Top 20 리디자인(P1~P5)의 회귀 가드.
+    //   공개(비인증) 페이지만 스냅샷: 로그인 사용자 전용 모달(MobileDesktopNotice)이 없어 결정론적.
+    { name: 'visual-desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }, testMatch: /visual\.spec\.ts/ },
+    { name: 'visual-mobile', use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true }, testMatch: /visual\.spec\.ts/ },
+    { name: 'visual-tablet', use: { viewport: { width: 768, height: 1024 }, hasTouch: true }, testMatch: /visual\.spec\.ts/ },
   ],
   webServer: {
     command: 'node node_modules/vite/bin/vite.js --port 8082',

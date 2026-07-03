@@ -1,5 +1,6 @@
 // [CL-AI-HIERARCHY-20260308-163000]
 // [DDAY-INLINE-PICKER-2026-03-07] 인라인 날짜 선택기 Popover 통합
+// [CL-TOP20-P3-CHECK-20260703-030000] D-day 실시간 프리뷰 카드 + 빈 상태 샘플 스켈레톤
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarIcon, X, CalendarDays, Clock } from 'lucide-react';
@@ -7,8 +8,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getRandomNoDdayNudge, getRandomIncompleteNudge } from '@/lib/checklist-nudges';
+import { getDdayPreview } from '@/lib/checklist-urgency';
+import { CHECKLIST_TEMPLATES, PERIOD_LABELS } from '@/lib/checklist-templates';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+
+// [CL-TOP20-P3-CHECK-20260703-030000] 빈 상태 샘플 프리뷰 — 실제 템플릿 앞 3개(회색·읽기전용)
+const SAMPLE_TEMPLATES = CHECKLIST_TEMPLATES.slice(0, 3);
 
 interface NudgeBannerProps {
   type: 'no-dday' | 'incomplete';
@@ -16,9 +22,11 @@ interface NudgeBannerProps {
   actionLabel?: string;
   /** [DDAY-INLINE-PICKER-2026-03-07] 인라인 날짜 선택 후 저장 콜백 */
   onSave?: (date: string, time: string) => Promise<void>;
+  /** [CL-TOP20-P3-CHECK-20260703-030000] 체크리스트 0개(빈 상태)일 때 샘플 항목 스켈레톤 노출 */
+  showSamplePreview?: boolean;
 }
 
-export function NudgeBanner({ type, onAction, actionLabel, onSave }: NudgeBannerProps) {
+export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePreview = false }: NudgeBannerProps) {
   const [dismissed, setDismissed] = useState(false);
   const [nudge] = useState(() =>
     type === 'no-dday' ? getRandomNoDdayNudge() : getRandomIncompleteNudge()
@@ -107,6 +115,27 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave }: NudgeBanner
                       className="w-full"
                     />
                   </div>
+
+                  {/* [CL-TOP20-P3-CHECK-20260703-030000] 실시간 D-day 프리뷰 카드 */}
+                  <div aria-live="polite">
+                    {selectedDate && (() => {
+                      const preview = getDdayPreview(selectedDate);
+                      return (
+                        <div
+                          data-testid="dday-preview"
+                          className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-1"
+                        >
+                          <p className="text-sm font-semibold text-primary">
+                            {preview.ddayLabel} · {preview.dateLabel}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            저장하면 {CHECKLIST_TEMPLATES.length}개 할 일이 시기별로 배치돼요
+                          </p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
                   <Button
                     onClick={handleSave}
                     disabled={!selectedDate || saving}
@@ -130,6 +159,34 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave }: NudgeBanner
               <CalendarIcon className="w-3.5 h-3.5 mr-1" />
               {actionLabel}
             </Button>
+          )}
+
+          {/* [CL-TOP20-P3-CHECK-20260703-030000] 빈 상태(체크리스트 0) — 샘플 항목 3개 스켈레톤 프리뷰 */}
+          {type === 'no-dday' && showSamplePreview && (
+            <div className="mt-3.5 space-y-1.5">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                날짜를 설정하면 이렇게 생성돼요
+              </p>
+              <ul className="space-y-1.5" aria-label="체크리스트 미리보기 예시">
+                {SAMPLE_TEMPLATES.map((t) => (
+                  <li
+                    key={t.title}
+                    className="flex items-center gap-2.5 rounded-xl border border-border/50 bg-muted/40 px-3 py-2 select-none"
+                  >
+                    <span
+                      className="h-4 w-4 flex-shrink-0 rounded-full border-2 border-muted-foreground/30"
+                      aria-hidden="true"
+                    />
+                    <span className="truncate text-xs text-muted-foreground">
+                      {t.title}
+                    </span>
+                    <span className="ml-auto flex-shrink-0 text-[10px] text-muted-foreground/70">
+                      {PERIOD_LABELS[t.period]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       </div>

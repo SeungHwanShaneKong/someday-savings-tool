@@ -13,6 +13,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAIChat } from '@/hooks/useAIChat';
 import { ChatContainer } from './ChatContainer';
 import { useIsMobile } from '@/hooks/use-mobile';
+// [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩.
+// 예산 컨텍스트는 Drawer 미주입(의도적): App.tsx 전역 마운트(비로그인 표면 포함)라
+// ①기존 예산 훅은 자동 생성(쓰기 부작용)+실시간 구독을 유발하고 ②useAuth 는 AuthProvider 밖에서 throw
+// → 전역 표면에서 auth/예산 의존을 추가하지 않는다. 컨텍스트는 /chat 페이지(Chat.tsx)에서만 주입.
+import { STARTER_PROMPTS } from '@/lib/chat-prompts';
 
 interface ChatDrawerProps {
   open: boolean;
@@ -95,6 +100,8 @@ export const ChatDrawer = forwardRef<HTMLDivElement, ChatDrawerProps>(function C
           dailyLimit={dailyLimit}
           limitReached={limitReached}
           showLimitCounter={true}
+          // [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩
+          starterPrompts={STARTER_PROMPTS}
         />
       </SheetContent>
     </Sheet>

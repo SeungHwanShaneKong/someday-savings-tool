@@ -12,6 +12,8 @@ import {
 } from '@/lib/kakao-browser';
 import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config';
 import { useSEO } from '@/hooks/useSEO';
+// [CL-TOP20-P1-FUNNEL-20260703-013000] 방문자 퍼널 종점 계측(auth_view) — Top20 #20
+import { trackFunnelOnce } from '@/lib/analytics/funnel-events';
 
 const DEV_TEST_EMAIL = 'dev-test@wedsem-local.dev';
 const DEV_TEST_PASSWORD = 'devtest123456';
@@ -32,6 +34,12 @@ export default function Auth() {
   const [showBridgeUI, setShowBridgeUI] = useState(false);
   const [browserInfo] = useState(() => getBrowserInfo());
   const [copied, setCopied] = useState(false);
+
+  // [CL-TOP20-P1-FUNNEL-20260703-013000] /auth 도달 계측 — 유입 표면은 sessionStorage 최근 경로 대신
+  // referrer 경로만(PII 0). 세션 1회.
+  useEffect(() => {
+    trackFunnelOnce('auth_view');
+  }, []);
 
   // 페이지 진입 시 즉시 인앱 브라우저 감지 → 다중 탈출 전략 실행
   useEffect(() => {

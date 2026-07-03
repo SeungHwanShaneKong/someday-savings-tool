@@ -14,10 +14,34 @@ import {
   getArticle,
   getArticleJsonLd,
   getArticleFaqJsonLd,
+  estimateReadingMinutes,
   type Article as ArticleData,
   type ArticleBlock,
 } from '@/content/articles';
-import { ArrowLeft, Sparkles, Lightbulb, ChevronRight, CalendarClock, ShieldCheck, ListChecks, BookOpen, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Sparkles, Lightbulb, ChevronRight, CalendarClock, ShieldCheck, ListChecks, BookOpen, ExternalLink, Clock, Link2 } from 'lucide-react';
+// [CL-TOP20-P2-ARTICLE-20260703-020000] 아티클 소비 경험 4종(읽기시간·진행바·맞춤 CTA·앵커 복사)
+import ReadingProgress from '@/components/article/ReadingProgress';
+import { copyToClipboard } from '@/lib/kakao-browser';
+import { toastSuccess, toastError } from '@/lib/toast';
+import { trackFunnel } from '@/lib/analytics/funnel-events';
+
+/**
+ * [CL-TOP20-P2-ARTICLE-20260703-020000] 섹션 앵커 공유 계측 — GA4 표준 'share' 이벤트.
+ * FunnelEvent 택소노미(funnel-events.ts)는 방문자 퍼널 전용이므로 GA4 recommended event('share')를
+ * 동일 안전 원칙(gtag 부재·차단 시 무음 no-op, UX 비차단)으로 직접 전송한다.
+ */
+function trackAnchorShare(slug: string, sectionIndex: number): void {
+  try {
+    if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
+    window.gtag('event', 'share', {
+      method: 'anchor_copy',
+      content_type: 'article_section',
+      item_id: `${slug}#sec-${sectionIndex}`,
+    });
+  } catch {
+    /* 계측 실패는 무음 — UX 비차단 */
+  }
+}
 
 /* ─── [CL-ADSENSE-CONTENT-20260630] E-E-A-T 바이라인 ─── */
 function Byline({ article }: { article: ArticleData }) {
@@ -33,6 +57,11 @@ function Byline({ article }: { article: ArticleData }) {
       </span>
       <span className="inline-flex items-center gap-1.5">
         <CalendarClock className="w-3.5 h-3.5" aria-hidden="true" /> 최종 수정 {article.dateModified}
+      </span>
+      {/* [CL-TOP20-P2-ARTICLE-20260703-020000] 읽기시간 배지 — countArticleWords 기반 250자/분 */}
+      <span data-testid="reading-time" className="inline-flex items-center gap-1.5">
+        <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+        <span className="sr-only">읽는 시간</span>약 {estimateReadingMinutes(article)}분
       </span>
       <Link to="/editorial/" className="inline-flex items-center gap-1 text-primary hover:underline">
         편집·제작 원칙
@@ -237,10 +266,28 @@ export default function Article() {
     return <Navigate to="/guide/" replace />;
   }
 
+  // [CL-TOP20-P2-ARTICLE-20260703-020000] 섹션 앵커 복사 — TOC 와 동일한 #sec-{i} 인프라 재사용.
+  // URL 은 canonical(trailing-slash) 경로 + 런타임 origin(호스트 비종속, CL-DOMAIN-PROMOTE 원칙).
+  const handleCopyAnchor = async (index: number, heading: string) => {
+    const url = `${window.location.origin}/guide/${article.slug}/#sec-${index}`;
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      toastSuccess('섹션 링크를 복사했어요', { description: heading });
+      trackAnchorShare(article.slug, index);
+    } else {
+      toastError('링크 복사에 실패했어요', { description: '주소창의 URL을 직접 복사해 주세요.' });
+    }
+  };
+
+  const contextualCta = article.contextualCta; // [CL-TOP20-P2-ARTICLE-20260703-020000]
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* sticky header — 단일 H1 정책: 헤더는 라벨(span), 본문에만 H1 */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
+      {/* [CL-TOP20-P2-ARTICLE-20260703-020000] 스크롤 읽기 진행바 */}
+      <ReadingProgress />
+      {/* header — 단일 H1 정책: 헤더는 라벨(span), 본문에만 H1.
+          [CL-TOP20-P2-HEADER-20260703-024500] 전역 AppHeader 도입으로 비스티키 전환(이중 스택 방지) */}
+      <header className="bg-background/80 border-b border-border/50">
         <div className="flex items-center px-4 h-14 max-w-lg mx-auto">
           <button
             onClick={() => navigate('/guide/')}
@@ -281,7 +328,18 @@ export default function Article() {
           {/* Sections */}
           {article.sections.map((section, si) => (
             <section key={si} id={`sec-${si}`} className="mb-10 scroll-mt-20">
-              <h2 className="text-lg font-semibold text-foreground mb-3">{section.heading}</h2>
+              {/* [CL-TOP20-P2-ARTICLE-20260703-020000] 섹션 앵커 복사 버튼 — 데스크톱은 hover/포커스 노출, 모바일(sm 미만)은 상시 노출 */}
+              <div className="group flex items-start gap-1 mb-3">
+                <h2 className="text-lg font-semibold text-foreground">{section.heading}</h2>
+                <button
+                  type="button"
+                  onClick={() => handleCopyAnchor(si, section.heading)}
+                  aria-label={`"${section.heading}" 섹션 링크 복사`}
+                  className="p-1 mt-0.5 rounded-md text-muted-foreground hover:text-primary transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Link2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
               {section.blocks.map((block, bi) => (
                 <Block key={bi} block={block} />
               ))}
@@ -309,21 +367,34 @@ export default function Article() {
             </section>
           )}
 
-          {/* CTA */}
+          {/* CTA — [CL-TOP20-P2-ARTICLE-20260703-020000] contextualCta 설정 시 슬러그 맞춤 브리지(+GA4 퍼널 계측), 미설정 시 기존 공통 CTA 그대로(회귀 0) */}
           <section className="text-center bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 mb-10">
             <div className="w-12 h-12 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-3">
               <Sparkles className="w-6 h-6 text-primary" aria-hidden="true" />
             </div>
             <h2 className="text-lg font-semibold text-foreground mb-2">
-              내 결혼 예산, 직접 계산해보세요
+              {contextualCta ? '읽은 내용, 웨딩셈에서 바로 실행해보세요' : '내 결혼 예산, 직접 계산해보세요'}
             </h2>
             <p className="text-sm text-muted-foreground mb-4">
-              웨딩셈의 AI 예산 시뮬레이터로 항목별 비용을 평균과 비교 분석해보세요
+              {contextualCta
+                ? contextualCta.description
+                : '웨딩셈의 AI 예산 시뮬레이터로 항목별 비용을 평균과 비교 분석해보세요'}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button asChild>
-                <Link to="/budget">예산 시뮬레이터로 계산하기</Link>
-              </Button>
+              {contextualCta ? (
+                <Button asChild>
+                  <Link
+                    to={contextualCta.to}
+                    onClick={() => trackFunnel('article_cta_click', { slug: article.slug })}
+                  >
+                    {contextualCta.label}
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild>
+                  <Link to="/budget">예산 시뮬레이터로 계산하기</Link>
+                </Button>
+              )}
               <Button variant="outline" asChild>
                 <Link to="/guide/">가이드 더 보기</Link>
               </Button>

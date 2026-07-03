@@ -206,8 +206,8 @@ export default function FAQ() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* [CL-HOME-BTN-ALL-20260403-223000] sticky header */}
-      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
+      {/* [CL-HOME-BTN-ALL-20260403-223000] header — [CL-TOP20-P2-HEADER-20260703-023500] 전역 AppHeader 도입으로 비스티키 전환(이중 스택 방지) */}
+      <header className="bg-background/80 border-b border-border/50">
         <div className="flex items-center px-4 h-14 max-w-lg mx-auto">
           <button
             onClick={() => navigate('/')}

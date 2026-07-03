@@ -8,6 +8,8 @@ interface ChatInputProps {
   placeholder?: string;
   // [CL-AI-CHAT-LIMIT5-20260408-100500] 한도 도달 시 입력 차단
   disabled?: boolean;
+  // [CL-TOP20-P4-AICHAT-20260703-040000] 마지막 1회 남음 — amber 강조(placeholder·링)
+  urgent?: boolean;
 }
 
 export function ChatInput({
@@ -15,6 +17,7 @@ export function ChatInput({
   isLoading,
   placeholder = '메시지를 입력하세요...',
   disabled = false,
+  urgent = false,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -63,6 +66,10 @@ export function ChatInput({
           'border-0 focus:ring-1 focus:ring-primary/30 focus:outline-none',
           'placeholder:text-muted-foreground/60',
           'max-h-[120px]',
+          // [CL-TOP20-P4-AICHAT-20260703-040000] 마지막 1회 amber 강조 (amber-700: 흰 배경 대비 AA)
+          urgent &&
+            !disabled &&
+            'ring-1 ring-amber-500/60 focus:ring-amber-500 placeholder:text-amber-700 dark:placeholder:text-amber-400',
           (isLoading || disabled) && 'opacity-50 cursor-not-allowed'
         )}
       />

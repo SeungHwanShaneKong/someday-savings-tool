@@ -1,10 +1,16 @@
+import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChat } from '@/hooks/useAIChat';
 import { ChatContainer } from '@/components/chat/ChatContainer';
 import { useSEO } from '@/hooks/useSEO';
+// [CL-TOP20-P4-AICHAT-20260703-040000] AI 챗 개인화 3종 — 예산 컨텍스트(옵트인)·스타터 칩
+import { useChatBudgetSummary } from '@/hooks/useChatBudgetSummary';
+import { getBudgetContextOptIn, setBudgetContextOptIn } from '@/lib/chat-budget-context';
+import { STARTER_PROMPTS } from '@/lib/chat-prompts';
 // [CL-BTNPERFECT-20260629] 대화 전체 삭제는 파괴적·비가역 → 확인 다이얼로그 + useAsyncAction(더블서밋 차단·실패 토스트)
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import {
@@ -22,6 +28,15 @@ export default function Chat() {
     path: '/chat',
   });
 
+  // [CL-TOP20-P4-AICHAT-20260703-040000] "내 예산 참고" 옵트인(기본 ON, localStorage 기억)
+  const [budgetRefEnabled, setBudgetRefEnabled] = useState<boolean>(() => getBudgetContextOptIn());
+  const handleBudgetRefChange = (enabled: boolean) => {
+    setBudgetRefEnabled(enabled);
+    setBudgetContextOptIn(enabled);
+  };
+  // 읽기 전용 요약 훅(자동 생성/실시간 구독 없음) — OFF 면 조회 자체를 건너뜀
+  const { summary: budgetSummary } = useChatBudgetSummary({ enabled: budgetRefEnabled });
+
   const {
     messages,
     isLoading,
@@ -32,7 +47,11 @@ export default function Chat() {
     remainingToday,
     dailyLimit,
     limitReached,
-  } = useAIChat({ feature: 'qa' });
+  } = useAIChat({
+    feature: 'qa',
+    // [CL-TOP20-P4-AICHAT-20260703-040000] 토글 OFF → null(컨텍스트 미포함 보장)
+    budgetContext: budgetRefEnabled ? budgetSummary : null,
+  });
 
   // [CL-BTNPERFECT-20260629] 대화 삭제 — 동기 게이트(더블서밋)+실패 시 표준 토스트
   const clear = useAsyncAction(async () => { await clearMessages(); }, {
@@ -85,6 +104,31 @@ export default function Chat() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+        {/* [CL-TOP20-P4-AICHAT-20260703-040000] 예산 컨텍스트 옵트인 토글 + 사용 중 칩 */}
+        <div className="flex items-center justify-between gap-2 px-4 pb-2 max-w-lg mx-auto">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="budget-context-toggle"
+              checked={budgetRefEnabled}
+              onCheckedChange={handleBudgetRefChange}
+              aria-describedby="budget-context-desc"
+            />
+            <label
+              htmlFor="budget-context-toggle"
+              className="text-xs font-medium text-foreground cursor-pointer"
+            >
+              내 예산 참고
+            </label>
+            <span id="budget-context-desc" className="sr-only">
+              켜면 총예산·상위 지출·결제 완료율 요약을 AI 답변에 참고합니다. 개인 식별 정보는 전송되지 않아요.
+            </span>
+          </div>
+          {budgetRefEnabled && budgetSummary && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+              <span aria-hidden="true">📊</span> 예산 맥락 사용 중
+            </span>
+          )}
+        </div>
       </header>
 
       {/* Chat */}
@@ -101,6 +145,8 @@ export default function Chat() {
         dailyLimit={dailyLimit}
         limitReached={limitReached}
         showLimitCounter={true}
+        // [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩
+        starterPrompts={STARTER_PROMPTS}
       />
     </div>
   );

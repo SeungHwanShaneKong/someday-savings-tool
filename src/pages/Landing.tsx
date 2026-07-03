@@ -18,7 +18,14 @@ import {
   MapPin,
   MessageCircle,
   Gift, // [CL-GIFT-CARD-20260418-240000]
+  BarChart3, // [CL-TOP20-P2-HUB-20260703-022500]
+  UserRound, // [CL-TOP20-P2-HUB-20260703-022500]
+  ArrowRight, // [CL-TOP20-P2-HUB-20260703-022500]
 } from 'lucide-react';
+// [CL-TOP20-P2-HUB-20260703-022500] 로그인 홈 허브(Top20 #9) — D-day 카운트다운(자체 페치·무props)
+import { WeddingCountdown } from '@/components/WeddingCountdown';
+// [CL-TOP20-P4-GAMIFY-20260703-044500] 다음 방문 이유 카드(Top20 #18) — useStreak 값 주입형
+import { NextMilestoneCard } from '@/components/gamification/NextMilestoneCard';
 import Footer from '@/components/Footer';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -35,6 +42,12 @@ import { useAIExternalNavigation } from '@/hooks/useAIExternalNavigation';
 // [CL-GAMIFY-INT-20260418-222329] 로그인 streak 노출
 import { StreakFlame } from '@/components/gamification/StreakFlame';
 import { useStreak } from '@/hooks/useStreak';
+// [CL-TOP20-P1-LANDING-20260703-014500] Top20 P1 방문자 대도약 — 웨딩 마크·미니 시뮬레이터·챗 프리뷰·신뢰 섹션·퍼널 계측
+import { WeddingMark } from '@/components/landing/WeddingMark';
+import { LandingBudgetSimulator } from '@/components/landing/LandingBudgetSimulator';
+import { ChatPreview } from '@/components/landing/ChatPreview';
+import TrustSection from '@/components/landing/TrustSection';
+import { trackFunnel } from '@/lib/analytics/funnel-events';
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -48,9 +61,12 @@ interface Feature {
   externalLink?: string; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
   // [CL-AI-EXTNAV-OVERLAY-20260418-205622] 존재 시 외부 이동 전 AI 로딩 오버레이 노출
   aiLoadingTitle?: string;
+  // [CL-TOP20-P1-LANDING-20260703-014500] 카드 위계(Top20 #5): high=주력 3종(대형), sub=특화 3종(컴팩트)
+  priority: 'high' | 'sub';
 }
 
-// [CL-GIFT-CARD-20260418-240000] 6개 카드 2×3 대칭 그리드 + 순서 재배치
+// [CL-GIFT-CARD-20260418-240000] 6개 카드 + [CL-TOP20-P1-LANDING-20260703-014500] 3+3 위계(Top20 #5):
+// 주력(high) = 코어 루프 3종(예산·체크리스트·챗) 대형 카드 / 특화(sub) = 확장 3종 컴팩트 카드.
 const FEATURES: Feature[] = [
   {
     icon: Calculator,
@@ -60,6 +76,7 @@ const FEATURES: Feature[] = [
     gradient: 'from-blue-500/10 to-blue-600/5',
     iconColor: 'text-blue-500',
     link: '/budget',
+    priority: 'high',
   },
   {
     icon: CalendarCheck,
@@ -69,6 +86,17 @@ const FEATURES: Feature[] = [
     gradient: 'from-emerald-500/10 to-emerald-600/5',
     iconColor: 'text-emerald-500',
     link: '/checklist',
+    priority: 'high',
+  },
+  {
+    icon: MessageCircle,
+    title: 'AI Q&A 챗봇',
+    description: '결혼 준비 궁금증, AI에게 실시간 질문',
+    isAI: true,
+    gradient: 'from-rose-500/10 to-rose-600/5',
+    iconColor: 'text-rose-500',
+    link: '/chat',
+    priority: 'high',
   },
   {
     icon: Gift,
@@ -79,6 +107,7 @@ const FEATURES: Feature[] = [
     iconColor: 'text-pink-500',
     externalLink: EXTERNAL_URLS.gift,
     aiLoadingTitle: 'AI가 완벽한 선물을 찾고 있어요', // [CL-AI-EXTNAV-OVERLAY-20260418-205622]
+    priority: 'sub',
   },
   {
     icon: MapPin,
@@ -89,6 +118,7 @@ const FEATURES: Feature[] = [
     iconColor: 'text-amber-500',
     externalLink: EXTERNAL_URLS.honeymoon,
     aiLoadingTitle: 'AI가 맞춤 여행지를 큐레이션하고 있어요', // [CL-AI-EXTNAV-OVERLAY-20260418-205622]
+    priority: 'sub',
   },
   {
     icon: Brain,
@@ -98,15 +128,7 @@ const FEATURES: Feature[] = [
     gradient: 'from-violet-500/10 to-violet-600/5',
     iconColor: 'text-violet-500',
     link: '/budget',
-  },
-  {
-    icon: MessageCircle,
-    title: 'AI Q&A 챗봇',
-    description: '결혼 준비 궁금증, AI에게 실시간 질문',
-    isAI: true,
-    gradient: 'from-rose-500/10 to-rose-600/5',
-    iconColor: 'text-rose-500',
-    link: '/chat',
+    priority: 'sub',
   },
 ];
 
@@ -180,11 +202,34 @@ export default function Landing() {
   }, []);
 
   const handleStart = () => {
+    // [CL-TOP20-P1-FUNNEL-20260703-014500] 히어로 주 CTA 계측(Top20 #20)
+    trackFunnel('landing_hero_cta_click', { authed: !!user });
     if (user) {
       navigate('/budget');
     } else {
       navigate('/auth');
     }
+  };
+
+  // [CL-TOP20-P1-LANDING-20260703-014500] 기능 카드 내비게이션 + feature_card_click 계측(Top20 #5·#20)
+  const makeFeatureNavigate = (feature: Feature): (() => void) | undefined => {
+    const go =
+      feature.externalLink && feature.aiLoadingTitle
+        ? () =>
+            startNavigation({
+              url: feature.externalLink!,
+              title: feature.aiLoadingTitle!,
+            })
+        : feature.externalLink
+          ? () => openExternalLink(feature.externalLink!)
+          : feature.link
+            ? () => navigate(feature.link!)
+            : undefined;
+    if (!go) return undefined;
+    return () => {
+      trackFunnel('feature_card_click', { feature: feature.title });
+      go();
+    };
   };
 
   const guide = getAppSpecificGuide(
@@ -262,17 +307,22 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <main className="flex-1 flex flex-col items-center px-6 pt-16 pb-12">
+    <div className="min-h-screen bg-background flex flex-col relative">
+      {/* [CL-TOP20-P1-LANDING-20260703-014500] 히어로 웜톤 배경(Top20 #4) — 상단 라디얼 로즈 틴트(장식·비간섭) */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_80%_100%_at_50%_0%,hsl(var(--wedding-rose-soft))_0%,transparent_70%)] dark:opacity-40"
+      />
+      <main className="flex-1 flex flex-col items-center px-6 pt-16 pb-12 relative">
         {/* ─── Hero Section ─── */}
         <section className="flex flex-col items-center w-full max-w-lg">
-          {/* Hero Icon */}
+          {/* Hero Icon — [CL-TOP20-P1-LANDING-20260703-014500] generic Sparkles → 웨딩 반지 모티프(Top20 #4) */}
           <div
             className="animate-fade-up animate-float"
             style={{ animationDelay: '0s' }}
           >
-            <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full flex items-center justify-center mb-6">
-              <Sparkles className="w-10 h-10 text-primary" aria-hidden="true" />
+            <div className="w-20 h-20 bg-gradient-to-br from-wedding-rose-soft to-primary/5 rounded-full flex items-center justify-center mb-6 ring-1 ring-wedding-rose/15">
+              <WeddingMark size={44} className="text-wedding-gold" />
             </div>
           </div>
 
@@ -307,12 +357,13 @@ export default function Landing() {
             <p className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
               꼼꼼한 셈 법
             </p>
-            <h1 className="text-5xl sm:text-6xl font-black bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent tracking-tighter">
+            {/* [CL-TOP20-P1-LANDING-20260703-014500] 타이틀 그라디언트에 로즈 웜톤 블렌드(Top20 #4) */}
+            <h1 className="text-5xl sm:text-6xl font-black bg-gradient-to-r from-primary via-wedding-rose to-primary bg-clip-text text-transparent tracking-tighter">
               웨딩셈
             </h1>
           </div>
 
-          {/* Subtitle */}
+          {/* Subtitle — ⚠️ '스마트 결혼 준비 플랫폼' 은 prerender.mjs '/' 마커. 문구 변경 시 마커 동기 수정 필수. */}
           <p
             className="animate-fade-up text-sm sm:text-base text-muted-foreground text-center mb-10 max-w-xs leading-relaxed"
             style={{ animationDelay: '0.2s' }}
@@ -323,7 +374,66 @@ export default function Landing() {
           </p>
         </section>
 
-        {/* ─── Feature Cards Section ─── */}
+        {/* ─── [CL-TOP20-P2-HUB-20260703-022500] 로그인 홈 허브 (Top20 #9) — 인증 시 방문자 도구 대신 표시 ─── */}
+        {!loading && user && (
+          <section
+            className="w-full max-w-lg mb-10 animate-fade-up"
+            style={{ animationDelay: '0.22s' }}
+            aria-label="내 결혼 준비 현황"
+          >
+            <WeddingCountdown />
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              {[
+                { icon: Calculator, label: '예산 이어하기', desc: '항목별 비용 관리', to: '/budget' },
+                { icon: CalendarCheck, label: '체크리스트', desc: 'D-day 준비 현황', to: '/checklist' },
+                { icon: BarChart3, label: '요약 보기', desc: '차트·비교 분석', to: '/summary' },
+                { icon: UserRound, label: '프로필·배지', desc: '스트릭과 달성', to: '/profile' },
+              ].map((q) => (
+                <button
+                  key={q.to}
+                  onClick={() => navigate(q.to)}
+                  className="group flex items-center gap-3 p-4 rounded-xl bg-card border border-border/60 hover:border-primary/40 hover:shadow-toss transition-all text-left"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <q.icon className="w-5 h-5 text-primary" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground leading-tight">{q.label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{q.desc}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary transition-colors flex-shrink-0" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+            {/* [CL-TOP20-P4-GAMIFY-20260703-044500] 다음 방문 이유(Top20 #18) — 스트릭 마일스톤 카운트다운 */}
+            <NextMilestoneCard
+              className="mt-3"
+              loginStreakDays={streak.loginStreakDays}
+              checklistStreakDays={streak.checklistStreakDays}
+              loginActiveToday={streak.loginActiveToday}
+              checklistActiveToday={streak.checklistActiveToday}
+              loginNextMilestoneIn={streak.loginNextMilestoneIn}
+              checklistNextMilestoneIn={streak.checklistNextMilestoneIn}
+              isLoading={streak.isLoading}
+            />
+          </section>
+        )}
+
+        {/* ─── [CL-TOP20-P1-LANDING-20260703-014500] 인터랙티브 미니 시뮬레이터 (Top20 #3) — 비로그인 전용 ─── */}
+        {!loading && !user && (
+          <section
+            className="w-full max-w-lg mb-10 animate-fade-up"
+            style={{ animationDelay: '0.22s' }}
+            aria-label="예상 결혼 예산 미니 계산기"
+          >
+            <LandingBudgetSimulator
+              onStartClick={() => navigate('/auth')}
+              onDemoClick={() => navigate('/demo')}
+            />
+          </section>
+        )}
+
+        {/* ─── Feature Cards Section — [CL-TOP20-P1-LANDING-20260703-014500] 3+3 위계(Top20 #5) ─── */}
         <section
           className="w-full max-w-lg mb-10 animate-fade-up"
           style={{ animationDelay: '0.25s' }}
@@ -331,28 +441,25 @@ export default function Landing() {
           <h2 className="text-sm font-semibold text-muted-foreground text-center mb-4 tracking-wider uppercase">
             주요 기능
           </h2>
-          {/* [CL-GIFT-CARD-20260418-240000] 6개 카드: 2×3 대칭 그리드 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {FEATURES.map((feature, idx) => (
-              <div key={feature.title} className={cn(idx === FEATURES.length - 1 && FEATURES.length % 2 === 1 && 'sm:col-span-2')}>
-                <FeatureCard
-                  feature={feature}
-                  onNavigate={
-                    // [CL-AI-EXTNAV-OVERLAY-20260418-205622] 외부 이동 + AI 로딩 Opt-in
-                    feature.externalLink && feature.aiLoadingTitle
-                      ? () =>
-                          startNavigation({
-                            url: feature.externalLink!,
-                            title: feature.aiLoadingTitle!,
-                          })
-                      : feature.externalLink
-                        ? () => openExternalLink(feature.externalLink!)
-                        : feature.link
-                          ? () => navigate(feature.link!)
-                          : undefined
-                  }
-                />
-              </div>
+          {/* 주력 3종 — 대형 카드 */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+            {FEATURES.filter((f) => f.priority === 'high').map((feature) => (
+              <FeatureCard
+                key={feature.title}
+                feature={feature}
+                emphasis
+                onNavigate={makeFeatureNavigate(feature)}
+              />
+            ))}
+          </div>
+          {/* 특화 3종 — 컴팩트 카드 */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {FEATURES.filter((f) => f.priority === 'sub').map((feature) => (
+              <FeatureCard
+                key={feature.title}
+                feature={feature}
+                onNavigate={makeFeatureNavigate(feature)}
+              />
             ))}
           </div>
         </section>
@@ -417,7 +524,8 @@ export default function Landing() {
             size="lg"
             className={cn(
               'w-full h-16 text-lg font-bold rounded-xl',
-              'bg-gradient-to-r from-blue-700 to-blue-600',
+              // [CL-TOP20-P1-LANDING-20260703-014500] 블루 하드코딩 → 토큰 그라디언트(Top20 #4)
+              'bg-gradient-to-r from-primary to-primary/80',
               'text-white',
               'shadow-primary-glow',
               'hover:shadow-primary-glow-lg',
@@ -438,6 +546,21 @@ export default function Landing() {
             30초면 시작할 수 있어요 · 카드 등록 없음
           </p>
 
+          {/* [CL-TOP20-P1-DEMO-20260703-014500] 가입 전 체험 브리지(Top20 #1) — 비로그인만 */}
+          {!loading && !user && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                // [CL-TOP20-P1-VERIFY-20260703-022000] 검증관 지적: convert(데모→가입)와 의미 분리 — 진입 전용 이벤트
+                trackFunnel('demo_enter_click', { from: 'landing_cta' });
+                navigate('/demo');
+              }}
+              className="mt-3 w-full h-11 rounded-xl border-wedding-rose/30 text-foreground hover:bg-wedding-rose-soft/60"
+            >
+              가입 없이 둘러보기
+            </Button>
+          )}
+
           {!loading && !user && (
             <button
               onClick={() => navigate('/auth')}
@@ -447,6 +570,20 @@ export default function Landing() {
             </button>
           )}
         </div>
+
+        {/* ─── [CL-TOP20-P1-LANDING-20260703-014500] AI 챗 미리보기 (Top20 #1 일부) — 비로그인 전용(로그인은 실챗 사용) ─── */}
+        {!loading && !user && (
+          <section
+            className="w-full max-w-lg mt-16 animate-fade-up"
+            style={{ animationDelay: '0.42s' }}
+            aria-label="AI 웨딩 챗봇 미리보기"
+          >
+            <ChatPreview onSignupClick={() => navigate('/auth')} />
+          </section>
+        )}
+
+        {/* ─── [CL-TOP20-P1-LANDING-20260703-014500] 신뢰 섹션 (Top20 #2) ─── */}
+        <TrustSection className="w-full max-w-lg mt-16 animate-fade-up" />
 
         {/* ─── [CL-ADSENSE-CONTENT-20260630] 공개 콘텐츠 섹션 (비로그인·크롤 가능·프리렌더) ─── */}
         <section className="w-full max-w-lg mt-16 animate-fade-up" style={{ animationDelay: '0.45s' }}>
@@ -544,38 +681,41 @@ export default function Landing() {
 
 /* ─── Feature Card Component ─── */
 // [FIX-20260418-051200] forwardRef 적용 — Landing의 ref 경고 해소
-const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: () => void }>(function FeatureCard({ feature, onNavigate }, ref) {
+// [CL-TOP20-P1-LANDING-20260703-014500] emphasis(주력 3종) — 세로 대형 레이아웃(Top20 #5)
+const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: () => void; emphasis?: boolean }>(function FeatureCard({ feature, onNavigate, emphasis = false }, ref) {
   const Icon = feature.icon;
 
   return (
     <Card
       ref={ref}
       className={cn(
-        'p-4 transition-all duration-200 hover:shadow-toss hover:scale-[1.02]',
+        'transition-all duration-200 hover:shadow-toss hover:scale-[1.02]',
+        emphasis ? 'p-5' : 'p-4',
         feature.isAI && 'ai-glow border-primary/20',
         onNavigate && 'cursor-pointer'
       )}
       role="article"
       onClick={onNavigate}
     >
-      <div className="flex items-start gap-3">
+      <div className={cn('flex gap-3', emphasis ? 'flex-col items-center text-center' : 'items-start')}>
         {/* Icon */}
         <div
           className={cn(
-            'w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0',
+            'rounded-xl bg-gradient-to-br flex items-center justify-center flex-shrink-0',
+            emphasis ? 'w-12 h-12' : 'w-10 h-10',
             feature.gradient
           )}
         >
           <Icon
-            className={cn('w-5 h-5', feature.iconColor)}
+            className={cn(emphasis ? 'w-6 h-6' : 'w-5 h-5', feature.iconColor)}
             aria-hidden="true"
           />
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1">
-            <h3 className="text-sm font-semibold text-foreground leading-tight">
+          <div className={cn('flex items-center gap-1.5 mb-1', emphasis && 'justify-center')}>
+            <h3 className={cn('font-semibold text-foreground leading-tight', emphasis ? 'text-base' : 'text-sm')}>
               {feature.title}
             </h3>
             {feature.isAI && (
@@ -591,7 +731,7 @@ const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: 
             {feature.description}
           </p>
           {onNavigate && (
-            <p className="text-xs text-primary font-medium mt-1.5">
+            <p className={cn('text-xs text-primary font-medium mt-1.5')}>
               체험하기 →
             </p>
           )}

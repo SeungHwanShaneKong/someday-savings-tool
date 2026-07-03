@@ -19,6 +19,9 @@
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 
     <!-- Font: Pretendard Variable (preload + apply) -->
+    <!-- [CL-TOP20-P1-LCP-20260703-011500] woff2 직접 preload — 프리렌더된 히어로 텍스트가 LCP 요소이므로
+         폰트 도착 시간이 곧 LCP. CSS(swap) 대기 없이 폰트 다운로드를 병렬 선행. -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/woff2/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"></noscript>
 
@@ -44,7 +47,13 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/favicon.png">
+    <!-- [CL-TOP20-P5-PWA-20260703-053000] iOS 홈 화면 아이콘 — 106x81 favicon 대신 정방형 192 사용 -->
+    <link rel="apple-touch-icon" href="/pwa-icon-192.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+
+    <!-- [CL-TOP20-P2-THEME-20260703-023500] 다크모드 FOUC 방지 — next-themes(storageKey 'theme') 하이드레이션 전
+         선적용. 프리렌더 HTML 은 라이트 고정이므로 다크 사용자 첫 페인트 플래시를 이 블로킹 스니펫이 차단. -->
+    <script>try{if(localStorage.getItem('theme')==='dark'){var d=document.documentElement;d.classList.remove('light');d.classList.add('dark');d.style.colorScheme='dark'}}catch(e){}</script>
 
     <!-- Google Analytics 4 -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-VPYSMMP3YT"></script>

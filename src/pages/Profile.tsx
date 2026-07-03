@@ -13,7 +13,8 @@ import { useGamificationState } from '@/hooks/useGamificationState';
 import { useStreak } from '@/hooks/useStreak';
 import { useBadgeUnlock, useUserEarnedBadges } from '@/hooks/useBadgeUnlock';
 import { LevelRing } from '@/components/gamification/LevelRing';
-import { StreakFlame } from '@/components/gamification/StreakFlame';
+// [CL-TOP20-P4-GAMIFY-20260703-040000] 스트릭 진행 링 승격 — StreakFlame 은 링 중앙에서 재사용
+import { StreakProgressRing } from '@/components/gamification/StreakProgressRing';
 import { BadgeGrid } from '@/components/gamification/BadgeGrid';
 import { BadgeUnlockModal } from '@/components/gamification/BadgeUnlockModal';
 import { Card } from '@/components/ui/card';
@@ -164,18 +165,6 @@ export default function Profile() {
               <div className="text-sm text-muted-foreground">
                 다음 레벨까지 <span className="font-semibold text-foreground">{nextLevelPoints.toLocaleString()}</span>pt
               </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                <StreakFlame
-                  days={streak.loginStreakDays}
-                  variant="login"
-                  size="sm"
-                />
-                <StreakFlame
-                  days={streak.checklistStreakDays}
-                  variant="checklist"
-                  size="sm"
-                />
-              </div>
               <div className="text-xs text-muted-foreground">
                 획득 뱃지 <span className="font-bold text-foreground">{earned.length}</span> / 전체 {definitions.length}
                 {state.freeze_tokens > 0 && (
@@ -183,6 +172,20 @@ export default function Profile() {
                 )}
               </div>
             </div>
+          </div>
+          {/* [CL-TOP20-P4-GAMIFY-20260703-040000] 스트릭 진행 링 — 다음 마일스톤(7/14/30/100/365)까지
+              구간 진행률 시각화. 기존 StreakFlame(일수·아이콘·hot 상태)은 링 중앙에 그대로 유지(정보 유실 0). */}
+          <div className="mt-5 pt-5 border-t border-border grid grid-cols-2 gap-4 justify-items-center">
+            <StreakProgressRing
+              days={streak.loginStreakDays}
+              variant="login"
+              size={124}
+            />
+            <StreakProgressRing
+              days={streak.checklistStreakDays}
+              variant="checklist"
+              size={124}
+            />
           </div>
         </Card>
 
@@ -229,6 +232,8 @@ export default function Profile() {
           badge={pendingUnlock?.badge ?? null}
           pointsGained={pendingUnlock?.points_gained ?? 0}
           onClose={dismissUnlock}
+          /* [CL-TOP20-P4-GAMIFY-20260703-040000] 생애 첫 배지 → 풀스크린 축하 변형 */
+          fullscreen={!!pendingUnlock?.is_first_badge}
         />
 
         {/* [CL-COEDIT-NICK-20260622-233012] 닉네임 변경 다이얼로그(개선8) */}

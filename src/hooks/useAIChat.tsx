@@ -1,9 +1,12 @@
 // [EF-RESILIENCE-20260308-041500] AI Chat Hook — RAG→ai-chat 폴백 체인 보존
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { searchKnowledge } from '@/lib/wedding-knowledge-base';
+// [CL-TOP20-P4-AICHAT-20260703-040000] 예산 컨텍스트 병합(순수 함수) — 데이터는 호출측이 주입
+import { withBudgetContext } from '@/lib/chat-budget-context';
 import type { Citation, FreshnessInfo } from '@/lib/rag-sources';
 import {
   edgeFunctionFetch,
@@ -26,6 +29,10 @@ export type AIFeature = 'honeymoon' | 'qa' | 'budget';
 interface UseAIChatOptions {
   feature: AIFeature;
   context?: Record<string, unknown>;
+  // [CL-TOP20-P4-AICHAT-20260703-040000] PII 없는 예산 요약 문자열(옵트인).
+  // 이 훅은 DB 를 직접 조회하지 않는다 — 호출측(Chat.tsx)이 useChatBudgetSummary 로 주입.
+  // null/빈 문자열이면 컨텍스트에 포함되지 않는다(토글 OFF = 호출측이 null 전달).
+  budgetContext?: string | null;
 }
 
 // ── RAG 응답 타입 ──
@@ -47,6 +54,10 @@ interface AIChatResponse {
   limit?: number;
 }
 
+// [CL-TOP20-P4-AICHAT-20260703-040000] ai_conversations 는 생성 타입에 없는 테이블 —
+// 기존 `(supabase as any)` 5곳을 무스키마 클라이언트 뷰 1곳으로 대체(린트 no-explicit-any 근본 해소, 런타임 동일 인스턴스).
+const untypedSupabase = supabase as unknown as SupabaseClient;
+
 // [CL-AI-CHAT-LIMIT5-20260408-100500] 429 응답 본문 타입
 interface RateLimitErrorBody {
   error?: string;
@@ -56,7 +67,7 @@ interface RateLimitErrorBody {
   resetAt?: string;
 }
 
-export function useAIChat({ feature, context }: UseAIChatOptions) {
+export function useAIChat({ feature, context, budgetContext }: UseAIChatOptions) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -76,7 +87,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
 
     const loadConversation = async () => {
       try {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await untypedSupabase
           .from('ai_conversations')
           .select('*')
           .eq('user_id', user.id)
@@ -101,10 +112,11 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
             setMessages(savedMessages);
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Log once then suppress
         if (dbAvailable.current) {
-          console.warn('[useAIChat] ai_conversations table not ready:', error.message || error.code);
+          const e = error as { message?: string; code?: string };
+          console.warn('[useAIChat] ai_conversations table not ready:', e?.message || e?.code);
           dbAvailable.current = false;
         }
       }
@@ -146,6 +158,8 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
               ),
             };
           }
+          // [CL-TOP20-P4-AICHAT-20260703-040000] 옵트인 예산 요약 병합(빈/null 이면 no-op)
+          enrichedContext = withBudgetContext(enrichedContext, budgetContext);
         }
 
         let reply: string;
@@ -225,7 +239,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         if (dbAvailable.current) {
           try {
             if (conversationId) {
-              await (supabase as any)
+              await untypedSupabase
                 .from('ai_conversations')
                 .update({
                   messages: finalMessages,
@@ -233,7 +247,7 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
                 })
                 .eq('id', conversationId);
             } else {
-              const { data: newConv } = await (supabase as any)
+              const { data: newConv } = await untypedSupabase
                 .from('ai_conversations')
                 .insert([{
                   user_id: user.id,
@@ -297,14 +311,15 @@ export function useAIChat({ feature, context }: UseAIChatOptions) {
         setIsLoading(false);
       }
     },
-    [user, messages, isLoading, feature, context, conversationId, toast]
+    // [CL-TOP20-P4-AICHAT-20260703-040000] budgetContext 의존성 추가(옵트인 토글 반영)
+    [user, messages, isLoading, feature, context, budgetContext, conversationId, toast]
   );
 
   // Clear conversation
   const clearMessages = useCallback(async () => {
     setMessages([]);
     if (conversationId) {
-      await (supabase as any)
+      await untypedSupabase
         .from('ai_conversations')
         .update({ messages: [], updated_at: new Date().toISOString() })
         .eq('id', conversationId);

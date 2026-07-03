@@ -1,7 +1,14 @@
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import type { ChatMessage as ChatMessageType } from '@/hooks/useAIChat';
+// [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩 타입
+import type { StarterPrompt } from '@/lib/chat-prompts';
 import { cn } from '@/lib/utils';
+
+// [CL-TOP20-P4-AICHAT-20260703-040000] 쿼터 프리엠티브 배너 — 세션 1회 노출 키
+export const QUOTA_WARN_SESSION_KEY = 'wedding_chat_quota_warn_shown';
 
 interface ChatContainerProps {
   messages: ChatMessageType[];
@@ -16,6 +23,8 @@ interface ChatContainerProps {
   dailyLimit?: number | null;
   limitReached?: boolean;
   showLimitCounter?: boolean;
+  // [CL-TOP20-P4-AICHAT-20260703-040000] 빈 대화 시 노출되는 추천 질문 칩(클릭 → 즉시 전송)
+  starterPrompts?: StarterPrompt[];
 }
 
 export function ChatContainer({
@@ -30,7 +39,38 @@ export function ChatContainer({
   dailyLimit,
   limitReached = false,
   showLimitCounter = false,
+  starterPrompts,
 }: ChatContainerProps) {
+  // [CL-TOP20-P4-AICHAT-20260703-040000] 잔여 ≤2 진입 시 1회 안내(세션 1회, sessionStorage)
+  const lowQuota =
+    showLimitCounter &&
+    !limitReached &&
+    typeof remainingToday === 'number' &&
+    remainingToday > 0 &&
+    remainingToday <= 2;
+
+  const [quotaWarnVisible, setQuotaWarnVisible] = useState(false);
+  useEffect(() => {
+    if (!lowQuota) return;
+    let alreadyShown = false;
+    try {
+      alreadyShown = sessionStorage.getItem(QUOTA_WARN_SESSION_KEY) === '1';
+    } catch {
+      /* sessionStorage 불가 — 마운트당 1회로 degrade */
+    }
+    if (!alreadyShown) {
+      setQuotaWarnVisible(true);
+      try {
+        sessionStorage.setItem(QUOTA_WARN_SESSION_KEY, '1');
+      } catch {
+        /* noop */
+      }
+    }
+  }, [lowQuota]);
+
+  // [CL-TOP20-P4-AICHAT-20260703-040000] 잔여 ≤2 → placeholder 에 잔여 표시, 마지막 1회는 amber 강조
+  const effectivePlaceholder = lowQuota ? `질문 입력 (${remainingToday}회 남음)` : placeholder;
+
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Messages area */}
@@ -43,6 +83,27 @@ export function ChatContainer({
             <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-muted/50 px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
               {welcomeMessage}
             </div>
+          </div>
+        )}
+
+        {/* [CL-TOP20-P4-AICHAT-20260703-040000] 스타터 프롬프트 칩 — 빈 대화에서만, 클릭 시 즉시 전송 */}
+        {messages.length === 0 && !!starterPrompts?.length && (
+          <div className="pl-9 flex flex-wrap gap-2" role="group" aria-label="추천 질문">
+            {starterPrompts.map((prompt) => (
+              <button
+                key={prompt.id}
+                type="button"
+                onClick={() => onSend(prompt.question)}
+                disabled={isLoading || limitReached}
+                className={cn(
+                  'rounded-full border border-primary/25 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary',
+                  'transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+              >
+                {prompt.label}
+              </button>
+            ))}
           </div>
         )}
 
@@ -68,6 +129,29 @@ export function ChatContainer({
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* [CL-TOP20-P4-AICHAT-20260703-040000] 쿼터 프리엠티브 안내 배너(잔여 ≤2, 세션 1회) */}
+      {quotaWarnVisible && lowQuota && (
+        <div className="px-3 pt-2">
+          <div
+            role="status"
+            className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 px-3 py-2 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2"
+          >
+            <span aria-hidden="true">⏳</span>
+            <span className="flex-1">
+              오늘 {remainingToday}회 남았어요 — 아껴서 물어보세요
+            </span>
+            <button
+              type="button"
+              onClick={() => setQuotaWarnVisible(false)}
+              aria-label="안내 닫기"
+              className="p-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-800/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60"
+            >
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* [CL-AI-CHAT-LIMIT5-20260408-100500] 한도 카운터 / 한도 도달 배너 */}
       {showLimitCounter && limitReached && (
@@ -96,12 +180,13 @@ export function ChatContainer({
         </div>
       )}
 
-      {/* Input */}
+      {/* Input — [CL-TOP20-P4-AICHAT-20260703-040000] 잔여 표시 placeholder + 마지막 1회 amber 강조 */}
       <ChatInput
         onSend={onSend}
         isLoading={isLoading}
-        placeholder={placeholder}
+        placeholder={effectivePlaceholder}
         disabled={limitReached}
+        urgent={lowQuota && remainingToday === 1}
       />
     </div>
   );

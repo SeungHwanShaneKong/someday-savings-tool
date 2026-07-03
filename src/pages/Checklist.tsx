@@ -17,6 +17,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
 // [CL-TREE-REDESIGN-20260403] 긴급도 카운트용
 import { getUrgencyLevel } from '@/lib/checklist-nudges';
+// [CL-TOP20-P3-CHECK-20260703-030000] 긴급도 위계 집계 + 오버듀 배너 + 긴급순 보기
+import { aggregateUrgency } from '@/lib/checklist-urgency';
+import { OverdueAlertBanner } from '@/components/checklist/OverdueAlertBanner';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 // [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
 import { useTimelineOptimizer } from '@/hooks/useTimelineOptimizer';
 import TimelinePanel from '@/components/planning/TimelinePanel';
@@ -62,6 +66,9 @@ export default function Checklist() {
   const [timelineOpen, setTimelineOpen] = useState(false);
   // [CL-TREE-REDESIGN-20260403] 전체 펼치기/접기 제어
   const [globalExpand, setGlobalExpand] = useState<boolean | null>(null);
+  // [CL-TOP20-P3-CHECK-20260703-030000] 긴급순 보기 토글 — off 기본(기존 순서 회귀 0)
+  const [urgencySort, setUrgencySort] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   // [CL-TREE-REDESIGN-20260403] 긴급도 카운트 — ChecklistProgress에 전달
   const urgencyCounts = useMemo(() => {
@@ -77,6 +84,21 @@ export default function Checklist() {
     }
     return { overdueCount, urgentCount, soonCount };
   }, [items]);
+
+  // [CL-TOP20-P3-CHECK-20260703-030000] 긴급도 위계 요약 — 상단 오버듀 배너/스크롤 타깃
+  const urgencySummary = useMemo(() => aggregateUrgency(items), [items]);
+
+  // [CL-TOP20-P3-CHECK-20260703-030000] 대상 기간 섹션으로 스크롤 (reduced-motion 존중)
+  const scrollToPeriod = useCallback(
+    (period: ChecklistPeriod) => {
+      const el = document.getElementById(`checklist-period-${period}`);
+      el?.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    },
+    [prefersReducedMotion]
+  );
 
   // Add custom item state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -166,7 +188,17 @@ export default function Checklist() {
           </div>
         )}
 
+        {/* [CL-TOP20-P3-CHECK-20260703-030000] 오버듀 배너 — 기한 초과 존재 시 세션 1회 */}
+        {!loading && items.length > 0 && urgencySummary.overdue > 0 && urgencySummary.firstOverduePeriod && (
+          <OverdueAlertBanner
+            overdueCount={urgencySummary.overdue}
+            targetPeriodLabel={PERIOD_LABELS[urgencySummary.firstOverduePeriod]}
+            onScrollToPeriod={() => scrollToPeriod(urgencySummary.firstOverduePeriod!)}
+          />
+        )}
+
         {/* [DDAY-INLINE-PICKER-2026-03-07] No D-day nudge — 인라인 날짜 선택기 */}
+        {/* [CL-TOP20-P3-CHECK-20260703-030000] 빈 상태면 샘플 3개 스켈레톤 프리뷰 노출 */}
         {!loading && !hasWeddingDate && (
           <NudgeBanner
             type="no-dday"
@@ -174,6 +206,7 @@ export default function Checklist() {
               await updateWeddingDate(date, time);
             }}
             actionLabel="D-day 설정하기"
+            showSamplePreview={items.length === 0}
           />
         )}
 
@@ -286,6 +319,8 @@ export default function Checklist() {
         {!loading && items.length > 0 && (
           <ChecklistTreeControls
             items={items}
+            urgencySort={urgencySort}
+            onUrgencySortChange={setUrgencySort}
             onExpandAll={() => {
               setGlobalExpand(true);
               setTimeout(() => setGlobalExpand(null), 500);
@@ -310,7 +345,8 @@ export default function Checklist() {
                 return (
                   <div
                     key={period}
-                    className="animate-fade-up"
+                    id={`checklist-period-${period}`}
+                    className="animate-fade-up scroll-mt-20"
                     style={{ animationDelay: `${idx * 0.08}s` }}
                   >
                     <ChecklistPeriodSection
@@ -318,6 +354,7 @@ export default function Checklist() {
                       items={periodItems}
                       isActive={period === activePeriod}
                       forceExpand={globalExpand}
+                      urgencySort={urgencySort}
                       onToggle={toggleItem}
                       onDelete={deleteItem}
                       onUpdateNotes={updateNotes}

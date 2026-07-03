@@ -7,18 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Check, X, Users, Trash2, ChevronDown, ChevronUp, GripVertical, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Check, X, Users, Trash2, ChevronDown, ChevronUp, GripVertical, Sparkles, AlertTriangle } from 'lucide-react';
 import { openHoneymoon } from '@/lib/external-links'; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+// [CL-TOP20-P3-INPUT-20260703-030000] 드래그 핸들 props 의 선재 any 2건 → dnd-kit 정식 타입(데스크톱 [CL-TOP20-P0-20260703-004000]과 동일 처방)
+import type { DraggableAttributes } from '@dnd-kit/core';
+import type { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useCategoryOrder } from '@/hooks/useCategoryOrder';
 import { ExtendedBudgetItem, CostSplitType, COST_SPLIT_OPTIONS } from './BudgetTable';
 import { AverageCostTooltip } from './AverageCostTooltip';
-import { hasAverageCost } from '@/lib/average-costs';
+import { hasAverageCost, getAverageCost } from '@/lib/average-costs';
 import { getEditorLabel } from '@/lib/collab/editor-label'; // [CL-EDITLABEL-20260626] 최근 편집자(나/파트너) 라벨
+import { SmartWonInput } from './budget/SmartWonInput'; // [CL-TOP20-P3-INPUT-20260703-030000] 스마트 금액 입력(만/억·힌트·평균 1탭)
+import { HiddenCostTrigger } from './budget/HiddenCostTrigger'; // [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 배선
+import { countCategoryHiddenCosts } from '@/lib/hidden-cost-map'; // [CL-TOP20-P3-HIDDEN-20260703-030000]
 
 interface BudgetTableMobileProps {
   items: ExtendedBudgetItem[];
@@ -45,8 +51,8 @@ function SortableMobileCategory({
 }: {
   category: Category;
   children: (props: {
-    attributes: Record<string, any>;
-    listeners: Record<string, any> | undefined;
+    attributes: DraggableAttributes;
+    listeners: SyntheticListenerMap | undefined;
     isDragging: boolean;
     setNodeRef: (node: HTMLElement | null) => void;
     style: React.CSSProperties;
@@ -104,7 +110,6 @@ export function BudgetTableMobile({
   
   // Editing states
   const [editingCell, setEditingCell] = useState<string | null>(null);
-  const [tempValue, setTempValue] = useState<string>('');
   const [editingName, setEditingName] = useState<string | null>(null);
   const [tempName, setTempName] = useState<string>('');
   const [addingToCategory, setAddingToCategory] = useState<string | null>(null);
@@ -213,22 +218,15 @@ export function BudgetTableMobile({
   };
   
   // Amount handling
-  const handleAmountClick = (categoryId: string, subCategoryId: string, currentAmount: number) => {
-    const cellKey = `${categoryId}-${subCategoryId}`;
-    setEditingCell(cellKey);
-    setTempValue(currentAmount > 0 ? currentAmount.toString() : '');
+  // [CL-TOP20-P3-INPUT-20260703-030000] 금액 임시버퍼(tempValue)는 SmartWonInput 내부 상태로 이동.
+  // 여기선 편집 셀 열기/커밋/취소만 담당 — Enter/Escape/blur 확정 흐름은 SmartWonInput 이 동일 계약으로 보존.
+  const handleAmountClick = (categoryId: string, subCategoryId: string) => {
+    setEditingCell(`${categoryId}-${subCategoryId}`);
   };
-  
-  const handleAmountChange = (value: string) => {
-    const numericValue = parseNumericInput(value);
-    setTempValue(numericValue);
-  };
-  
-  const handleAmountBlur = (categoryId: string, subCategoryId: string) => {
-    const amount = parseInt(tempValue) || 0;
+
+  const handleAmountCommit = (categoryId: string, subCategoryId: string, amount: number) => {
     onAmountChange(categoryId, subCategoryId, amount);
     setEditingCell(null);
-    setTempValue('');
   };
   
   // Notes handling
@@ -316,6 +314,8 @@ export function BudgetTableMobile({
             const categoryItems = getCategoryItems(category.id);
             const categoryTotal = getCategoryTotal(category.id);
             const isExpanded = expandedCategories.has(category.id);
+            // [CL-TOP20-P3-HIDDEN-20260703-030000] 카테고리 요약 헤더 집계 배지용
+            const categoryHiddenCount = countCategoryHiddenCosts(category.id, items);
             
             return (
               <SortableMobileCategory
@@ -351,6 +351,13 @@ export function BudgetTableMobile({
                           <span className="text-xs text-muted-foreground">
                             ({categoryItems.length}개)
                           </span>
+                          {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 집계 배지(N>0 시만) */}
+                          {categoryHiddenCount > 0 && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:text-amber-300 whitespace-nowrap">
+                              <AlertTriangle className="h-2.5 w-2.5 flex-shrink-0" aria-hidden="true" />
+                              숨은 비용 {categoryHiddenCount}건
+                            </span>
+                          )}
                           {/* [CL-HOME-FIX-20260315-120000] button 중첩 해소 — span + role=link */}
                           {category.id === 'honeymoon' && (
                             <span
@@ -410,10 +417,12 @@ export function BudgetTableMobile({
                                         if (e.key === 'Escape') handleCancelRename();
                                       }}
                                     />
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleSaveRename(item.id)}>
+                                    {/* [CL-TOP20-P5-PWA-20260703-050000] 터치 타깃 확대: 모바일 40px(h-10 w-10), md 이상 기존 크기 유지.
+                                        아이콘은 Button 베이스 [&_svg]:size-4 가 자식 클래스보다 우선하므로 부모 레벨에서 확대. */}
+                                    <Button size="icon" variant="ghost" className="h-10 w-10 md:h-8 md:w-8 [&_svg]:size-5 md:[&_svg]:size-4" onClick={() => handleSaveRename(item.id)}>
                                       <Check className="h-4 w-4" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleCancelRename}>
+                                    <Button size="icon" variant="ghost" className="h-10 w-10 md:h-8 md:w-8 [&_svg]:size-5 md:[&_svg]:size-4" onClick={handleCancelRename}>
                                       <X className="h-4 w-4" />
                                     </Button>
                                   </div>
@@ -446,13 +455,23 @@ export function BudgetTableMobile({
                                           className="flex-shrink-0"
                                         />
                                       )}
+                                      {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 트리거(금액 입력 시 발동) */}
+                                      <HiddenCostTrigger
+                                        categoryId={category.id}
+                                        subCategoryId={subCat.id}
+                                        amount={item.amount || 0}
+                                        itemName={displayName}
+                                        className="flex-shrink-0"
+                                      />
                                     </div>
+                                    {/* [CL-TOP20-P5-PWA-20260703-050000] 터치 타깃 확대: 모바일 40px(h-10 w-10), md 이상 기존 크기 유지.
+                                        아이콘은 Button 베이스 [&_svg]:size-4 가 자식 클래스보다 우선하므로 부모 레벨에서 확대. */}
                                     <div className="flex items-center gap-1 flex-shrink-0">
                                       {onRenameItem && (
                                         <Button
                                           size="icon"
                                           variant="ghost"
-                                          className="h-7 w-7"
+                                          className="h-10 w-10 md:h-7 md:w-7 [&_svg]:size-5 md:[&_svg]:size-4"
                                           onClick={() => handleStartRename(item.id, displayName)}
                                         >
                                           <Pencil className="h-3.5 w-3.5" />
@@ -462,7 +481,7 @@ export function BudgetTableMobile({
                                         <Button
                                           size="icon"
                                           variant="ghost"
-                                          className="h-7 w-7 text-destructive"
+                                          className="h-10 w-10 md:h-7 md:w-7 [&_svg]:size-5 md:[&_svg]:size-4 text-destructive"
                                           onClick={() => {
                                             setItemToDelete({ id: item.id, name: displayName });
                                             setDeleteDialogOpen(true);
@@ -546,26 +565,21 @@ export function BudgetTableMobile({
                                 )}
                                 
                                 {isEditing ? (
-                                  <Input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={tempValue}
-                                    onChange={e => handleAmountChange(e.target.value)}
-                                    onBlur={() => handleAmountBlur(category.id, subCat.id)}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') handleAmountBlur(category.id, subCat.id);
-                                      if (e.key === 'Escape') {
-                                        setEditingCell(null);
-                                        setTempValue('');
-                                      }
-                                    }}
-                                    className="h-9 text-right flex-1"
+                                  /* [CL-TOP20-P3-INPUT-20260703-030000] 스마트 금액 입력(만/억 인식·실시간 힌트·평균 1탭) — Enter/Escape/blur 흐름 보존 */
+                                  <SmartWonInput
+                                    value={item.amount || 0}
+                                    onCommit={amount => handleAmountCommit(category.id, subCat.id, amount)}
+                                    onCancel={() => setEditingCell(null)}
+                                    averageAmount={!item.is_custom ? getAverageCost(category.id, subCat.id)?.amount ?? null : null}
+                                    containerClassName="flex-1"
+                                    className="h-9 text-right w-full"
+                                    aria-label={`${displayName} 금액`}
                                     autoFocus
                                     placeholder="금액 입력"
                                   />
                                 ) : (
                                   <button
-                                    onClick={() => handleAmountClick(category.id, subCat.id, item.amount || 0)}
+                                    onClick={() => handleAmountClick(category.id, subCat.id)}
                                     className={cn(
                                       "flex-1 text-right px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm",
                                       item.amount ? "text-foreground font-medium" : "text-muted-foreground italic"

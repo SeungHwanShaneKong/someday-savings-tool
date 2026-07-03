@@ -1,9 +1,10 @@
 /**
  * [CL-TREE-REDESIGN-20260403] 트리 전체 컨트롤 바 — Toss 스타일
  * 전체 펼치기/접기 + 긴급 통계 + 진행률 바
+ * [CL-TOP20-P3-CHECK-20260703-030000] "긴급순 보기" 토글 추가
  */
 
-import { ChevronsDown, ChevronsUp, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
+import { ChevronsDown, ChevronsUp, AlertTriangle, ArrowDownWideNarrow, Clock, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { getUrgencyLevel } from '@/lib/checklist-nudges';
@@ -13,12 +14,17 @@ interface ChecklistTreeControlsProps {
   items: ChecklistItem[];
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  /** [CL-TOP20-P3-CHECK-20260703-030000] 긴급순 보기 토글 상태 (미전달 시 토글 미노출 — 기존 사용처 회귀 0) */
+  urgencySort?: boolean;
+  onUrgencySortChange?: (value: boolean) => void;
 }
 
 export function ChecklistTreeControls({
   items,
   onExpandAll,
   onCollapseAll,
+  urgencySort = false,
+  onUrgencySortChange,
 }: ChecklistTreeControlsProps) {
   const total = items.length;
   const completed = items.filter(i => i.is_completed).length;
@@ -45,6 +51,25 @@ export function ChecklistTreeControls({
           🌳 전체 구조
         </h3>
         <div className="flex items-center gap-1">
+          {/* [CL-TOP20-P3-CHECK-20260703-030000] 긴급순 보기 토글 — off 기본(기존 순서 유지) */}
+          {onUrgencySortChange && (
+            <button
+              type="button"
+              onClick={() => onUrgencySortChange(!urgencySort)}
+              aria-pressed={urgencySort}
+              aria-label="긴급순 보기"
+              title="마감 임박한 항목부터 정렬해요"
+              className={cn(
+                'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-all active:scale-[0.95] motion-reduce:active:scale-100',
+                urgencySort
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+              )}
+            >
+              <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
+              긴급순
+            </button>
+          )}
           <button
             onClick={onExpandAll}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all active:scale-[0.95]"

@@ -4,7 +4,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+// [CL-TOP20-P2-THEME-20260703-023500] 다크모드(Top20 #8) — next-themes class 전략(.dark 토큰은 기완비)
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
+// [CL-TOP20-P2-HEADER-20260703-023500] 전역 헤더(Top20 #7) — 콘텐츠 표면 한정(내부 allowlist)
+import { AppHeader } from "@/components/layout/AppHeader";
+// [CL-TOP20-P5-PWA-20260703-053000] PWA 설치 배너(Top20 #19) — beforeinstallprompt 캡처·30일 억제
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { AdSenseLayout } from "@/components/AdSenseLayout";
 import { MobileDesktopNotice } from "@/components/MobileDesktopNotice";
@@ -45,6 +51,8 @@ const Profile = lazyWithRetry(() => import("./pages/Profile"), { routeId: "Profi
 const StaticPage = lazyWithRetry(() => import("./pages/StaticPage"), { routeId: "StaticPage" });
 // [CL-COEDIT-E2E-20260620-130000] 공동 예산 초대 수락 페이지
 const AcceptInvite = lazyWithRetry(() => import("./pages/AcceptInvite"), { routeId: "AcceptInvite" });
+// [CL-TOP20-P1-DEMO-20260703-014500] 게스트 체험 모드 — lazy 필수(BudgetTable+dnd-kit 체인의 초기 번들 유입 방지)
+const Demo = lazyWithRetry(() => import("./pages/Demo"), { routeId: "Demo" });
 
 // [CL-PERF-QUERY-20260418-230000] React Query 기본 설정 최적화
 const queryClient = new QueryClient({
@@ -81,10 +89,14 @@ function AppRoutes() {
       <InviteResumeWatcher />
       <FeatureRequestPrompt />
       <AppErrorBoundary>
+      {/* [CL-TOP20-P2-HEADER-20260703-023500] Suspense 밖 — 레이지 청크 로딩 중에도 헤더 유지 */}
+      <AppHeader />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          {/* [CL-TOP20-P1-DEMO-20260703-014500] 가입 전 가치 체험(Top20 #1) — SPA 라우트(canonical 슬래시 없음) */}
+          <Route path="/demo" element={<Demo />} />
           <Route path="/budget" element={<BudgetFlow />} />
           <Route path="/summary" element={<Summary />} />
           <Route path="/checklist" element={<Checklist />} />
@@ -120,10 +132,15 @@ function AppRoutes() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    {/* [CL-TOP20-P2-THEME-20260703-023500] attribute="class" 필수(Tailwind class 전략)·라이트 기본·전환 플래시 방지.
+        Toaster/Sonner 위에 감싸야 sonner.tsx 의 기존 useTheme 이 실제 테마와 동기화. */}
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        {/* [CL-TOP20-P5-PWA-20260703-053000] Router/Query 비의존 전역 오버레이 */}
+        <InstallPrompt />
         <BrowserRouter
           future={{
             // [CL-PREVIEW-SYNC-20260403-120830] Silence React Router v7 migration warnings in preview
@@ -137,6 +154,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

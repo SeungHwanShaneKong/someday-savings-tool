@@ -4,7 +4,17 @@ import { renderWithProviders, screen, fireEvent, within, currentPath } from '@/t
 import Landing from '../Landing';
 
 /* ─── useAuth mock (hoisted) ─── */
-let mockAuth: any;
+// [CL-TOP20-P3-LINT-20260703-043000] 선재 any 5건 → 명시 타입(리포 lint 클린화)
+type MockAuth = {
+  user: { id: string; email: string } | null;
+  loading: boolean;
+  signOut: ReturnType<typeof vi.fn>;
+  signInWithGoogle: ReturnType<typeof vi.fn>;
+  signIn: ReturnType<typeof vi.fn>;
+  signUp: ReturnType<typeof vi.fn>;
+  session: null;
+};
+let mockAuth: MockAuth;
 beforeEach(() => {
   mockAuth = {
     user: null,
@@ -18,7 +28,7 @@ beforeEach(() => {
 });
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockAuth,
-  AuthProvider: ({ children }: any) => children,
+  AuthProvider: ({ children }: { children?: import('react').ReactNode }) => children,
 }));
 
 /* ─── useAIExternalNavigation mock ─── */
@@ -52,6 +62,16 @@ vi.mock('@/hooks/useStreak', () => ({
 /* ─── useSEO mock (avoid document mutations crashing jsdom) ─── */
 vi.mock('@/hooks/useSEO', () => ({ useSEO: () => {} }));
 
+/* ─── [CL-TOP20-P2-VERIFY-20260703-031500] useWeddingDate mock — 허브(WeddingCountdown) 렌더 시 Supabase 호출 차단 ─── */
+vi.mock('@/hooks/useWeddingDate', () => ({
+  useWeddingDate: () => ({
+    weddingDate: null,
+    weddingTime: null,
+    loading: false,
+    updateWeddingDate: vi.fn(async () => true),
+  }),
+}));
+
 /* ─── kakao-browser mock (getBrowserInfo → normal browser) ─── */
 vi.mock('@/lib/kakao-browser', () => ({
   getBrowserInfo: () => ({
@@ -75,7 +95,7 @@ describe('Landing — 버튼/네비게이션', () => {
   });
 
   it('L2: 로그인 → CTA "예산 관리하기" 렌더', () => {
-    mockAuth.user = { id: 'u1', email: 't@t.com' } as any;
+    mockAuth.user = { id: 'u1', email: 't@t.com' };
     renderWithProviders(<Landing />);
     expect(screen.getByRole('button', { name: '예산 관리하기' })).toBeInTheDocument();
   });
@@ -87,7 +107,7 @@ describe('Landing — 버튼/네비게이션', () => {
   });
 
   it('L4: 로그인 CTA 클릭 → /budget 로 이동', () => {
-    mockAuth.user = { id: 'u1', email: 't@t.com' } as any;
+    mockAuth.user = { id: 'u1', email: 't@t.com' };
     renderWithProviders(<Landing />);
     fireEvent.click(screen.getByRole('button', { name: '예산 관리하기' }));
     expect(currentPath()).toBe('/budget');
@@ -100,7 +120,7 @@ describe('Landing — 버튼/네비게이션', () => {
   });
 
   it('L6: 로그인 상태에서 "이미 계정이 있으신가요?" 버튼 미노출', () => {
-    mockAuth.user = { id: 'u1', email: 't@t.com' } as any;
+    mockAuth.user = { id: 'u1', email: 't@t.com' };
     renderWithProviders(<Landing />);
     expect(screen.queryByRole('button', { name: '이미 계정이 있으신가요?' })).toBeNull();
   });
@@ -153,5 +173,30 @@ describe('Landing — 버튼/네비게이션', () => {
     expect(mockStartNavigation).toHaveBeenCalledWith(
       expect.objectContaining({ url: expect.stringContaining('honeymoon.moderninsightspot.com') }),
     );
+  });
+});
+
+/* ─── [CL-TOP20-P2-VERIFY-20260703-031500] 허브↔방문자 도구 상호배타 게이팅 (독립검증 관찰 1 반영) ─── */
+describe('로그인 허브 게이팅 (Top20 #9)', () => {
+  it('비로그인: 시뮬레이터 표시 + 허브 미표시', () => {
+    renderWithProviders(<Landing />);
+    expect(screen.getByText('우리 결혼, 얼마나 들까요?')).toBeInTheDocument();
+    expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
+  });
+
+  it('로그인: 허브(빠른 이동 카드) 표시 + 시뮬레이터·챗프리뷰 미표시', () => {
+    mockAuth.user = { id: 'u1', email: 't@t.dev' };
+    renderWithProviders(<Landing />);
+    expect(screen.getByLabelText('내 결혼 준비 현황')).toBeInTheDocument();
+    expect(screen.getByText('예산 이어하기')).toBeInTheDocument();
+    expect(screen.queryByText('우리 결혼, 얼마나 들까요?')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('AI 웨딩 챗봇 미리보기')).not.toBeInTheDocument();
+  });
+
+  it('인증 확정 전(loading): 허브·시뮬레이터 둘 다 미표시(오표시 플래시 방지)', () => {
+    mockAuth.loading = true;
+    renderWithProviders(<Landing />);
+    expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
+    expect(screen.queryByText('우리 결혼, 얼마나 들까요?')).not.toBeInTheDocument();
   });
 });

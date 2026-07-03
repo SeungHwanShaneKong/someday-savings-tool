@@ -1,6 +1,7 @@
 // [CL-TREE-HIERARCHY-20260308-190000]
 // [CL-TREE-REDESIGN-20260403] 트리 커넥터 + forceExpand + 미니 프로그레스
-import { useState, useEffect } from 'react';
+// [CL-TOP20-P3-CHECK-20260703-030000] 그룹 헤더 소형 긴급 도트 + 긴급순 정렬
+import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -10,6 +11,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ChecklistItem } from './ChecklistItem';
+import { UrgencyDot } from './UrgencyDot';
+import { countUrgency, sortItemsByUrgency, urgencyLabelParts } from '@/lib/checklist-urgency';
 import type { CategoryGroup } from '@/lib/checklist-tree';
 
 /** 카테고리 색상 → tree-branch CSS 클래스 매핑 */
@@ -27,6 +30,8 @@ interface ChecklistCategoryGroupProps {
   group: CategoryGroup;
   isLast?: boolean;
   forceExpand?: boolean | null;
+  /** [CL-TOP20-P3-CHECK-20260703-030000] 긴급순 보기 — on 시 항목을 due 임박순 정렬(완료 하단) */
+  urgencySort?: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateNotes: (id: string, notes: string) => void;
@@ -36,6 +41,7 @@ interface ChecklistCategoryGroupProps {
 export function ChecklistCategoryGroup({
   group,
   forceExpand,
+  urgencySort = false,
   onToggle,
   onDelete,
   onUpdateNotes,
@@ -56,6 +62,16 @@ export function ChecklistCategoryGroup({
 
   const treeBranchColor = TREE_BRANCH_COLORS[meta.color] || 'tree-branch-slate';
 
+  // [CL-TOP20-P3-CHECK-20260703-030000] 그룹 긴급 카운트(미완료만) + 긴급순 정렬(원본 불변)
+  const urgency = useMemo(() => countUrgency(items), [items]);
+  const urgencyAria = urgencyLabelParts(urgency)
+    .map((part) => `, ${part}`)
+    .join('');
+  const displayItems = useMemo(
+    () => (urgencySort ? sortItemsByUrgency(items) : items),
+    [items, urgencySort]
+  );
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="space-y-0">
@@ -67,7 +83,7 @@ export function ChecklistCategoryGroup({
               'hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer',
               'group'
             )}
-            aria-label={`${meta.name} 그룹, ${items.length}개 항목 중 ${completed}개 완료`}
+            aria-label={`${meta.name} 그룹, ${items.length}개 항목 중 ${completed}개 완료${urgencyAria}`}
           >
             {/* 카테고리 아이콘 */}
             <span className="text-sm flex-shrink-0" aria-hidden="true">
@@ -83,6 +99,9 @@ export function ChecklistCategoryGroup({
             >
               {meta.name}
             </span>
+
+            {/* [CL-TOP20-P3-CHECK-20260703-030000] 소형 긴급 도트 */}
+            <UrgencyDot overdue={urgency.overdue} dueSoon={urgency.dueSoon} />
 
             {/* [CL-TREE-REDESIGN-20260403] 미니 프로그레스 바 + 카운트 */}
             <div className="flex items-center gap-1.5 ml-auto mr-1 flex-shrink-0">
@@ -125,13 +144,13 @@ export function ChecklistCategoryGroup({
             'ml-3 sm:ml-4 space-y-2 sm:space-y-2.5 pb-1',
             allDone && 'opacity-60'
           )}>
-            {items.map((item, idx) => (
+            {displayItems.map((item, idx) => (
               <div
                 key={item.id}
                 className={cn(
                   'tree-branch',
                   treeBranchColor,
-                  idx === items.length - 1 && 'last-tree-item'
+                  idx === displayItems.length - 1 && 'last-tree-item'
                 )}
               >
                 <ChecklistItem

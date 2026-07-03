@@ -1,13 +1,16 @@
 // [CL-AI-HIERARCHY-20260308-163000]
 // [CL-TREE-HIERARCHY-20260308-190000] flat → grouped tree rendering
 // [CL-TREE-REDESIGN-20260403] forceExpand + 트리 노드 스타일
-import { useState, useEffect } from 'react';
+// [CL-TOP20-P3-CHECK-20260703-030000] 헤더 긴급 알럿 도트 + 긴급순 정렬 전달
+import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChecklistCategoryGroup } from './ChecklistCategoryGroup';
+import { UrgencyDot } from './UrgencyDot';
 import { groupItemsByCategory } from '@/lib/checklist-tree';
+import { countUrgency, urgencyLabelParts } from '@/lib/checklist-urgency';
 import {
   PERIOD_LABELS,
   PERIOD_EMOJI,
@@ -21,6 +24,8 @@ interface ChecklistPeriodSectionProps {
   items: ChecklistItemType[];
   isActive: boolean;
   forceExpand?: boolean | null;
+  /** [CL-TOP20-P3-CHECK-20260703-030000] 긴급순 보기 — on 시 그룹 내 항목을 due 임박순 정렬 */
+  urgencySort?: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateNotes: (id: string, notes: string) => void;
@@ -32,6 +37,7 @@ export function ChecklistPeriodSection({
   items,
   isActive,
   forceExpand,
+  urgencySort = false,
   onToggle,
   onDelete,
   onUpdateNotes,
@@ -69,6 +75,12 @@ export function ChecklistPeriodSection({
 
   const categoryGroups = groupItemsByCategory(items);
 
+  // [CL-TOP20-P3-CHECK-20260703-030000] 섹션 긴급 카운트(미완료만) — 헤더 도트 + aria
+  const urgency = useMemo(() => countUrgency(items), [items]);
+  const urgencyAria = urgencyLabelParts(urgency)
+    .map((part) => `, ${part}`)
+    .join('');
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className={sectionStyle}>
@@ -77,7 +89,7 @@ export function ChecklistPeriodSection({
           <button
             className="w-full flex items-center gap-3 p-4 sm:p-5 hover:bg-muted/30 transition-colors"
             aria-expanded={isOpen}
-            aria-label={`${PERIOD_LABELS[period]} 체크리스트, ${items.length}개 항목 중 ${completed}개 완료`}
+            aria-label={`${PERIOD_LABELS[period]} 체크리스트, ${items.length}개 항목 중 ${completed}개 완료${urgencyAria}`}
           >
             {/* [CL-TREE-REDESIGN-20260403] 트리 루트 노드 — 원형 배경 */}
             <span className={cn(
@@ -102,6 +114,13 @@ export function ChecklistPeriodSection({
                     완료
                   </span>
                 )}
+                {/* [CL-TOP20-P3-CHECK-20260703-030000] 긴급 알럿 도트 + 카운트 */}
+                <UrgencyDot
+                  overdue={urgency.overdue}
+                  dueSoon={urgency.dueSoon}
+                  showCount
+                  className="ml-auto"
+                />
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <Progress
@@ -138,6 +157,7 @@ export function ChecklistPeriodSection({
                 key={group.key}
                 group={group}
                 forceExpand={forceExpand}
+                urgencySort={urgencySort}
                 onToggle={onToggle}
                 onDelete={onDelete}
                 onUpdateNotes={onUpdateNotes}

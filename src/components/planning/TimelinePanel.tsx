@@ -54,6 +54,8 @@ const AI_LOADING_MESSAGES = [
 function LoadingSkeleton() {
   const [msgIndex, setMsgIndex] = useState(0);
   const [dots, setDots] = useState('');
+  // [CL-TOP20-P0-20260703-002000] 15초 초과 시 안심 문구 — 타임아웃 무피드백 공백 해소(적대검증 #25)
+  const [slow, setSlow] = useState(false);
 
   // 3초마다 메시지 순환
   useEffect(() => {
@@ -69,6 +71,11 @@ function LoadingSkeleton() {
       setDots((prev) => (prev.length >= 3 ? '' : prev + '.'));
     }, 500);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSlow(true), 15000);
+    return () => clearTimeout(timer);
   }, []);
 
   const current = AI_LOADING_MESSAGES[msgIndex];
@@ -90,7 +97,7 @@ function LoadingSkeleton() {
           {current.text}{dots}
         </p>
         <p className="text-xs text-blue-500/80 mt-1.5">
-          잠시만 기다려 주세요
+          {slow ? '평소보다 조금 오래 걸리고 있어요 — 곧 완성돼요' : '잠시만 기다려 주세요'}
         </p>
 
         {/* 프로그레스 바 */}

@@ -1,4 +1,6 @@
 import type { Config } from "tailwindcss";
+// [CL-TOP20-P1-TOKENS-20260703-011500] 선재 require() → ESM import (no-require-imports 린트 클린)
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -71,6 +73,12 @@ export default {
           "3": "hsl(var(--chart-3))",
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
+        },
+        /* [CL-TOP20-P1-TOKENS-20260703-011500] 웨딩 무드 웜톤 — 히어로/축하 표면 전용 보조축 */
+        wedding: {
+          rose: "hsl(var(--wedding-rose))",
+          "rose-soft": "hsl(var(--wedding-rose-soft))",
+          gold: "hsl(var(--wedding-gold))",
         },
       },
       borderRadius: {
@@ -162,5 +170,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;

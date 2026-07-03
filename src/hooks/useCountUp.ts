@@ -29,7 +29,11 @@ export function useCountUp(rawTarget: number, durationMs = 500): number {
     }
     const from = valueRef.current;
     if (from === target) return;
-    if (typeof window === 'undefined' || !window.requestAnimationFrame) {
+    // [CL-BTN-AUDIT-20260703-120000] rAF 는 숨겨진/비활성 탭에서 throttle 되어 콜백이 아예 안 올 수 있다.
+    //   애니메이션은 어차피 보이지 않으므로, rAF 미지원이거나 탭이 hidden 이면 즉시 최종값으로 스냅한다
+    //   (시각 카운트업이 stale 로 고정돼 aria-live 최종값과 발산하던 문제의 근본 차단).
+    const documentHidden = typeof document !== 'undefined' && document.hidden === true;
+    if (typeof window === 'undefined' || !window.requestAnimationFrame || documentHidden) {
       setValue(target);
       return;
     }
@@ -47,7 +51,13 @@ export function useCountUp(rawTarget: number, durationMs = 500): number {
       }
     };
     rafId = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(rafId);
+    // [CL-BTN-AUDIT-20260703-120000] 애니메이션 도중 탭이 hidden 으로 전환돼 rAF 가 멈춰도
+    //   durationMs 경과 후 최종값 일관성을 보장하는 폴백(setTimeout 은 hidden 탭에서도 결국 발화).
+    const settle = window.setTimeout(() => setValue(target), durationMs + 100);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(settle);
+    };
   }, [target, durationMs, reduced]);
 
   return value;

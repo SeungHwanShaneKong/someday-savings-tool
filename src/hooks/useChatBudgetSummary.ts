@@ -40,7 +40,14 @@ export function useChatBudgetSummary({ enabled = true }: UseChatBudgetSummaryOpt
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false });
 
-        if (error || !budgets || budgets.length === 0) {
+        // [CL-SEC-AUDIT-R2-20260703-130000] 관측성: '예산 없음'(신규 유저 정상)과 '조회 실패'(네트워크/RLS)를
+        //   구분해, 실패일 때만 debug 로깅(useAIChat 패턴). degrade-safe 동작(summary=null)은 불변.
+        if (error) {
+          if (!cancelled) setSummary(null);
+          console.debug('[chat-budget-summary] budgets 조회 실패(컨텍스트 미포함으로 진행):', error.message);
+          return;
+        }
+        if (!budgets || budgets.length === 0) {
           if (!cancelled) setSummary(null);
           return;
         }
@@ -63,6 +70,8 @@ export function useChatBudgetSummary({ enabled = true }: UseChatBudgetSummaryOpt
 
         if (itemsError) {
           if (!cancelled) setSummary(null);
+          // [CL-SEC-AUDIT-R2-20260703-130000] 관측성: 항목 조회 실패 로깅(degrade-safe 불변)
+          console.debug('[chat-budget-summary] budget_items 조회 실패(컨텍스트 미포함으로 진행):', itemsError.message);
           return;
         }
 

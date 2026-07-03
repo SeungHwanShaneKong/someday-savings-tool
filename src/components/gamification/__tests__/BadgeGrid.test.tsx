@@ -71,8 +71,9 @@ describe('BadgeGrid', () => {
       makeBadge('a-first', 'starter', { display_order: 1 }),
     ];
     render(<BadgeGrid definitions={defs} earned={[]} groupByCategory={false} />);
-    const buttons = screen.getAllByRole('button');
-    // 첫 번째 버튼이 display_order=1 뱃지
-    expect(buttons[0].getAttribute('aria-label')).toContain('a-first');
+    // [CL-BTN-AUDIT-20260703-120000] 표시용 배지는 role="img"(비인터랙티브) — BadgeGrid 는 onClick 미전달
+    const chips = screen.getAllByRole('img');
+    // 첫 번째 칩이 display_order=1 뱃지
+    expect(chips[0].getAttribute('aria-label')).toContain('a-first');
   });
 });

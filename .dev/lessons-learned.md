@@ -7,6 +7,16 @@
 
 ## 최신
 
+### [CL-BTNAUDIT-RR-SLASH-20260703] 정적 버튼/라우트 감사는 프레임워크 동작을 오해해 대량 false-positive 를 낸다 — 라이브 실증 필수
+- **발생원인**: 버튼 기능 감사 워크플로가 "Footer 링크 `/faq/`(트레일링 슬래시) vs App.tsx `path="/faq"`(없음) → React Router 404" 를 9건 중 8건 '치명 고장(sev5)'으로 보고.
+- **기술내용**: React Router v6 는 매칭 시 **트레일링 슬래시를 정규화**해 `/faq/` 를 `path="/faq"` 에 매칭한다(404 아님). 프리뷰 라이브 렌더(/faq/·/editorial/ h1 정상)+기존 e2e(public-pages 트레일링 슬래시 통과)+이미 배포·작동 중이 반증. `/guide/wedding-cost-data/` 도 finder 가 articles.ts 만 보고 tier-3/4 레지스트리를 놓쳐 '없는 슬러그'로 오판(실제 렌더됨).
+- **해결책**: **라우트/네비게이션 '고장' 주장은 반드시 프리뷰·e2e 로 실제 렌더를 실증한 뒤에만 수정.** 검증 없는 일괄 라우트 수정(App.tsx path 에 슬래시 추가)은 오히려 현재 작동 중인 라우팅을 깨뜨릴 수 있다. 정적 분석 finder 는 프레임워크 규칙(RR 슬래시 정규화·지연 로딩·레지스트리 분할)을 모르면 과탐한다 → PM 이 라이브로 반증.
+
+### [CL-RAF-HIDDEN-TAB-20260703] 카운트업/애니메이션은 숨겨진 탭(rAF throttle)에서 최종값 일관성을 보장해야 한다
+- **발생원인**: LandingBudgetSimulator 시각 총액이 프리뷰에서 스타일 변경에도 7,247만원 고정(aria-live 는 정확). 원인 추적 = 프리뷰 탭 `visibilityState:hidden`·`hasFocus:false` → rAF 600ms 간 0회 발화.
+- **기술내용**: useCountUp 이 애니메이션 최종값(`setValue(target)`)을 rAF 틱 안에서만 설정 → rAF 가 throttle(백그라운드 탭)되면 콜백이 안 와 `from` 에 영구 고정, 시각값이 aria-live 최종값과 발산. 실사용자도 '값 변경 직후 탭 전환' 시 재현 가능한 강건성 공백.
+- **해결책**: rAF 미지원이거나 `document.hidden` 이면 즉시 최종값 스냅(안 보이는 애니메이션 스킵) + rAF 경로에 `setTimeout(durationMs+100)` 폴백으로 중도 hidden 전환에도 최종 일관성 보장. 근본 원칙: **애니메이션은 '보기 좋게'가 목적이고, 값 정확성은 rAF 발화 여부와 무관하게 항상 보장돼야 한다.**
+
 ### [CL-CDN-PRELOAD-20260703] 외부 CDN preload URL 은 실HTTP 검증 후 커밋 (LCP 최적화가 404 로 역효과)
 - **발생원인**: Top20 P1 LCP 작업에서 Pretendard woff2 를 `<link rel=preload>` 로 선다운로드하려 했으나 URL(`.../dist/web/variable/woff2/...`)을 CSS 경로에서 추정해 넣음.
 - **기술내용**: 해당 경로는 CDN 404(curl -I 로 실증) → 브라우저가 무효 요청을 날리고 실제 폰트는 CSS(swap) 경로로만 늦게 도착 = LCP 최적화 의도가 오히려 낭비 요청. R50 회귀헌터가 적발.

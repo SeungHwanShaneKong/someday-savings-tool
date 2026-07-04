@@ -33,7 +33,8 @@ export interface UseCollaborationResult {
   /** 전역 1:1 현재 파트너(없으면 null) */
   myPartner: PartnerInfo | null;
   createInvite: () => Promise<string | null>;
-  removeCollaborator: (userId: string) => Promise<void>;
+  /** 공동관리자 해제 — Supabase delete error 검사 후 성공 여부 반환(형제 releasePartner 계약과 동일) */
+  removeCollaborator: (userId: string) => Promise<boolean>;
   /** 파트너 해지 — 양방향 협업자 링크 제거(예산 본문은 소유자 보관). 성공 여부 반환 */
   releasePartner: () => Promise<boolean>;
   /** 새 우리 옵션을 현재 파트너에게 자동 공유(파트너 없으면 no-op). 성공 여부 반환(실패 시 호출측 폴백) */
@@ -151,16 +152,19 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
     }
   }, [budgetId, user]);
 
+  // [CL-BTNAUDIT3-20260704 | remove-err-check] delete error 미검사로 실패가 침묵되던 것을 근본수정 —
+  //   형제 releasePartner/shareBudgetWithPartner 와 동일 계약(Promise<boolean>)으로 통일. 호출측이 토스트로 배선.
   const removeCollaborator = useCallback(
-    async (userId: string) => {
-      if (!budgetId) return;
-      await supabase
+    async (userId: string): Promise<boolean> => {
+      if (!budgetId) return false;
+      const { error } = await supabase
         .from('budget_collaborators')
         .delete()
         .eq('budget_id', budgetId)
         .eq('user_id', userId);
       await refresh();
       await refreshPartner();
+      return !error;
     },
     [budgetId, refresh, refreshPartner],
   );

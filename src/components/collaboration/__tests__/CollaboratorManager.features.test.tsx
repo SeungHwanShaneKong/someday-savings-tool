@@ -5,7 +5,7 @@
 // 격리: useCollaboration 을 hoisted 홀더로 모킹(목록/콜백 직접 제어 — 기존 .test.tsx 는 supabase 모킹이라 별도 파일).
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent } from '@testing-library/react';
-import { renderWithProviders, screen } from '@/test/test-utils';
+import { renderWithProviders, screen, waitFor } from '@/test/test-utils';
 import { CollaboratorManager } from '@/components/collaboration/CollaboratorManager';
 import type { Collaborator } from '@/hooks/useCollaboration';
 
@@ -14,7 +14,7 @@ const h = vi.hoisted(() => ({
   inviteUrl: null as string | null,
   busy: false,
   createInvite: vi.fn(async () => 'https://wedsem.example.com/invite/tok'),
-  removeCollaborator: vi.fn(async () => {}),
+  removeCollaborator: vi.fn(async () => true),
   refresh: vi.fn(async () => {}),
 }));
 vi.mock('@/hooks/useCollaboration', () => ({ useCollaboration: () => h }));
@@ -107,5 +107,32 @@ describe('CollaboratorManager — F2 복사하여 공동편집', () => {
     );
     expect(screen.queryByText('복사하여 공동편집 (원본 보존)')).toBeNull();
     expect(screen.queryByText('파트너 초대 링크 만들기')).toBeNull();
+  });
+
+  // [CL-BTNAUDIT3-20260704 | copy-double-submit] 진행 중(Promise pending) 이중 클릭 → onCopyToCoedit 1회만.
+  //   AsyncButton 이 Promise 반환을 감지해 busy(disabled) 로 잠그므로 두 번째 클릭은 무시되어야 한다.
+  it('CMF.10 복사 진행 중 이중 클릭 → onCopyToCoedit 1회만 호출(공동편집본 중복 생성 차단)', async () => {
+    let resolveCopy: () => void = () => {};
+    const onCopy = vi.fn(
+      () =>
+        new Promise<void>((res) => {
+          resolveCopy = res;
+        }),
+    );
+    renderWithProviders(
+      <CollaboratorManager budgetId="b1" isOwner={true} showCopyToCoedit onCopyToCoedit={onCopy} />,
+    );
+
+    const btn = screen.getByText('복사하여 공동편집 (원본 보존)').closest('button')!;
+    // 1차 클릭 → Promise pending → 버튼 busy(disabled)
+    fireEvent.click(btn);
+    await waitFor(() => expect(btn).toBeDisabled());
+    // 2차 클릭(연타) → disabled + 내부 busyRef 동기 게이트라 무시
+    fireEvent.click(btn);
+    expect(onCopy).toHaveBeenCalledTimes(1);
+
+    // 완료 후 잠금 해제(회복 검증)
+    resolveCopy();
+    await waitFor(() => expect(btn).not.toBeDisabled());
   });
 });

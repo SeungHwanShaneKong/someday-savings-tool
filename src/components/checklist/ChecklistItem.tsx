@@ -162,15 +162,16 @@ export function ChecklistItem({
         </div>
 
         {/* Expand button */}
+        {/* [CL-BTNAUDIT3-20260704 | 터치타깃44] 히트영역만 모바일 44px, 아이콘 w-4 유지 */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+          className="min-h-11 min-w-11 md:min-h-0 md:min-w-0 inline-flex items-center justify-center p-1 text-muted-foreground hover:text-foreground transition-colors"
           aria-label={expanded ? '접기' : '펼치기'}
         >
           {expanded ? (
-            <ChevronUp className="w-4 h-4" />
+            <ChevronUp className="w-4 h-4" aria-hidden="true" />
           ) : (
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-4 h-4" aria-hidden="true" />
           )}
         </button>
       </div>

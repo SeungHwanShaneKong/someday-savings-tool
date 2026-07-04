@@ -193,8 +193,8 @@ export default function Admin() {
         {/* ===== 헤더 ===== */}
         <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border/50">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full shrink-0">
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="rounded-full shrink-0" aria-label="홈으로 돌아가기" /* [CL-BTNAUDIT3-20260704 | 뒤로 접근명] */>
+              <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </Button>
             <div className="flex-1 min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold truncate leading-relaxed">
@@ -210,8 +210,8 @@ export default function Admin() {
               )}
               {/* [CL-AUDIT2-R3-ERRSURFACE-20260628] 스핀/disable 을 isFetching 에 바인딩 — keepPreviousData 로 첫 로드 후
                   isLoading 은 영구 false 라 폴링/수동 새로고침 시 스피너가 안 돌던 회귀 수정(F5). */}
-              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading || kpiFetching}>
-                <RefreshCw className={`h-4 w-4 ${(dataLoading || kpiFetching) ? 'animate-spin' : ''}`} />
+              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={dataLoading || kpiFetching} aria-label="새로고침" /* [CL-BTNAUDIT3-20260704 | 새로고침 접근명] */>
+                <RefreshCw className={`h-4 w-4 ${(dataLoading || kpiFetching) ? 'animate-spin' : ''}`} aria-hidden="true" />
               </Button>
             </div>
           </div>

@@ -14,15 +14,33 @@ import { useEffect } from 'react';
 const OPEN_MODAL_SELECTOR =
   '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]';
 
+// [CL-BTNAUDIT3-20260704 | popover-exclude] Radix Popover 콘텐츠도 role="dialog"
+//   data-state="open" 을 렌더하지만 body 를 잠그지 않는다(비-modal). 반면 Dialog/AlertDialog 만
+//   body 를 inert 로 잠근다. 따라서 '보존해야 할 진짜 modal' 후보에서 Popover(popper 래퍼 하위)를
+//   제외해야, 다른 modal 이 남긴 누수 잠금이 Popover 개방 중에도 정상 해제된다. (Popover 는 절대
+//   body 를 잠그지 않으므로 보존 대상이 아니다 = 근본해결.)
+const POPPER_WRAPPER_SELECTOR = '[data-radix-popper-content-wrapper]';
+
 export function PointerEventsGuard() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const body = document.body;
 
+    // 열린 dialog/alertdialog 후보 중 '실제로 body 를 잠그는 진짜 modal' 이 하나라도 있는지.
+    //   Popover(popper 래퍼 조상 보유)는 제외한다 — body 를 잠그지 않기 때문.
+    const hasLockingModal = () => {
+      const candidates = document.querySelectorAll(OPEN_MODAL_SELECTOR);
+      for (const el of candidates) {
+        // closest 로 popper-wrapper 조상 유무를 판정(래퍼 자신 포함). 없으면 진짜 modal.
+        if (!el.closest(POPPER_WRAPPER_SELECTOR)) return true;
+      }
+      return false;
+    };
+
     const reconcile = () => {
-      // body 가 잠겨 있는데(열림 없음) 열린 모달이 하나도 없으면 잠금을 해제한다.
+      // body 가 잠겨 있는데(열림 없음) 열린(잠그는) 모달이 하나도 없으면 잠금을 해제한다.
       if (body.style.pointerEvents !== 'none') return;
-      if (document.querySelector(OPEN_MODAL_SELECTOR)) return; // 정당한 모달 잠금 — 보존
+      if (hasLockingModal()) return; // 정당한 모달 잠금 — 보존 (Popover 는 제외됨)
       body.style.pointerEvents = '';
     };
 

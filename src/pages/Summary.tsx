@@ -451,8 +451,9 @@ export default function Summary() {
             size="icon"
             onClick={() => navigate('/')} /* [CL-HOME-BTN-20260315-140000] */
             className="rounded-full"
+            aria-label="홈으로 돌아가기" /* [CL-BTNAUDIT3-20260704 | 뒤로 접근명] */
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Button>
           <h1 className="text-subheading font-semibold">예산 요약</h1>
           <LogoutButton />
@@ -469,6 +470,7 @@ export default function Summary() {
               size="sm"
               onClick={() => setViewMode('comparison')}
               className="rounded-lg"
+              aria-pressed={viewMode === 'comparison'} /* [CL-BTNAUDIT3-20260704 | 토글 상태] */
             >
               전체 비교
             </Button>
@@ -477,6 +479,7 @@ export default function Summary() {
               size="sm"
               onClick={() => setViewMode('individual')}
               className="rounded-lg"
+              aria-pressed={viewMode === 'individual'} /* [CL-BTNAUDIT3-20260704 | 토글 상태] */
             >
               개별 보기
             </Button>

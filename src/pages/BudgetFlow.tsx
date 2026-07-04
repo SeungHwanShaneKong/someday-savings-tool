@@ -451,13 +451,15 @@ export default function BudgetFlow() {
           <div className="flex flex-col gap-2 sm:gap-0 sm:flex-row sm:items-center sm:justify-between">
             {/* Top Row: Back + Title */}
             <div className="flex items-center gap-2 sm:gap-4">
+              {/* [CL-BTNAUDIT3-20260704 | 뒤로가기 접근명] */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/')}
+                aria-label="홈으로 돌아가기"
                 className="rounded-full h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0"
               >
-                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
+                <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
               </Button>
               <div className="min-w-0 flex-1">
                 <h1 className="text-base sm:text-xl font-bold truncate">결혼 예산 시뮬레이터</h1>
@@ -470,23 +472,26 @@ export default function BudgetFlow() {
             {/* Bottom Row on Mobile: Action Buttons */}
             <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1 sm:mx-0 sm:px-0">
               {/* View Mode Toggle */}
+              {/* [CL-BTNAUDIT3-20260704 | 뷰토글 aria-pressed] 활성상태를 시각대비 외 스크린리더에도 전달 */}
               <div className="flex items-center bg-muted rounded-lg p-1">
                 <Button
                   variant={viewMode === 'table' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('table')}
+                  aria-pressed={viewMode === 'table'}
                   className="gap-1"
                 >
-                  <Table2 className="h-4 w-4" />
+                  <Table2 className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">표</span>
                 </Button>
                 <Button
                   variant={viewMode === 'comparison' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('comparison')}
+                  aria-pressed={viewMode === 'comparison'}
                   className="gap-1"
                 >
-                  <BarChart3 className="h-4 w-4" />
+                  <BarChart3 className="h-4 w-4" aria-hidden="true" />
                   <span className="hidden sm:inline">비교</span>
                 </Button>
               </div>
@@ -626,11 +631,12 @@ export default function BudgetFlow() {
                           if (e.key === 'Escape') handleCancelEdit();
                         }}
                       />
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSaveEdit}>
-                        <Check className="h-3 w-3" />
+                      {/* [CL-BTNAUDIT3-20260704 | 인라인편집 접근명] */}
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleSaveEdit} aria-label="이름 저장">
+                        <Check className="h-3 w-3" aria-hidden="true" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelEdit}>
-                        <X className="h-3 w-3" />
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCancelEdit} aria-label="편집 취소">
+                        <X className="h-3 w-3" aria-hidden="true" />
                       </Button>
                     </div>
                   ) : (
@@ -638,24 +644,28 @@ export default function BudgetFlow() {
                       <span className="font-medium text-sm whitespace-nowrap">{budget.name}</span>
                       {activeBudgetId === budget.id && (
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
+                          {/* [CL-BTNAUDIT3-20260704 | 이름수정 접근명] */}
+                          <Button
+                            size="icon"
+                            variant="ghost"
                             className="h-6 w-6 hover:bg-primary-foreground/20"
                             onClick={() => handleStartEdit(budget.id, budget.name)}
+                            aria-label={`${budget.name} 이름 수정`}
                           >
-                            <Pencil className="h-3 w-3" />
+                            <Pencil className="h-3 w-3" aria-hidden="true" />
                           </Button>
                           {/* [CL-OWNERDEL-GUARD-20260622-233012] 개선7: 옵션 삭제는 소유자만(비소유자에겐 숨김) */}
                           {budgets.length > 1 && budget.user_id === user?.id && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
+                                {/* [CL-BTNAUDIT3-20260704 | 옵션삭제 접근명] */}
                                 <Button
                                   size="icon"
                                   variant="ghost"
                                   className="h-6 w-6 hover:bg-destructive/20"
+                                  aria-label={`${budget.name} 옵션 삭제`}
                                 >
-                                  <Trash2 className="h-3 w-3" />
+                                  <Trash2 className="h-3 w-3" aria-hidden="true" />
                                 </Button>
                               </AlertDialogTrigger>
                               <AlertDialogContent>

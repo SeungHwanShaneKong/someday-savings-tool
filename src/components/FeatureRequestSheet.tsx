@@ -2,7 +2,7 @@
  * [CL-FEEDBACK-DAILY-20260621] 기능 요청 Sheet — Footer 버튼과 일1회 토스트가 공유하는 controlled 모달.
  * (기존 FeatureRequestButton 의 Sheet+폼+제출 로직을 추출. 제출=feature_requests insert + 오프라인 큐 폴백.)
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -33,9 +33,16 @@ export function FeatureRequestSheet({ open, onOpenChange, onSubmitted }: Feature
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const { toast } = useToast();
+  // [CL-BTNAUDIT3-20260704 | 동기 게이트] submitting(state)만으로는 getUser() await 창에서
+  //   두 번째 클릭이 클로저 stale(submitting=false)을 읽어 재진입 → feature_requests INSERT 2회.
+  //   ref 는 리렌더 이전(같은 틱)에 즉시 반영되므로 동기 차단으로 중복 제출을 원천 봉쇄한다.
+  const inFlight = useRef(false);
 
   const handleSubmit = useCallback(async () => {
-    if (!content.trim() || submitting) return;
+    if (!content.trim()) return;
+    // [CL-BTNAUDIT3-20260704 | 재진입차단] 동기 ref 게이트 — state 갱신을 기다리지 않고 같은 틱 재진입 차단.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setSubmitting(true);
 
     const payload = {
@@ -45,37 +52,42 @@ export function FeatureRequestSheet({ open, onOpenChange, onSubmitted }: Feature
     };
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      payload.user_id = user?.id ?? null;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        payload.user_id = user?.id ?? null;
 
-      const { error } = await (supabase as any)
-        .from('feature_requests')
-        .insert(payload);
+        const { error } = await (supabase as any)
+          .from('feature_requests')
+          .insert(payload);
 
-      if (error) throw error;
-    } catch {
-      // [CL-ADMIN-FEATURE-REQ-20260403] 오프라인 큐 — 실패 시 localStorage 저장
-      const queue = JSON.parse(localStorage.getItem('feature_request_queue') || '[]');
-      queue.push({ ...payload, queued_at: new Date().toISOString() });
-      localStorage.setItem('feature_request_queue', JSON.stringify(queue));
+        if (error) throw error;
+      } catch {
+        // [CL-ADMIN-FEATURE-REQ-20260403] 오프라인 큐 — 실패 시 localStorage 저장
+        const queue = JSON.parse(localStorage.getItem('feature_request_queue') || '[]');
+        queue.push({ ...payload, queued_at: new Date().toISOString() });
+        localStorage.setItem('feature_request_queue', JSON.stringify(queue));
+      }
+
+      // 성공/큐 모두 성공 UX 표시 (성공 화면 유지 동안 submitting=true 로 버튼 계속 비활성)
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onOpenChange(false);
+        setContent('');
+        setCategory(null);
+        setSubmitting(false);
+        onSubmitted?.();
+        toast({
+          title: '소중한 의견 감사합니다!',
+          description: '더 나은 웨딩셈을 만드는 데 반영할게요.',
+        });
+      }, 800);
+    } finally {
+      // [CL-BTNAUDIT3-20260704 | 게이트해제] 제출 라이프사이클 종료 시 게이트 해제(다음 제출 허용).
+      //   성공 화면은 별도 submitting=true 로 비활성 유지 → 게이트 해제와 버튼 비활성은 독립.
+      inFlight.current = false;
     }
-
-    // 성공/큐 모두 성공 UX 표시
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      onOpenChange(false);
-      setContent('');
-      setCategory(null);
-      onSubmitted?.();
-      toast({
-        title: '소중한 의견 감사합니다!',
-        description: '더 나은 웨딩셈을 만드는 데 반영할게요.',
-      });
-    }, 800);
-
-    setSubmitting(false);
-  }, [content, category, submitting, toast, onOpenChange, onSubmitted]);
+  }, [content, category, toast, onOpenChange, onSubmitted]);
 
   // 글자 수 progress bar 색상
   const charRatio = content.length / 200;

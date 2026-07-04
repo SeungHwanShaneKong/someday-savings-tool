@@ -7,6 +7,11 @@
 
 ## 최신
 
+### [CL-BTNAUDIT3-20260704] 감사→적대검증→파일배타분할 병렬수정→중앙오라클→독립검증 파이프라인 + 병렬편집 IDE진단은 과도상태
+- **발생원인**: 3차 전 버튼 감사(7차원 병렬 적대). 11개 파일그룹을 배타 분할해 병렬 근본수정 직후, 하니스 IDE 진단이 다수 `unused import/var`(AsyncButton·useAsyncAction·useNoticeSlot·useRef 등)과 `useCollaboration.ts:196 Promise<void>≠Promise<boolean>` 타입에러를 보고 → "미완결 배선(import만 추가·JSX 미연결)" 의심.
+- **기술내용**: 진단은 **병렬 편집이 아직 파일에 전부 반영되기 전의 과도상태 스냅샷**이었다. 권위 오라클 `tsc -b --noEmit`(EXIT 0)·`git diff`(실제 `<AsyncButton onClick={handleCopyToCoedit}>` 등 배선 확인)로 대조하니 전부 정상 배선. 유일 실제 잔재는 신규 테스트의 미사용 import 1건(`within`)뿐. eslint 베이스라인은 선재 97 errors(feature_requests `(supabase as any)` 등 — 릴리스 게이트 아님, 오라클=tsc/vitest/build).
+- **해결책**: **병렬 편집 워크플로 직후의 IDE `new-diagnostics` 는 신뢰하지 말고 반드시 중앙 `tsc -b`+`git diff`+`vitest` 로 재확정.** 파일 배타 분할(한 파일=한 에이전트)로 병렬 충돌 0 확보 → 중앙에서 1회 오라클 → 독립 skeptical-verifier(오라클 재현+diff 3중 검사) GO 게이트. 확정결함 21건(거짓양성 6제거) 전부 근본수정: AsyncButton 더블서밋·AlertDialog 파괴적확인·Promise<boolean> 무음실패·inFlight ref 동기게이트·PointerGuard `closest('[data-radix-popper-content-wrapper]')` Popover제외·PraiseModal 코디네이터·aria-label/aria-pressed/터치44px(`min-h-11 md:min-h-0`).
+
 ### [CL-MODAL-STACK-20260703] 조율 없는 전역 자동 모달은 스택돼 하위 버튼을 덮고 Radix body 잠금을 잔존시킨다
 - **발생원인**: UpdateNotice(500ms)·MobileDesktopNotice(800ms)·OnboardingCarousel(600ms) 등 전역 자동 Radix 모달이 겹쳐 열림(실기기: '확인' 버튼 클릭 불가 신고, 프리뷰 재현 dialogCount=2, elementFromPoint=상위 모달).
 - **기술내용**: ① 둘 다 z-50 → 나중에 열린 모달이 먼저 열린 모달 버튼을 덮음 ② Radix 모달이 `body{pointer-events:none}` 잠금을 걸고 닫힘 시 정리 못 하는 경우(애니 중단·빠른 open/close·백그라운드 탭) 페이지 전체가 클릭 불가.

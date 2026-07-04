@@ -50,7 +50,8 @@ export function ChecklistTreeControls({
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
           🌳 전체 구조
         </h3>
-        <div className="flex items-center gap-1">
+        {/* [CL-BTNAUDIT3-20260704 | 간격증대] 인접 아이콘버튼 오터치 방지 gap-1→gap-1.5 sm:gap-2 */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* [CL-TOP20-P3-CHECK-20260703-030000] 긴급순 보기 토글 — off 기본(기존 순서 유지) */}
           {onUrgencySortChange && (
             <button
@@ -60,7 +61,8 @@ export function ChecklistTreeControls({
               aria-label="긴급순 보기"
               title="마감 임박한 항목부터 정렬해요"
               className={cn(
-                'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium transition-all active:scale-[0.95] motion-reduce:active:scale-100',
+                // [CL-BTNAUDIT3-20260704 | 터치타깃44] 히트영역만 모바일 44px, 시각크기 유지
+                'inline-flex items-center justify-center gap-1 rounded-lg border px-2 py-1 min-h-11 md:min-h-0 text-xs font-medium transition-all active:scale-[0.95] motion-reduce:active:scale-100',
                 urgencySort
                   ? 'border-primary/30 bg-primary/10 text-primary'
                   : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -70,21 +72,22 @@ export function ChecklistTreeControls({
               긴급순
             </button>
           )}
+          {/* [CL-BTNAUDIT3-20260704 | 터치타깃44] 아이콘전용 버튼 히트영역 모바일 44px, 아이콘 w-4 유지 */}
           <button
             onClick={onExpandAll}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all active:scale-[0.95]"
+            className="min-h-11 min-w-11 md:min-h-0 md:min-w-0 inline-flex items-center justify-center p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all active:scale-[0.95]"
             aria-label="전체 펼치기"
             title="전체 펼치기"
           >
-            <ChevronsDown className="w-4 h-4" />
+            <ChevronsDown className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
             onClick={onCollapseAll}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all active:scale-[0.95]"
+            className="min-h-11 min-w-11 md:min-h-0 md:min-w-0 inline-flex items-center justify-center p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all active:scale-[0.95]"
             aria-label="전체 접기"
             title="전체 접기"
           >
-            <ChevronsUp className="w-4 h-4" />
+            <ChevronsUp className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>

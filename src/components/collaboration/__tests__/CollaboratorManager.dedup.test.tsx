@@ -16,7 +16,7 @@ const externalStub: UseCollaborationResult = {
   // [CL-PARTNER-1TO1-20260622-233012] 인터페이스 확장 반영(파트너 1:1)
   myPartner: null,
   createInvite: vi.fn(async () => null),
-  removeCollaborator: vi.fn(async () => {}),
+  removeCollaborator: vi.fn(async () => true),
   releasePartner: vi.fn(async () => true),
   shareBudgetWithPartner: vi.fn(async () => true),
   refresh: vi.fn(async () => {}),

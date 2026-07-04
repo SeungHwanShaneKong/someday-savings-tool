@@ -78,11 +78,12 @@ export function OverdueAlertBanner({
         </Button>
       </div>
 
+      {/* [CL-BTNAUDIT3-20260704 | 닫기 44px] 히트영역 44px 확대(aria-label 유지·아이콘 크기 유지) */}
       <button
         type="button"
         onClick={() => setVisible(false)}
         aria-label="기한 초과 알림 닫기"
-        className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+        className="absolute right-2 top-2 min-h-11 min-w-11 inline-flex items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>

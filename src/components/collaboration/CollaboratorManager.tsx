@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { UserPlus, Copy, Check, Users, X, UserMinus, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AsyncButton } from '@/components/ui/async-button';
 import { Card } from '@/components/ui/card';
 import {
   AlertDialog,
@@ -32,7 +33,8 @@ interface CollaboratorManagerProps {
   onAutoInviteHandled?: () => void;
   /** [CL-COEDIT-COPY-20260620] 개인 예산일 때 "복사하여 공동편집(원본 보존)" 1순위 버튼 노출 */
   showCopyToCoedit?: boolean;
-  onCopyToCoedit?: () => void;
+  /** [CL-BTNAUDIT3-20260704] Promise 반환 시 AsyncButton 이 자동 busy 추적 → 진행 중 disabled·이중 클릭 방지(공동편집본 중복 생성 차단) */
+  onCopyToCoedit?: () => void | Promise<void>;
   /** [CL-COEDIT-NICK-20260622-233012] 내 닉네임 변경 트리거(상위가 NicknameDialog 오픈). 없으면 미노출(개선8) */
   onEditMyNickname?: () => void;
   /** [CL-AUDIT-RPC-DEDUP-20260622] 상위에서 단일 useCollaboration 을 주입(중복 RPC 제거). */
@@ -91,6 +93,21 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
     );
   };
 
+  // [CL-BTNAUDIT3-20260704 | copy-double-submit] '복사하여 공동편집' 이중 클릭 방어(공동편집 예산 중복 생성 차단).
+  //   onCopyToCoedit 가 Promise 를 반환하면 AsyncButton 이 busy 자동 추적하고, 그 Promise 를 그대로 반환해
+  //   AsyncButton 이 완료까지 disabled 유지. (콜백이 void 여도 AsyncButton 의 동기 busyRef 로 같은-틱 재진입 차단.)
+  const handleCopyToCoedit = () => onCopyToCoedit?.();
+
+  // [CL-BTNAUDIT3-20260704 | remove-toast] 해제 결과를 토스트로 배선(형제 releasePartner 패턴). 무음 실패 제거.
+  const handleRemove = async (userId: string, name: string) => {
+    const ok = await removeCollaborator(userId);
+    toast(
+      ok
+        ? { title: `${name}님과의 공동관리를 해제했어요` }
+        : { title: '해제 중 오류가 발생했어요', description: '잠시 후 다시 시도해주세요.', variant: 'destructive' },
+    );
+  };
+
   // [CL-COEDIT-PARTICIPANTS-20260620] 나를 제외한 "상대" 참여자. display_name 우선('파트너' 폴백) + 이메일(개선5).
   const others = collaborators.filter((c) => !c.isMe);
   const roleLabel = (role: string) => (role === 'owner' ? '관리자' : role === 'viewer' ? '뷰어' : '편집');
@@ -131,10 +148,11 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <button
-                        className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                        // [CL-BTNAUDIT3-20260704 | touch44] 파괴적 액션 히트영역 모바일 44px 확대(아이콘 시각크기 유지)
+                        className="min-h-11 min-w-11 inline-flex items-center justify-center md:min-h-0 md:min-w-0 md:p-1 text-muted-foreground hover:text-destructive transition-colors"
                         aria-label={`${name} 공동관리 해제`}
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
@@ -146,7 +164,7 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>취소</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => removeCollaborator(c.user_id)} className="bg-destructive hover:bg-destructive/90">
+                        <AlertDialogAction onClick={() => handleRemove(c.user_id, name)} className="bg-destructive hover:bg-destructive/90">
                           해제
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -202,10 +220,11 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
           {/* [CL-COEDIT-COPY-20260620] 개인 예산: 원본 보존하고 복사본을 공유(1순위) */}
           {showCopyToCoedit && (
             <>
-              <Button onClick={onCopyToCoedit} className="w-full gap-2" size="sm">
-                <Copy className="w-4 h-4" />
+              {/* [CL-BTNAUDIT3-20260704 | copy-async] AsyncButton — 진행 중 disabled+스피너+aria-busy 로 이중 클릭 차단 */}
+              <AsyncButton onClick={handleCopyToCoedit} className="w-full gap-2" size="sm" loadingText="복사 중...">
+                <Copy className="w-4 h-4" aria-hidden="true" />
                 복사하여 공동편집 (원본 보존)
-              </Button>
+              </AsyncButton>
               <p className="text-[11px] text-muted-foreground/70 mt-1.5 mb-2.5">
                 이 개인 예산을 복사해 공동편집본을 만들어요. 원본은 '개인'에 그대로 남아요.
               </p>

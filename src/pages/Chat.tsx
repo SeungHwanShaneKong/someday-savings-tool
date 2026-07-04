@@ -75,8 +75,9 @@ export default function Chat() {
           <button
             onClick={() => navigate('/')} /* [CL-HOME-BTN-20260315-140000] */
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="홈으로 돌아가기" /* [CL-BTNAUDIT3-20260704 | 뒤로 접근명] */
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5" aria-hidden="true" />
           </button>
           <h1 className="text-base font-semibold text-foreground">
             💬 웨딩셈 Q&A

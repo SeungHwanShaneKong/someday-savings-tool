@@ -1,6 +1,6 @@
 /** [CL-QA100-BTN-20260531] 컴포넌트 상호작용 검증 — ChatDrawer */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders, screen, fireEvent, currentPath } from '@/test/test-utils';
+import { renderWithProviders, screen, fireEvent, currentPath, waitFor } from '@/test/test-utils';
 import { ChatDrawer } from '../ChatDrawer';
 import { createRef } from 'react';
 
@@ -83,22 +83,40 @@ describe('ChatDrawer', () => {
     expect(screen.queryByText(/웨딩셈 Q&A/)).toBeNull();
   });
 
-  it('DR.6: messages 있을 때 트래시 버튼 클릭 → clearMessages 호출', () => {
+  it('DR.6: messages 있을 때 트래시 버튼 + 풀스크린 버튼 모두 표시', () => {
     // Seed messages into mock return value
     mockReturnValue.messages = [{ role: 'user', content: '안녕하세요', timestamp: new Date().toISOString() }];
 
     renderWithProviders(<ChatDrawer open={true} onOpenChange={onOpenChange} />);
 
-    // With messages, BOTH trash and fullscreen buttons should be present
-    const svgButtons = screen.getAllByRole('button').filter(btn =>
-      btn.className.includes('h-7') || btn.closest('[class*="h-7"]') !== null || btn.querySelector('svg')
+    // 아이콘 전용 버튼은 aria-label 로 안정적으로 스코핑(위치 인덱스 의존 제거)
+    expect(screen.getByRole('button', { name: '대화 삭제' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '전체 화면으로 열기' })).toBeInTheDocument();
+  });
+
+  // [CL-BTNAUDIT3-20260704 | drawer-clear-safe] 파괴적 안전 회귀 — Chat.tsx CD.1/CD.2 와 동형.
+  // 드로어의 '대화 삭제'도 확인 다이얼로그 없이는 삭제되지 않는다(실수 방지).
+  it('DR.7: 삭제 트리거 클릭만으로는 clearMessages 미호출(확인 필요)', async () => {
+    mockReturnValue.messages = [{ role: 'user', content: '안녕하세요', timestamp: new Date().toISOString() }];
+
+    renderWithProviders(<ChatDrawer open={true} onOpenChange={onOpenChange} />);
+
+    // 트래시 트리거 클릭 → 다이얼로그만 열림, 삭제 호출 0
+    fireEvent.click(screen.getByRole('button', { name: '대화 삭제' }));
+    await waitFor(() =>
+      expect(screen.getByText('대화 기록을 삭제할까요?')).toBeInTheDocument()
     );
+    expect(clearMessagesMock).not.toHaveBeenCalled();
+  });
 
-    // There should be at least 2 icon buttons now (trash + fullscreen)
-    expect(svgButtons.length).toBeGreaterThanOrEqual(2);
+  it('DR.8: 확인(삭제) 클릭 시에만 clearMessages 1회 호출', async () => {
+    mockReturnValue.messages = [{ role: 'user', content: '안녕하세요', timestamp: new Date().toISOString() }];
 
-    // The first icon button in header should be the trash button
-    fireEvent.click(svgButtons[0]);
-    expect(clearMessagesMock).toHaveBeenCalledTimes(1);
+    renderWithProviders(<ChatDrawer open={true} onOpenChange={onOpenChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '대화 삭제' }));
+    const confirm = await screen.findByText('삭제');
+    fireEvent.click(confirm);
+    await waitFor(() => expect(clearMessagesMock).toHaveBeenCalledTimes(1));
   });
 });

@@ -77,11 +77,14 @@ export function NudgeBanner({ type, onAction, actionLabel, onSave, showSamplePre
 
   return (
     <div className="relative bg-gradient-to-r from-primary/10 via-blue-50 to-primary/5 rounded-2xl p-4 sm:p-5 border border-primary/20">
+      {/* [CL-BTNAUDIT3-20260704 | 닫기 a11y+44px] type/aria-label + 히트영역 44px(아이콘 크기 유지) */}
       <button
+        type="button"
         onClick={() => setDismissed(true)}
-        className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-foreground rounded-full"
+        aria-label="안내 닫기"
+        className="absolute top-2 right-2 min-h-11 min-w-11 inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full"
       >
-        <X className="w-3.5 h-3.5" />
+        <X className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
 
       <div className="flex items-start gap-3 pr-6">

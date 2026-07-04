@@ -407,11 +407,12 @@ export function BudgetTable({
             if (e.key === 'Enter') handleSaveRename(item.id);
             if (e.key === 'Escape') handleCancelRename();
           }} />
-              <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6" onClick={() => handleSaveRename(item.id)}>
-                <Check className="h-3 w-3" />
+              {/* [CL-BTNAUDIT3-20260704 | 이름저장/취소 접근명] 아이콘 전용 버튼 → 한국어 aria-label + 아이콘 aria-hidden */}
+              <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6" aria-label="이름 저장" onClick={() => handleSaveRename(item.id)}>
+                <Check className="h-3 w-3" aria-hidden="true" />
               </Button>
-              <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6" onClick={handleCancelRename}>
-                <X className="h-3 w-3" />
+              <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6" aria-label="편집 취소" onClick={handleCancelRename}>
+                <X className="h-3 w-3" aria-hidden="true" />
               </Button>
             </div> : <div className="flex items-center gap-1 group">
               <span className="break-keep text-[10px] sm:text-base">{displayName}</span>
@@ -437,17 +438,18 @@ export function BudgetTable({
               )}
               {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 트리거 — 룰 매칭+금액 입력(>0) 시 amber 아이콘 */}
               <HiddenCostTrigger categoryId={category.id} subCategoryId={subCat.id} amount={item.amount || 0} itemName={displayName} className="flex-shrink-0" />
-              {onRenameItem && <Button size="icon" variant="ghost" className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 flex-shrink-0" onClick={() => handleStartRename(item.id, displayName)}>
-                  <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+              {/* [CL-BTNAUDIT3-20260704 | 이름수정/삭제 접근명] 항목명 포함 aria-label + 아이콘 aria-hidden */}
+              {onRenameItem && <Button size="icon" variant="ghost" className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 flex-shrink-0" aria-label={`${displayName} 이름 수정`} onClick={() => handleStartRename(item.id, displayName)}>
+                  <Pencil className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
                 </Button>}
-              {onDeleteItem && <Button size="icon" variant="ghost" className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 text-destructive flex-shrink-0" onClick={() => {
+              {onDeleteItem && <Button size="icon" variant="ghost" className="h-4 w-4 sm:h-5 sm:w-5 opacity-100 text-destructive flex-shrink-0" aria-label={`${displayName} 삭제`} onClick={() => {
             setItemToDelete({
               id: item.id,
               name: displayName
             });
             setDeleteDialogOpen(true);
           }}>
-                  <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                  <Trash2 className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
                 </Button>}
             </div>}
         </TableCell>
@@ -463,8 +465,9 @@ export function BudgetTable({
             }
           }}>
                 <PopoverTrigger asChild>
-                  <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6">
-                    <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                  {/* [CL-BTNAUDIT3-20260704 | 인원계산 접근명] 항목명 포함 aria-label + 아이콘 aria-hidden */}
+                  <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6" aria-label={`${displayName} 인원수 계산`}>
+                    <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-56 sm:w-64" align="end">

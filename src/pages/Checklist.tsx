@@ -29,6 +29,8 @@ import { ChecklistPeriodSection } from '@/components/checklist/ChecklistPeriodSe
 import { ChecklistTreeControls } from '@/components/checklist/ChecklistTreeControls';
 import { NudgeBanner } from '@/components/checklist/NudgeBanner';
 import { PraiseModal } from '@/components/checklist/PraiseModal';
+// [CL-BTNAUDIT3-20260704 | praise-slot] 전역 자동알림과 '한 번에 하나' 상호배제
+import { useNoticeSlot } from '@/hooks/useNoticeSlot';
 import { BudgetLinkPrompt } from '@/components/checklist/BudgetLinkPrompt';
 import { PERIOD_ORDER, PERIOD_LABELS, type ChecklistPeriod } from '@/lib/checklist-templates';
 
@@ -115,6 +117,12 @@ export default function Checklist() {
     },
     [prefersReducedMotion]
   );
+
+  // [CL-BTNAUDIT3-20260704 | praise-slot] 축하 모달을 전역 모달 코디네이터에 편입 — 자동 안내
+  //   (update-notice 2·mobile-desktop 1·onboarding 3)와 동시 발화 시 스택 방지('한 번에 하나').
+  //   우선순위 4 = 사용자 능동 축하이므로 자동 안내보다 높게 즉시 승계·표시.
+  //   기존 조건(praiseEvent!=null) 보존: 이를 wantOpen 으로 삼고, 닫힘은 setPraiseEvent(null)로 wantOpen=false.
+  const praiseOpen = useNoticeSlot('praise-modal', praiseEvent != null, 4);
 
   // Add custom item state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -378,9 +386,11 @@ export default function Checklist() {
       </main>
 
       {/* Praise Modal */}
+      {/* [CL-BTNAUDIT3-20260704 | praise-slot] open=코디네이터 승계(praiseOpen)로 게이트 —
+          자동 안내와 겹치면 슬롯 점유 시까지 대기 후 표시. 닫힘 시 setPraiseEvent(null)→wantOpen=false→release. */}
       {praiseEvent && (
         <PraiseModal
-          open={!!praiseEvent}
+          open={praiseOpen}
           onClose={() => setPraiseEvent(null)}
           emoji={praiseEvent.emoji}
           title={praiseEvent.title}

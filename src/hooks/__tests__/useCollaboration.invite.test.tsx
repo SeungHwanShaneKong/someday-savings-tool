@@ -247,6 +247,32 @@ describe('useCollaboration.removeCollaborator — delete 인자 정확성', () =
     // budgetId null → 조기 return, supabase.from 미접근(마운트 refresh 도 조기 종료)
     expect(calls).not.toContain('budget_collaborators');
   });
+
+  // [CL-BTNAUDIT3-20260704 | remove-err-check] delete error 를 검사해 false 반환(무음 실패 제거).
+  //   형제 releasePartner/shareBudgetWithPartner 와 동일 계약 — 호출측이 실패 토스트를 띄울 수 있어야 한다.
+  it('INV.A11b delete error → false 반환(성공 시 true)', async () => {
+    // 실패 케이스: budget_collaborators delete 종단이 error 를 돌려줌
+    vi.mocked(supabase.from).mockImplementation((table: string) =>
+      (table === 'budget_collaborators'
+        ? makeChain({ list: { data: null, error: { message: 'delete failed' } } })
+        : makeChain()) as never,
+    );
+    const { result } = renderHook(() => useCollaboration('budget-5'));
+    let ok: boolean | 'sentinel' = 'sentinel';
+    await act(async () => { ok = await result.current.removeCollaborator('victim-9'); });
+    expect(ok).toBe(false);
+
+    // 성공 케이스: error 없음 → true
+    vi.mocked(supabase.from).mockImplementation((table: string) =>
+      (table === 'budget_collaborators'
+        ? makeChain({ list: { data: [], error: null } })
+        : makeChain()) as never,
+    );
+    const { result: ok2Result } = renderHook(() => useCollaboration('budget-5'));
+    let ok2: boolean | 'sentinel' = 'sentinel';
+    await act(async () => { ok2 = await ok2Result.current.removeCollaborator('victim-9'); });
+    expect(ok2).toBe(true);
+  });
 });
 
 describe('useCollaboration.createInvite — origin 비종속 URL 구성', () => {

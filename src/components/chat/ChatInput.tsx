@@ -79,7 +79,8 @@ export function ChatInput({
         // [CL-TOP20-R50-CHAT-20260703-094000] 아이콘 전용 버튼 접근성 이름
         aria-label="메시지 전송"
         className={cn(
-          'p-2.5 rounded-xl transition-all flex-shrink-0',
+          // [CL-BTNAUDIT3-20260704 | send-touch44] 히트영역 44px(h-11 w-11)로 확대 — 아이콘 시각크기(w-4)는 유지
+          'h-11 w-11 inline-flex items-center justify-center rounded-xl transition-all flex-shrink-0',
           value.trim() && !isLoading && !disabled
             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
             : 'bg-muted text-muted-foreground'

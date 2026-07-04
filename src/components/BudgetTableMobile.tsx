@@ -419,11 +419,12 @@ export function BudgetTableMobile({
                                     />
                                     {/* [CL-TOP20-P5-PWA-20260703-050000] 터치 타깃 확대: 모바일 40px(h-10 w-10), md 이상 기존 크기 유지.
                                         아이콘은 Button 베이스 [&_svg]:size-4 가 자식 클래스보다 우선하므로 부모 레벨에서 확대. */}
-                                    <Button size="icon" variant="ghost" className="h-10 w-10 md:h-8 md:w-8 [&_svg]:size-5 md:[&_svg]:size-4" onClick={() => handleSaveRename(item.id)}>
-                                      <Check className="h-4 w-4" />
+                                    {/* [CL-BTNAUDIT3-20260704 | 접근명] 아이콘 전용 버튼 접근명 + 아이콘 aria-hidden */}
+                                    <Button size="icon" variant="ghost" aria-label="이름 저장" className="h-10 w-10 md:h-8 md:w-8 [&_svg]:size-5 md:[&_svg]:size-4" onClick={() => handleSaveRename(item.id)}>
+                                      <Check className="h-4 w-4" aria-hidden="true" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-10 w-10 md:h-8 md:w-8 [&_svg]:size-5 md:[&_svg]:size-4" onClick={handleCancelRename}>
-                                      <X className="h-4 w-4" />
+                                    <Button size="icon" variant="ghost" aria-label="편집 취소" className="h-10 w-10 md:h-8 md:w-8 [&_svg]:size-5 md:[&_svg]:size-4" onClick={handleCancelRename}>
+                                      <X className="h-4 w-4" aria-hidden="true" />
                                     </Button>
                                   </div>
                                 ) : (
@@ -471,23 +472,25 @@ export function BudgetTableMobile({
                                         <Button
                                           size="icon"
                                           variant="ghost"
+                                          aria-label={`${displayName} 수정`}
                                           className="h-10 w-10 md:h-7 md:w-7 [&_svg]:size-5 md:[&_svg]:size-4"
                                           onClick={() => handleStartRename(item.id, displayName)}
                                         >
-                                          <Pencil className="h-3.5 w-3.5" />
+                                          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                                         </Button>
                                       )}
                                       {onDeleteItem && (
                                         <Button
                                           size="icon"
                                           variant="ghost"
+                                          aria-label={`${displayName} 삭제`}
                                           className="h-10 w-10 md:h-7 md:w-7 [&_svg]:size-5 md:[&_svg]:size-4 text-destructive"
                                           onClick={() => {
                                             setItemToDelete({ id: item.id, name: displayName });
                                             setDeleteDialogOpen(true);
                                           }}
                                         >
-                                          <Trash2 className="h-3.5 w-3.5" />
+                                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                                         </Button>
                                       )}
                                     </div>

@@ -237,8 +237,9 @@ export default function Auth() {
           size="icon"
           onClick={() => navigate('/')}
           className="rounded-full"
+          aria-label="홈으로 돌아가기" /* [CL-BTNAUDIT3-20260704 | 뒤로 접근명] */
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Button>
       </header>
 

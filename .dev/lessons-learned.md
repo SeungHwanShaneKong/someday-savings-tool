@@ -7,6 +7,13 @@
 
 ## 최신
 
+### [CL-VULN-R10-20260704] prove-first를 git stash로 기계 입증 + jsdom location.href 개별 재정의 불가 + KST 프레임 전 모듈 통일
+- **발생원인**: 5렌즈 적대 감사(보안·안정성·성능·에러·엣지)로 확정 6건(10주장 중, 거짓양성 4·보안 0 — 정직 미달 보고)을 근본수정. 사용자 요구 "재현 테스트로 먼저 입증(FAIL) → 수정(PASS)"을 기계적으로 증명해야 함.
+- **기술내용/해결책 3가지**:
+  1. **prove-first stash 전략**: 소스수정(tracked)만 `git stash push -- <files>` 로 격리하고 신규 테스트(untracked)는 남긴 채 실행 → 버그 코드에서 FAIL(입증) → `git stash pop` 복원 후 PASS. 파일배타분할 병렬수정과 결합하면 "수정 없이는 실패, 수정하면 통과"를 6건 일괄 기계 증명. (신규 테스트는 반드시 별도 파일 — stash가 untracked를 안 건드림.)
+  2. **jsdom location.href 개별 재정의 금지**: `Object.defineProperty(window.location, 'href', ...)` 는 `Cannot redefine property: href` 로 실패(설정단계 에러가 assertion 전에 터져 prove-first가 무효화됨). 해법=`window.location` 을 통째로 교체(`Object.defineProperty(window, 'location', { value: mockLocation })`, href는 mockLocation의 accessor로) — kakao-browser.intent.test 관례. href 대입을 흡수하는 딥링크/네비 테스트는 이 패턴 필수.
+  3. **KST 달력일 프레임 전 모듈 통일**: [[CL-TESTFLAKY-KST]]·[CL-AUDIT-DUEDATE-UTC] 에 이어 getUrgencyLevel 도 로컬 인스턴트(new Date()) vs UTC자정(new Date('YYYY-MM-DD')) 혼용 → KST 마감 당일 오전9시부터 overdue 오표시. 날짜 비교는 원시 타임스탬프 차가 아니라 `daysBetween(toKSTDateString(), dueDate.slice(0,10))` 처럼 KST 달력일 정수 비교로. 규칙: **모든 날짜 경계 판정은 저장(UTC 달력일)·표시(KST 달력일) 프레임을 명시 통일**, 인스턴트 diff 금지.
+
 ### [CL-BTNAUDIT3-20260704] 감사→적대검증→파일배타분할 병렬수정→중앙오라클→독립검증 파이프라인 + 병렬편집 IDE진단은 과도상태
 - **발생원인**: 3차 전 버튼 감사(7차원 병렬 적대). 11개 파일그룹을 배타 분할해 병렬 근본수정 직후, 하니스 IDE 진단이 다수 `unused import/var`(AsyncButton·useAsyncAction·useNoticeSlot·useRef 등)과 `useCollaboration.ts:196 Promise<void>≠Promise<boolean>` 타입에러를 보고 → "미완결 배선(import만 추가·JSX 미연결)" 의심.
 - **기술내용**: 진단은 **병렬 편집이 아직 파일에 전부 반영되기 전의 과도상태 스냅샷**이었다. 권위 오라클 `tsc -b --noEmit`(EXIT 0)·`git diff`(실제 `<AsyncButton onClick={handleCopyToCoedit}>` 등 배선 확인)로 대조하니 전부 정상 배선. 유일 실제 잔재는 신규 테스트의 미사용 import 1건(`within`)뿐. eslint 베이스라인은 선재 97 errors(feature_requests `(supabase as any)` 등 — 릴리스 게이트 아님, 오라클=tsc/vitest/build).

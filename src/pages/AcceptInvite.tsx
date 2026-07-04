@@ -86,8 +86,23 @@ export default function AcceptInvite() {
         openInExternalBrowserWithFallback(window.location.href, () => setShowBridge(true));
         return; // 탈출 중 — 'checking' 유지. 자동 탈출 실패 시 브릿지 UI 노출.
       }
-      void signInWithGoogle();
-      return; // 이동 중 — 'checking' 유지
+      // [CL-VULN-R10-20260704 | 핵심] signInWithGoogle 은 throw 가 아니라 {error} 를 resolve.
+      //   기존 void 호출은 반환 error 를 버려 OAuth 개시 실패(리다이렉트 미발생) 시 phase='checking'
+      //   에 영구 고착(ranRef=true 라 재실행도 안 됨). Auth.tsx(87-94)처럼 error 검사 → 에러 UI 전환.
+      //   개시 자체가 reject(throw)하는 경우까지 try/catch 로 감싸 고착을 완전 차단(멱등 안전).
+      void (async () => {
+        try {
+          const result = await signInWithGoogle();
+          if (result?.error) {
+            setErrorMsg('로그인을 시작하지 못했어요. 잠시 후 다시 시도해주세요.');
+            setPhase('error');
+          }
+        } catch {
+          setErrorMsg('로그인을 시작하지 못했어요. 잠시 후 다시 시도해주세요.');
+          setPhase('error');
+        }
+      })();
+      return; // 이동 중 — 'checking' 유지(성공 시 OAuth 리다이렉트)
     }
 
     // 로그인됨 → 수락

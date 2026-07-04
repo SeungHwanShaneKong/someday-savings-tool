@@ -78,11 +78,16 @@ export function useAsyncAction<TArgs = void, TRes = void>(
     const o = optsRef.current;
     try {
       const call = fnRef.current(args);
+      // [CL-VULN-R10-20260704 | 핵심] 타이머 핸들을 잡아 정상/에러 어느 경로든 해제 — call 이 먼저
+      //   resolve 해도 dangling setTimeout(최대 timeoutMs·60초)이 매 run 누적되던 자원 누수/비결정성 근본수정.
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const res = o.timeoutMs
         ? await Promise.race([
             call,
-            new Promise<never>((_, rej) => setTimeout(() => rej(new TimeoutError()), o.timeoutMs)),
-          ])
+            new Promise<never>((_, rej) => {
+              timeoutHandle = setTimeout(() => rej(new TimeoutError()), o.timeoutMs);
+            }),
+          ]).finally(() => { if (timeoutHandle) clearTimeout(timeoutHandle); })
         : await call;
       if (mountedRef.current) {
         setState('success');

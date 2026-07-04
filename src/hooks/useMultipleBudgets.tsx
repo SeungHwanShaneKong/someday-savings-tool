@@ -275,10 +275,18 @@ export function useMultipleBudgets() {
         });
       });
 
-      const { data: insertedItems } = await supabase
+      // [CL-VULN-R10-20260704 | 핵심] 항목 시드 insert 의 error 미검사 → 실패해도 무음 진행하던 결함 근본수정.
+      //  형제 copyBudget 과 계약 통일: error 구조분해 후 throw → catch 의 '예산 생성 중 오류' 토스트로 승격(무음 아님).
+      //  추가 강화: 시드 실패 시 방금 만든 budgets 행을 보상 삭제해 좀비 빈 예산(텅 빈 온보딩 화면) 잔존을 차단.
+      const { data: insertedItems, error: insertError } = await supabase
         .from('budget_items')
         .insert(initialItems)
         .select();
+
+      if (insertError) {
+        await supabase.from('budgets').delete().eq('id', newBudget.id);
+        throw insertError;
+      }
 
       // [CL-COEDIT-OPTADD-20260621] isShared 즉시 주입 → 생성 직후 올바른 탭(개인/우리)에 표시(refetch 전 누수 0)
       setBudgets(prev => [...prev, { ...newBudget, isShared: shared }]);

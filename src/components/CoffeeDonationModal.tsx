@@ -8,7 +8,7 @@
  * - Minimal friction: preset → CTA in 2 taps
  * - Safe area aware positioning for notch devices
  */
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,17 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
   const [isTransferring, setIsTransferring] = useState(false);
   const isMobile = useIsMobile();
   const transferTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  // [CL-VULN-R10-20260704 | 핵심] visibilitychange 리스너 참조 보관 — 등록/해제 대칭 결속으로 orphan 리스너 누적 방지
+  const visibilityHandlerRef = useRef<(() => void) | null>(null);
+
+  // [CL-VULN-R10-20260704 | 핵심] 송금 시도 정리함수 — 타이머 + visibilitychange 리스너를 한 번에 대칭 해제
+  const clearTransfer = useCallback(() => {
+    clearTimeout(transferTimeoutRef.current);
+    if (visibilityHandlerRef.current) {
+      document.removeEventListener('visibilitychange', visibilityHandlerRef.current);
+      visibilityHandlerRef.current = null;
+    }
+  }, []);
 
   const finalAmount = isCustom ? (parseInt(customAmount) || 0) : (selectedAmount || 0);
 
@@ -70,6 +81,8 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
 
   const handleTossTransfer = useCallback(() => {
     if (isTransferring || finalAmount <= 0) return;
+    // [CL-VULN-R10-20260704 | 핵심] 새 시도 전 이전 타이머·리스너를 먼저 정리(재클릭 시 중복 등록 방지)
+    clearTransfer();
     setIsTransferring(true);
     window.location.href = buildTossLink(finalAmount);
 
@@ -82,15 +95,16 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
       setIsTransferring(false);
     }, 2000);
 
+    // [CL-VULN-R10-20260704 | 핵심] 리스너를 ref에 보관 → clearTransfer 로 대칭 해제. visible 복귀 시에도 clearTransfer 사용
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        clearTimeout(transferTimeoutRef.current);
+        clearTransfer();
         setIsTransferring(false);
-        document.removeEventListener('visibilitychange', handleVisibility);
       }
     };
+    visibilityHandlerRef.current = handleVisibility;
     document.addEventListener('visibilitychange', handleVisibility);
-  }, [finalAmount, isTransferring, handleCopyAccount]);
+  }, [finalAmount, isTransferring, handleCopyAccount, clearTransfer]);
 
   const handleKakaoBank = useCallback(() => {
     if (isTransferring) return;
@@ -104,10 +118,14 @@ export function CoffeeDonationModal({ open, onOpenChange }: CoffeeDonationModalP
     if (!v) {
       setCopied(false);
       setIsTransferring(false);
-      clearTimeout(transferTimeoutRef.current);
+      // [CL-VULN-R10-20260704 | 핵심] 모달 닫기 시 타이머+visibilitychange 리스너 대칭 정리(orphan 방지)
+      clearTransfer();
     }
     onOpenChange(v);
   };
+
+  // [CL-VULN-R10-20260704 | 핵심] 언마운트 cleanup — 딥링크 무반응/재클릭으로 남은 리스너를 마지막 안전망으로 해제
+  useEffect(() => () => clearTransfer(), [clearTransfer]);
 
   const handlePresetClick = (amount: number) => {
     setSelectedAmount(amount);

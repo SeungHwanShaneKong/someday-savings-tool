@@ -3,6 +3,9 @@
  * BRD §2.2: 손실 회피, 사회적 증거, 게이미피케이션
  */
 
+// [CL-VULN-R10-20260704 | 핵심] KST 달력일 정수 비교로 긴급도 프레임 통일
+import { toKSTDateString, daysBetween } from '@/lib/gamification/streak-calc';
+
 // ─── 넛지 메시지 (손실 회피 + 사회적 증거) ───
 
 export interface NudgeMessage {
@@ -175,9 +178,10 @@ export function getUrgencyLevel(
   if (isCompleted) return 'done';
   if (!dueDate) return 'normal';
 
-  const today = new Date();
-  const due = new Date(dueDate);
-  const diffDays = (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+  // [CL-VULN-R10-20260704 | 핵심] 로컬 인스턴트 vs UTC자정 인스턴트 원시 뺄셈 프레임 혼용 제거.
+  // calculateDueDate(UTC 달력일)·getDdayPreview(로컬 달력일)와 프레임 통일 → KST 달력일 정수 차.
+  // daysBetween(a,b)=b-a(양수=b 더 최근). 당일=0→urgent, 어제이하<0→overdue 의미 보존.
+  const diffDays = daysBetween(toKSTDateString(), dueDate.slice(0, 10));
 
   if (diffDays < 0) return 'overdue';
   if (diffDays <= 7) return 'urgent';

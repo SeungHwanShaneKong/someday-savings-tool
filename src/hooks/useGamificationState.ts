@@ -152,6 +152,22 @@ export function useGamificationState() {
       if (error) throw error;
       return next;
     },
+    // [CL-VULN-R10-20260704 | 핵심] 형제 mutation(line 78-119)과 동일한 낙관적 롤백 계약.
+    //  mutationFn 이 line 147 에서 setQueryData(next) 로 캐시를 '선기록'한 뒤 DB update 하므로,
+    //  update 실패(throw) 시 onMutate 스냅샷을 onError 가 복원하지 않으면 인플레된 포인트/레벨/배지가
+    //  재조회(invalidate)까지 잔존(오프라인이면 refetch 도 실패 → 영구 노출)한다.
+    //  onMutate 로 직전 캐시를 스냅샷 → onError 로 복원 → onSettled invalidate 로 서버 진실 재동기화.
+    onMutate: async () => {
+      if (!userId) return;
+      await qc.cancelQueries({ queryKey: ['gamificationState', userId] });
+      const prev = qc.getQueryData<GamificationState>(['gamificationState', userId]);
+      return { prev };
+    },
+    onError: (_err, _w, ctx) => {
+      if (userId && ctx?.prev) {
+        qc.setQueryData(['gamificationState', userId], ctx.prev);
+      }
+    },
     onSettled: () => {
       if (userId) qc.invalidateQueries({ queryKey: ['gamificationState', userId] });
     },

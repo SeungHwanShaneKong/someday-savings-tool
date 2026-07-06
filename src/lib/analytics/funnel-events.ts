@@ -31,7 +31,13 @@ export type FunnelEvent =
   //   (정적 SPA 에 전용 '가입 성공' 훅이 없어 관측 가능한 최선점. 드물게 '가입 후 입력 0 인
   //   기존 계정의 재방문'이 포함될 수 있음 — 수용된 오차, 세션 중복은 once 가드가 차단).
   | 'wizard_enter'                // 첫 예산 위저드 첫 노출(open 전이 시점·세션 1회)
-  | 'wizard_apply';               // 위저드 프리필 적용 (params.template/guests/style)
+  | 'wizard_apply'                // 위저드 프리필 적용 (params.template/guests/style)
+  // [CL-PWA-A2HS-20260706-202410] 홈 화면/바탕화면 바로가기(PWA 설치) 퍼널
+  | 'pwa_install_cta_click'       // 설치 버튼 클릭 (params.placement: header|footer|hero|fab|banner, params.platform)
+  | 'pwa_install_accepted'        // 네이티브 프롬프트 수락 (params.placement)
+  | 'pwa_install_dismissed'       // 네이티브 프롬프트 거절 (params.placement)
+  | 'pwa_install_guide_shown'     // 수동 안내 모달 노출 (params.platform)
+  | 'pwa_install_shortcut_download'; // 바탕화면 바로가기 파일 다운로드 (params.os)
 
 type FunnelParams = Record<string, string | number | boolean>;
 

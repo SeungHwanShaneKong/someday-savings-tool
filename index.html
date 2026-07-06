@@ -51,6 +51,11 @@
     <!-- [CL-TOP20-P5-PWA-20260703-053000] iOS 홈 화면 아이콘 — 106x81 favicon 대신 정방형 192 사용 -->
     <link rel="apple-touch-icon" href="/pwa-icon-192.png">
     <link rel="manifest" href="/manifest.webmanifest">
+    <!-- [CL-PWA-A2HS-20260706-202740] iOS standalone(홈 화면 추가) 신뢰도 — 앱 모드·상태바·앱 타이틀 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="웨딩셈">
 
     <!-- [CL-TOP20-P2-THEME-20260703-023500] 다크모드 FOUC 방지 — next-themes(storageKey 'theme') 하이드레이션 전
          선적용. 프리렌더 HTML 은 라이트 고정이므로 다크 사용자 첫 페인트 플래시를 이 블로킹 스니펫이 차단. -->

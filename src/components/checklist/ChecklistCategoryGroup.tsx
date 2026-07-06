@@ -114,7 +114,8 @@ export function ChecklistCategoryGroup({
               />
               <span
                 className={cn(
-                  'text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-full',
+                  // [CL-READ-UX-20260706-211350] 카운트는 어떤 폭에서도 세로로 안 찢어지게 nowrap 고정
+                  'text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap',
                   allDone
                     ? 'bg-green-100 text-green-700'
                     : completed > 0

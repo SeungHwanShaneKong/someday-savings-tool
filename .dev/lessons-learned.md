@@ -7,6 +7,28 @@
 
 ## 최신
 
+### [CL-SCROLLTOP+WWWCERT-20260706] SPA 라우트 변경 스크롤 복원 부재 + GitHub Pages 인증서 API catch-22 + deploy-pages 일시실패
+- **발생원인**: ①관련글(`/guide/:slug`) 클릭 시 새 글이 하단부터 보임(가독성↓). ②`www.moderninsightspot.com` CERT_COMMON_NAME_INVALID.
+- **기술내용/해결책**:
+  1. **SPA 동일라우트 파라미터 변경은 스크롤 리셋 안 됨**: `/guide/A`→`/guide/B`는 Article 언마운트 없이 param만 갱신 → 뷰포트가 이전 위치 유지. 앱 전역 스크롤 복원이 아예 없었음. 해결=전역 `ScrollToTop`(`useLocation`+`useNavigationType`): PUSH/REPLACE→`window.scrollTo(0,0)` instant, **POP은 브라우저 복원 위임(뒤로가기 위치 보존)**, **해시(#앵커)는 요소 scrollIntoView**. `<BrowserRouter>`(비 데이터라우터)라 v6 `<ScrollRestoration>` 미가용 → 커스텀. 오라클=픽셀(preview scrollY===0) + RTL(scrollTo 스파이·MemoryRouter 초기=POP 특성).
+  2. **GitHub Pages 인증서 stuck의 API catch-22**: 커스텀도메인 인증서가 `state:"new"`로 정체(www가 SAN 미포함 폴백 `*.github.io` 서빙) → `gh api PUT …/pages` 로 재기동 시도 시 **`-F https_enforced=false`/`build_type` 동반이면 `404 "certificate has not yet been issued"` 거부**(cname-only PUT만 통과·상태 리셋엔 무력). **API로 인증서 발급 강제 불가** → **대시보드 UI 제거→재등록**(CNAME 파일 처리 포함)이 유일 신뢰 경로(사용자 실행). `domains`에 www 이미 포함되면 **별도 www-redirect repo는 불필요**(400 거부·오처방). 진단 오라클=`gh api …/pages --jq .https_certificate.{state,domains}` + `openssl … subjectAltName`. apex 무중단 게이트(remove 후 curl 200 확인·재등록 항상 마지막)로 프로덕션 보호.
+  3. **deploy-pages "Deployment failed, try again later"는 대개 일시적**: build 성공·deploy 스텝만 실패면 GitHub 측 hiccup → `gh run rerun <id> --failed`로 재실행 시 성공(영구고장 오인 금지). 라이브는 마지막 성공분 계속 서빙.
+
+### [CL-READ-UX-20260706] 좁은 화면 겹침/과다줄바꿈 = flex 자식 min-w-0 부재 + 무제한 배지 + 배지 텍스트 노드 계약
+- **발생원인**: 좁은 폰에서 예산표 카테고리명이 음절 중간 3줄 과다줄바꿈+"(N개)" 세로분리, 파트너 편집배지("공찌곰돌맹쿠 변경")가 항목명과 겹침. 원인 3층: ①`justify-between` 좌우 그룹에 `min-w-0` 없어 이름이 안 줄고 밀림 ②이름 옆 `flex-shrink-0` 배지 + `getEditorLabel` 닉네임 **길이 무제한** → 배지가 이름 공간 잠식 ③CJK 기본 `word-break:normal`이 음절 아무데서나 끊음.
+- **기술내용/해결책 3가지**:
+  1. **flex 자식 truncate/줄바꿈은 min-w-0 없이는 무효**: flex 아이템 기본 `min-width:auto`라 콘텐츠폭 아래로 안 줄어듦 → 이름 span·좌측 그룹에 `min-w-0`(+`flex-1`) 부여해야 truncate/break-keep 발동. 카운트·총액 같은 "안 깨져야 할 것"은 `whitespace-nowrap flex-shrink-0`. 한국어 줄바꿈은 `break-keep`(word-break:keep-all)로 단어 경계만 끊어 최대 2줄 유지(전체 이름 보존).
+  2. **경쟁 요소는 2줄로 분리하면 겹침이 구조적으로 불가능**: 이름과 가변폭 배지를 같은 flex 행에 두지 말고 `flex-col`(줄1 이름 truncate / 줄2 배지 형제)로 스택 → 수평 경쟁 자체가 사라짐. 무제한 텍스트(닉네임)는 추가로 `capNickname`(8자+…) 하드캡.
+  3. **공유 배지 추출 시 getByText 텍스트 노드 계약 보존**: dom-testing-library `getNodeText`는 **직계 텍스트 노드만** 이어붙임(자식 엘리먼트 텍스트 제외). 닉네임을 중첩 `<span>`으로 감싸면 `getByText('지윤 변경')`이 깨진다. 캡은 JS(`${capNickname(nick)} 변경` 단일 문자열)로 하고 부수정보(상대시간)만 중첩 span에. → 데스크톱 기존 테스트 50건 무회귀.
+  4. **CSS-레이아웃 수정의 오라클은 픽셀이 아니라 구조 단언**: jsdom은 레이아웃 계산 0이라 스크린샷 불가·뷰포트 의존 컴포넌트(BudgetTableMobile은 /demo가 BudgetTable 직접사용이라 preview로 못 봄)는 `nameSpan.parentElement.contains(badge)===false`처럼 **DOM 부모 분리를 단언**해 "겹침 불가능성"을 결정론적으로 입증. 실기기 육안은 보조.
+
+### [CL-PWA-A2HS-20260706] "바탕화면 바로가기"의 유일한 웹표준 = PWA 설치 + 전역 렌더 유틸은 try/catch로 소비자 모킹/예외에 degrade + FAB 3중 충돌 조율
+- **발생원인**: "모든 폰·PC(맥북)·태블릿 바탕화면/홈 화면에 웨딩셈 바로가기를 얹는 버튼". 순수 웹은 샌드박스로 사용자 바탕화면에 파일 직접생성 불가 → 오해 소지. 또 신규 코어(useInstallResolution)를 Footer/Header/Landing에 꽂자 **6개 페이지 테스트(kakao-browser 부분모킹)가 렌더 시 `No "isInAppBrowser" export` throw** → 전체 스위트 14 fail.
+- **기술내용/해결책 3가지**:
+  1. **바로가기=PWA 설치가 유일 표준경로**: Windows Chrome/Edge 설치 → **바탕화면 바로가기+시작메뉴** 생성 / macOS Safari 17+ "Dock에 추가" / 폰 "홈 화면에 추가". `beforeinstallprompt`(installable)면 원터치, 아니면 플랫폼별 안내 모달, 설치불가 데스크톱(Firefox·구Safari)은 **`.url`/`.webloc` 다운로드 폴백**(URL=SITE_ORIGIN 고정)으로 "모든 PC" 완결. 감지는 순수함수 `resolveInstallPlatform`(우선순위 installable→in-app→ios→macos-safari→firefox→unsupported)로 격리해 UA 매트릭스 12행 결정성 테스트.
+  2. **전역에 꽂는 렌더 유틸의 의존 호출은 try/catch 방어**: `useInstallResolution` 이 `isInAppBrowser()` 를 try/catch로 감싸 "인앱 아님" degrade. 이건 테스트 마스킹 꼼수가 아니라 **정당한 프로덕션 방어**(브라우저 감지 유틸이 어디서 throw해도 설치 버튼이 전 페이지를 크래시시키면 안 됨). 부분모킹 6파일을 개별 수정하는 것보다 근본적·미래안전(다음 페이지 테스트가 또 부분모킹해도 안 깨짐). 규칙: **다수 표면에 마운트되는 공용 컴포넌트가 외부 감지/파싱 유틸을 호출하면 방어적으로 감싸라.**
+  3. **다중 플로팅(FAB) 충돌 조율**: 실측 충돌지도 먼저 그려라 — ChatFab(좌하단 z-40·로그인) / CoffeeFab(우하단 z-50·**/budget 한정** BudgetFlow 마운트) / InstallPrompt 배너(하단전폭·모바일). 신규 InstallFab=우하단 z-40, **/budget만 CoffeeFab 위 스택**(bottom-24), `/`·`/auth` 숨김, 배너와 **시간배타**(`bannerWillShow = isMobile && !suppressed && (canOneTap||ios)`). 억제 상태는 `useSyncExternalStore` pub/sub(`useInstallPromptSuppressed`)로 반응형 → 배너 닫힘 즉시 FAB 등장. 검증: 1570 green(신규38·회귀0)·tsc0·독립검증 GO·확정결함0.
+
 ### [CL-VULN-R10-20260704] prove-first를 git stash로 기계 입증 + jsdom location.href 개별 재정의 불가 + KST 프레임 전 모듈 통일
 - **발생원인**: 5렌즈 적대 감사(보안·안정성·성능·에러·엣지)로 확정 6건(10주장 중, 거짓양성 4·보안 0 — 정직 미달 보고)을 근본수정. 사용자 요구 "재현 테스트로 먼저 입증(FAIL) → 수정(PASS)"을 기계적으로 증명해야 함.
 - **기술내용/해결책 3가지**:

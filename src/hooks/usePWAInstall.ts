@@ -108,6 +108,7 @@ export function usePWAInstall() {
 export function _resetPWAInstallStateForTests() {
   deferredEvent = null;
   installed = false;
+  suppressedCache = null; // [CL-AUDIT-PWA-PERF-20260706-222500] 억제 캐시도 초기화(테스트 격리)
   emit();
 }
 
@@ -130,6 +131,30 @@ export function isInstallPromptSuppressed(now: number = Date.now()): boolean {
   }
 }
 
+// ── 억제 상태 반응형 구독 ([CL-PWA-A2HS-20260706-202540]) ──
+// InstallPrompt(배너)가 닫히면 InstallFab(전역 플로팅)가 즉시 등장하도록, 억제 상태 변경을 구독 가능하게 한다.
+const suppressionListeners = new Set<() => void>();
+
+// [CL-AUDIT-PWA-PERF-20260706-222500] getSnapshot 캐시 — useSyncExternalStore 는 tearing 검출을 위해
+//   렌더마다 getSnapshot 을 호출하므로, 매번 localStorage 를 동기 조회하면 순수 낭비다(억제 상태는
+//   rememberInstallPromptDismissed 시점에만 변함). 값을 모듈 캐시에 보관하고 변경 시에만 재조회한다.
+let suppressedCache: boolean | null = null;
+/** 캐시된 억제 여부 반환(최초 1회만 localStorage 조회). useSyncExternalStore getSnapshot 용. */
+function getSuppressedSnapshot(): boolean {
+  if (suppressedCache === null) suppressedCache = isInstallPromptSuppressed();
+  return suppressedCache;
+}
+function emitSuppressionChange() {
+  suppressedCache = isInstallPromptSuppressed(); // 변경 시점에만 재조회 → 이후 getSnapshot 은 캐시 반환
+  suppressionListeners.forEach((l) => l());
+}
+function subscribeSuppression(onChange: () => void) {
+  suppressionListeners.add(onChange);
+  return () => {
+    suppressionListeners.delete(onChange);
+  };
+}
+
 /** 닫기 시각 기록 — 프라이빗 모드 등 저장 불가 시 조용히 무시(세션 내 상태로만 억제) */
 export function rememberInstallPromptDismissed() {
   try {
@@ -137,4 +162,11 @@ export function rememberInstallPromptDismissed() {
   } catch {
     // no-op
   }
+  // 저장 성공/실패와 무관하게 구독자 재평가 트리거(배너→FAB 전환).
+  emitSuppressionChange();
+}
+
+/** 억제 여부를 반응형으로 반환 — 배너 닫힘 시 재렌더(전역 플로팅 버튼 조율용). getSnapshot 은 캐시 반환. */
+export function useInstallPromptSuppressed(): boolean {
+  return useSyncExternalStore(subscribeSuppression, getSuppressedSnapshot, () => false);
 }

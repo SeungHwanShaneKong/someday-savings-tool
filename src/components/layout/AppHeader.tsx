@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { WeddingMark } from "@/components/landing/WeddingMark";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+// [CL-PWA-A2HS-20260706-202620] 홈 화면 바로가기 버튼(헤더 표면)
+import { InstallAppButton } from "@/components/install/InstallAppButton";
 
 /**
  * 전역 헤더를 표시하는 라우트 허용 목록.
@@ -72,6 +74,8 @@ export function AppHeader() {
 
         {/* [우] 테마 토글 + 로그인 상태별 액션 */}
         <nav aria-label="전역 메뉴" className="flex items-center gap-1.5">
+          {/* [CL-PWA-A2HS-20260706-202620] 홈 화면 바로가기 — standalone/설치본에서는 자체 gating 으로 자동 숨김 */}
+          <InstallAppButton placement="header" />
           <ThemeToggle />
           {/* 인증 판별 전(loading)에는 액션을 비워 잘못된 상태 플래시를 방지 */}
           {!loading &&

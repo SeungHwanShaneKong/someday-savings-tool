@@ -48,6 +48,7 @@ import { LandingBudgetSimulator } from '@/components/landing/LandingBudgetSimula
 import { ChatPreview } from '@/components/landing/ChatPreview';
 import TrustSection from '@/components/landing/TrustSection';
 import { trackFunnel } from '@/lib/analytics/funnel-events';
+import { InstallAppButton } from '@/components/install/InstallAppButton'; // [CL-PWA-A2HS-20260706-202700] 히어로 설치 CTA
 
 /* ─── Feature Data ─── */
 interface Feature {
@@ -569,6 +570,9 @@ export default function Landing() {
               이미 계정이 있으신가요?
             </button>
           )}
+
+          {/* [CL-PWA-A2HS-20260706-202700] 홈 화면 바로가기 CTA — 전 사용자 노출·설치본에서는 자체 gating 으로 숨김 */}
+          <InstallAppButton placement="hero" />
         </div>
 
         {/* ─── [CL-TOP20-P1-LANDING-20260703-014500] AI 챗 미리보기 (Top20 #1 일부) — 비로그인 전용(로그인은 실챗 사용) ─── */}

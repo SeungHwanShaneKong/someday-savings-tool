@@ -11,6 +11,10 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AppHeader } from "@/components/layout/AppHeader";
 // [CL-TOP20-P5-PWA-20260703-053000] PWA 설치 배너(Top20 #19) — beforeinstallprompt 캡처·30일 억제
 import { InstallPrompt } from "@/components/InstallPrompt";
+// [CL-PWA-A2HS-20260706-202600] 전역 플로팅 "홈 화면에 추가" 버튼(모든 페이지 상시 접근)
+import { InstallFab } from "@/components/install/InstallFab";
+// [CL-SCROLLTOP-20260706-220936] 라우트 변경 시 상단 스크롤 복원(관련글 클릭 즉시 이동)
+import { ScrollToTop } from "@/components/ScrollToTop";
 // [CL-MODAL-COORD-20260703-140000] Radix 모달 잠금 미정리(페이지 클릭 불가) 자가 치유 가드
 import { PointerEventsGuard } from "@/components/PointerEventsGuard";
 import { usePageTracking } from "@/hooks/usePageTracking";
@@ -85,6 +89,8 @@ function AppRoutes() {
 
   return (
     <>
+      {/* [CL-SCROLLTOP-20260706-220936] 라우트 변경 시 상단 복원 — Router 내부·Routes 위 (useLocation/useNavigationType) */}
+      <ScrollToTop />
       <MobileDesktopNotice />
       <UpdateNotice />
       <OnboardingCarousel />
@@ -128,6 +134,8 @@ function AppRoutes() {
       {/* Global Q&A FAB — visible on all pages except /, /auth, /chat */}
       <ChatFab onClick={() => setChatOpen(true)} />
       <ChatDrawer open={chatOpen} onOpenChange={setChatOpen} />
+      {/* [CL-PWA-A2HS-20260706-202600] 전역 "홈 화면에 추가" 플로팅 버튼 — Router 내부(useLocation)·표면/배너 자체 gating */}
+      <InstallFab />
     </>
   );
 }

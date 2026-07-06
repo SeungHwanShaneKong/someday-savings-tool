@@ -29,5 +29,25 @@
       "type": "image/png",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "예산 시뮬레이터",
+      "short_name": "예산",
+      "description": "항목별 결혼 비용 관리",
+      "url": "/budget"
+    },
+    {
+      "name": "D-day 체크리스트",
+      "short_name": "체크리스트",
+      "description": "결혼 준비 체크리스트",
+      "url": "/checklist"
+    },
+    {
+      "name": "AI 웨딩 챗봇",
+      "short_name": "AI 챗",
+      "description": "결혼 준비 AI 질문",
+      "url": "/chat"
+    }
   ]
 }

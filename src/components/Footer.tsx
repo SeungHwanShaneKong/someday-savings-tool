@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FeatureRequestButton } from '@/components/FeatureRequestButton';
 import { EXTERNAL_URLS } from '@/lib/external-links'; // [CL-HONEYMOON-EXTERNAL-20260416-221500]
+import { InstallAppButton } from '@/components/install/InstallAppButton'; // [CL-PWA-A2HS-20260706-202640] 전 페이지 공통 앵커
 
 export default function Footer() {
   return (
@@ -76,6 +77,10 @@ export default function Footer() {
                 {/* [CL-IMPROVE-7TASKS-20260330] 의견 수집 */}
                 <li>
                   <FeatureRequestButton />
+                </li>
+                {/* [CL-PWA-A2HS-20260706-202640] 홈 화면 바로가기(전 페이지 공통 앵커·설치본 자동 숨김) */}
+                <li>
+                  <InstallAppButton placement="footer" />
                 </li>
               </ul>
             </nav>

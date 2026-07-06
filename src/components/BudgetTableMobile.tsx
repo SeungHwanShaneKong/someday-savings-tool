@@ -21,7 +21,7 @@ import { useCategoryOrder } from '@/hooks/useCategoryOrder';
 import { ExtendedBudgetItem, CostSplitType, COST_SPLIT_OPTIONS } from './BudgetTable';
 import { AverageCostTooltip } from './AverageCostTooltip';
 import { hasAverageCost, getAverageCost } from '@/lib/average-costs';
-import { getEditorLabel } from '@/lib/collab/editor-label'; // [CL-EDITLABEL-20260626] 최근 편집자(나/파트너) 라벨
+import { EditorChangeBadge } from '@/components/collaboration/EditorChangeBadge'; // [CL-READ-UX-20260706-211330] 공유 편집자 배지(닉네임 캡·2줄 스택)
 import { SmartWonInput } from './budget/SmartWonInput'; // [CL-TOP20-P3-INPUT-20260703-030000] 스마트 금액 입력(만/억·힌트·평균 1탭)
 import { HiddenCostTrigger } from './budget/HiddenCostTrigger'; // [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 배선
 import { countCategoryHiddenCosts } from '@/lib/hidden-cost-map'; // [CL-TOP20-P3-HIDDEN-20260703-030000]
@@ -345,10 +345,11 @@ export function BudgetTableMobile({
                         onClick={() => toggleCategory(category.id)}
                         className="flex-1 flex items-center justify-between"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{category.icon}</span>
-                          <span className="font-semibold text-sm">{category.name}</span>
-                          <span className="text-xs text-muted-foreground">
+                        {/* [CL-READ-UX-20260706-211340] min-w-0 flex-1: 이름이 break-keep 로 음절 안 깨고 최대 2줄 줄바꿈·"(N개)"는 nowrap 고정 */}
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-xl flex-shrink-0">{category.icon}</span>
+                          <span className="font-semibold text-sm break-keep min-w-0">{category.name}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
                             ({categoryItems.length}개)
                           </span>
                           {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 집계 배지(N>0 시만) */}
@@ -372,8 +373,8 @@ export function BudgetTableMobile({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-primary text-sm">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="font-bold text-primary text-sm whitespace-nowrap">
                             ₩{categoryTotal.toLocaleString()}
                           </span>
                           {isExpanded ? (
@@ -397,12 +398,12 @@ export function BudgetTableMobile({
                           
                           return (
                             <div key={item.id} className={cn("p-3 space-y-2", changedItemIds?.has(item.id) && "partner-changed-row")}>
-                              {/* Row 1: Checkbox + Item Name + Actions */}
-                              <div className="flex items-center gap-2">
+                              {/* Row 1: Checkbox + Item Name + Actions — [CL-READ-UX-20260706-211330] items-start(이름 2줄 대응·체크박스는 줄1 정렬) */}
+                              <div className="flex items-start gap-2">
                                 <Checkbox
                                   checked={item.is_paid || false}
                                   onCheckedChange={() => onTogglePaid(item.id)}
-                                  className="data-[state=checked]:bg-success data-[state=checked]:border-success h-5 w-5 flex-shrink-0"
+                                  className="mt-0.5 data-[state=checked]:bg-success data-[state=checked]:border-success h-5 w-5 flex-shrink-0"
                                 />
                                 
                                 {isRenamingThis ? (
@@ -429,40 +430,38 @@ export function BudgetTableMobile({
                                   </div>
                                 ) : (
                                   <>
-                                    <div className={cn(
-                                      "flex items-center gap-1 flex-1 min-w-0",
-                                      item.is_paid && "line-through text-muted-foreground"
-                                    )}>
-                                      <span className="text-sm truncate">{displayName}</span>
-                                      {/* [CL-VULN-R6C-A11Y-20260625] 파트너 변경 비색상 단서(색맹/SR 가시, WCAG 1.4.1) */}
-                                      {/* [CL-EDITLABEL-20260626] 단일 슬롯 상호배타: 변경분=amber 편집자명 승격, 그 외=정적 "최근:" 배지 */}
-                                      {changedItemIds?.has(item.id) ? (
-                                        <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap flex-shrink-0">
-                                          <Sparkles className="w-2.5 h-2.5 flex-shrink-0" aria-hidden />
-                                          {partnerName?.trim() ? `${partnerName.trim()} 변경` : '파트너 변경'}
-                                        </span>
-                                      ) : showEditorLabels && getEditorLabel(item.last_edited_by, myUserId, partnerName) ? (
-                                        <span
-                                          className="inline-flex items-center text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0"
-                                          aria-label={`최근 편집: ${getEditorLabel(item.last_edited_by, myUserId, partnerName)}`}
-                                        >
-                                          최근: {getEditorLabel(item.last_edited_by, myUserId, partnerName)}
-                                        </span>
-                                      ) : null}
-                                      {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
-                                        <AverageCostTooltip
+                                    {/* [CL-READ-UX-20260706-211330] 이름 열: 줄1=이름+아이콘 트리거(truncate), 줄2=편집 배지(있을 때만) → 이름 전체 노출·겹침 0 */}
+                                    <div className="flex-1 min-w-0">
+                                      <div className={cn(
+                                        "flex items-center gap-1 min-w-0",
+                                        item.is_paid && "line-through text-muted-foreground"
+                                      )}>
+                                        <span className="text-sm truncate">{displayName}</span>
+                                        {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
+                                          <AverageCostTooltip
+                                            categoryId={category.id}
+                                            subCategoryId={subCat.id}
+                                            className="flex-shrink-0"
+                                          />
+                                        )}
+                                        {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 트리거(금액 입력 시 발동) */}
+                                        <HiddenCostTrigger
                                           categoryId={category.id}
                                           subCategoryId={subCat.id}
+                                          amount={item.amount || 0}
+                                          itemName={displayName}
                                           className="flex-shrink-0"
                                         />
-                                      )}
-                                      {/* [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 트리거(금액 입력 시 발동) */}
-                                      <HiddenCostTrigger
-                                        categoryId={category.id}
-                                        subCategoryId={subCat.id}
-                                        amount={item.amount || 0}
-                                        itemName={displayName}
-                                        className="flex-shrink-0"
+                                      </div>
+                                      {/* [CL-VULN-R6C-A11Y-20260625] 파트너 변경 비색상 단서(색맹/SR 가시, WCAG 1.4.1) */}
+                                      {/* [CL-READ-UX-20260706-211330] 편집 배지를 이름 아래 2번째 줄로 → 긴 닉네임이 이름과 겹치지 않음. 공유 컴포넌트(닉네임 캡). */}
+                                      <EditorChangeBadge
+                                        changed={changedItemIds?.has(item.id) ?? false}
+                                        partnerName={partnerName}
+                                        lastEditedBy={item.last_edited_by}
+                                        myUserId={myUserId}
+                                        showEditorLabels={showEditorLabels}
+                                        className="mt-0.5"
                                       />
                                     </div>
                                     {/* [CL-TOP20-P5-PWA-20260703-050000] 터치 타깃 확대: 모바일 40px(h-10 w-10), md 이상 기존 크기 유지.

@@ -20,7 +20,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useCategoryOrder } from '@/hooks/useCategoryOrder';
 import { AverageCostTooltip } from './AverageCostTooltip';
 import { hasAverageCost, getAverageCost } from '@/lib/average-costs';
-import { getEditorLabel, formatRelativeTime } from '@/lib/collab/editor-label'; // [CL-EDITLABEL-20260626] 최근 편집자(나/파트너) 라벨 + [CL-TOP20-P4-COLLAB-20260703-040000] 상대시간
+import { formatRelativeTime } from '@/lib/collab/editor-label'; // [CL-TOP20-P4-COLLAB-20260703-040000] 상대시간 병기
+import { EditorChangeBadge } from '@/components/collaboration/EditorChangeBadge'; // [CL-READ-UX-20260706-211320] 공유 편집자 배지(닉네임 캡·중복 제거)
 import { SmartWonInput } from './budget/SmartWonInput'; // [CL-TOP20-P3-INPUT-20260703-030000] 스마트 금액 입력(만/억·힌트·평균 1탭)
 import { HiddenCostTrigger } from './budget/HiddenCostTrigger'; // [CL-TOP20-P3-HIDDEN-20260703-030000] 숨은 비용 경고 배선
 import { countCategoryHiddenCosts } from '@/lib/hidden-cost-map'; // [CL-TOP20-P3-HIDDEN-20260703-030000]
@@ -414,25 +415,19 @@ export function BudgetTable({
               <Button size="icon" variant="ghost" className="h-5 w-5 sm:h-6 sm:w-6" aria-label="편집 취소" onClick={handleCancelRename}>
                 <X className="h-3 w-3" aria-hidden="true" />
               </Button>
-            </div> : <div className="flex items-center gap-1 group">
-              <span className="break-keep text-[10px] sm:text-base">{displayName}</span>
+            </div> : <div className="flex items-center gap-1 group min-w-0">
+              <span className="break-keep text-[10px] sm:text-base min-w-0">{displayName}</span>
               {/* [CL-VULN-R6C-A11Y-20260625] 파트너 변경 비색상 단서 — 색맹/SR 가시(WCAG 1.4.1). amber 틴트만으로 전달 금지. */}
-              {/* [CL-EDITLABEL-20260626] 단일 슬롯 상호배타: 변경분(transient)은 amber로 편집자명 승격, 그 외엔 정적 "최근:" 배지. */}
-              {changedItemIds?.has(item.id) ? (
-                <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] text-amber-700 dark:text-amber-300 font-medium whitespace-nowrap flex-shrink-0">
-                  <Sparkles className="w-2.5 h-2.5 flex-shrink-0" aria-hidden />
-                  {partnerName?.trim() ? `${partnerName.trim()} 변경` : '파트너 변경'}
-                  {/* [CL-TOP20-P4-COLLAB-20260703-040000] 상대시간 병기 — 중첩 span(부모 직계 텍스트 노드 불변 → 기존 getByText 계약 보존) */}
-                  {changedAgo && <span className="font-normal opacity-80">· {changedAgo}</span>}
-                </span>
-              ) : showEditorLabels && getEditorLabel(item.last_edited_by, myUserId, partnerName) ? (
-                <span
-                  className="inline-flex items-center text-[9px] sm:text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0"
-                  aria-label={`최근 편집: ${getEditorLabel(item.last_edited_by, myUserId, partnerName)}`}
-                >
-                  최근: {getEditorLabel(item.last_edited_by, myUserId, partnerName)}
-                </span>
-              ) : null}
+              {/* [CL-READ-UX-20260706-211320] 공유 배지로 단일화(닉네임 캡). 텍스트 계약("지윤 변경"/"최근: 지윤") 보존. */}
+              <EditorChangeBadge
+                changed={changedItemIds?.has(item.id) ?? false}
+                partnerName={partnerName}
+                lastEditedBy={item.last_edited_by}
+                myUserId={myUserId}
+                showEditorLabels={showEditorLabels}
+                changedAgo={changedAgo}
+                className="text-[9px] sm:text-[10px]"
+              />
               {!item.is_custom && hasAverageCost(category.id, subCat.id) && (
                 <AverageCostTooltip categoryId={category.id} subCategoryId={subCat.id} />
               )}

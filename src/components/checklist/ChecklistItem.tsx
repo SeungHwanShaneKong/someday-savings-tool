@@ -120,7 +120,8 @@ export function ChecklistItem({
           <div className="flex items-start justify-between gap-2">
             <span
               className={cn(
-                'text-sm sm:text-base font-medium leading-tight',
+                // [CL-READ-UX-20260706-211350] min-w-0 break-keep: 긴 제목이 음절 중간 안 깨고 단어 경계로 줄바꿈
+                'text-sm sm:text-base font-medium leading-tight min-w-0 break-keep',
                 item.is_completed && 'line-through text-muted-foreground'
               )}
             >

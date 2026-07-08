@@ -1,6 +1,6 @@
 // [CL-COVERAGE50-20260620] kpi-definitions 단위 검증 — 미테스트 영역 커버리지 보강
 import { describe, it, expect } from 'vitest';
-import { startOfDay, subDays } from 'date-fns';
+import { startOfKstDayUtc, subKstDays } from '@/lib/admin/kst-time';
 import {
   KPI_DEFINITIONS,
   getKPIStatus,
@@ -180,29 +180,29 @@ describe('withCumulativeSignups (신규→누적 가입자)', () => {
 });
 
 // [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 누적 baseline 경계 정렬 — 첫 부분일 가입자 누락(경계 갭) 회귀 가드
-describe('firstTrendBucketStart (누적 baseline 경계 정렬)', () => {
-  it('startOfDay 로 정규화 — 시/분/초/ms = 0', () => {
-    const end = new Date('2026-06-22T14:30:45.123');
+// [CL-ADMIN-KST-CUMSUM-20260709-073000] R11 근본수정: 컷오프를 트렌드 루프(KST 절대시각)와 동일 진실원으로 통일.
+//   과거 date-fns startOfDay(로컬 TZ) 기대값은 비-KST TZ에서 트렌드 버킷과 어긋나 이중집계/누락을 유발했고,
+//   그 버그값을 잠그던 단언(startOfDay 동치)을 KST 절대시각(TZ 불변) 동치로 교체한다.
+describe('firstTrendBucketStart (누적 baseline 경계 = 트렌드 첫 KST 버킷 · TZ 무관)', () => {
+  it('dayCount=min(periodDays,90)-1 일 전의 KST 달력일 시작 (90 캡) — TZ 무관', () => {
+    const end = new Date('2026-06-22T14:30:00Z');
+    expect(firstTrendBucketStart(end, 30).getTime()).toBe(startOfKstDayUtc(subKstDays(end, 29)).getTime());
+    expect(firstTrendBucketStart(end, 7).getTime()).toBe(startOfKstDayUtc(subKstDays(end, 6)).getTime());
+    expect(firstTrendBucketStart(end, 200).getTime()).toBe(startOfKstDayUtc(subKstDays(end, 89)).getTime()); // ytd 등 >90 → 90 캡
+  });
+
+  it('반환 인스턴트는 KST 자정(00:00 KST)으로 정규화 — 프로세스 TZ 무관', () => {
+    const end = new Date('2026-06-22T14:30:45.123Z');
     const r = firstTrendBucketStart(end, 30);
-    expect([r.getHours(), r.getMinutes(), r.getSeconds(), r.getMilliseconds()]).toEqual([0, 0, 0, 0]);
+    // r 을 KST(UTC+9)로 보면 시/분/초/ms = 0 이어야 한다(절대시각 기반이라 실행 TZ와 무관).
+    const kst = new Date(r.getTime() + 9 * 60 * 60 * 1000);
+    expect([kst.getUTCHours(), kst.getUTCMinutes(), kst.getUTCSeconds(), kst.getUTCMilliseconds()]).toEqual([0, 0, 0, 0]);
   });
 
-  it('dayCount=min(periodDays,90)-1 일 전의 startOfDay (90 캡)', () => {
-    const end = new Date('2026-06-22T14:30:00');
-    expect(firstTrendBucketStart(end, 30).getTime()).toBe(startOfDay(subDays(end, 29)).getTime());
-    expect(firstTrendBucketStart(end, 7).getTime()).toBe(startOfDay(subDays(end, 6)).getTime());
-    expect(firstTrendBucketStart(end, 200).getTime()).toBe(startOfDay(subDays(end, 89)).getTime()); // ytd 등 >90 → 90 캡
-  });
-
-  it('경계 갭 제거: 컷오프가 시각보존 startISO(subDays(end,periodDays))보다 이후 → [startISO,컷오프) 갭이 baseline에 흡수', () => {
-    // 버그 재현 본질: baseline 이 startISO(시각보존) 미만이면 [startISO, 첫버킷startOfDay) 가입자가
-    //   baseline·일별버킷 양쪽에서 누락됐다. 컷오프=첫버킷 startOfDay 로 정렬하면 그 구간이 baseline(<컷오프)에 포함된다.
-    const end = new Date('2026-06-22T14:30:00');
-    const startTimePreserving = subDays(end, 30); // 기존 startISO 기준점
+  it('경계 정렬: 컷오프가 시각보존 시작(subKstDays(end,periodDays))보다 이후 → [start,컷오프) 갭이 baseline(<컷오프)에 흡수', () => {
+    const end = new Date('2026-06-22T14:30:00Z');
+    const startTimePreserving = subKstDays(end, 30); // 기존 startISO 기준점(절대 -30d)
     const cutoff = firstTrendBucketStart(end, 30);
     expect(cutoff.getTime()).toBeGreaterThan(startTimePreserving.getTime());
-    // 갭 구간(예: startISO + 1시간)에 가입한 프로필은 컷오프 미만 → baseline 에 포함되어 누락되지 않음
-    const inGap = new Date(startTimePreserving.getTime() + 60 * 60 * 1000);
-    expect(inGap.getTime()).toBeLessThan(cutoff.getTime());
   });
 });

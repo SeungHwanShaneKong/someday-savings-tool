@@ -24,7 +24,7 @@ let baselineLt: string | null = null;
 function makeChain(table: string) {
   let isCountHead = false;
   const q: Record<string, unknown> = {};
-  for (const m of ['insert', 'update', 'delete', 'eq', 'neq', 'gte', 'lte', 'in', 'order', 'match', 'is', 'gt']) {
+  for (const m of ['insert', 'update', 'delete', 'eq', 'neq', 'not', 'gte', 'lte', 'in', 'order', 'match', 'is', 'gt']) {
     q[m] = vi.fn(() => q);
   }
   q.select = vi.fn((_cols?: unknown, opts?: { head?: boolean }) => {

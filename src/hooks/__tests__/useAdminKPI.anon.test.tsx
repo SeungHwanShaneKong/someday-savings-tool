@@ -60,7 +60,7 @@ describe('useAdminKPI — 전체 방문(익명) RPC 매핑', () => {
     rpcMock.mockResolvedValue({ data: [], error: null } as never);
     vi.mocked(supabase.from).mockImplementation(((table: string) => {
       const q: Record<string, unknown> = {};
-      const methods = ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in', 'order', 'match', 'is', 'limit'];
+      const methods = ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'not', 'gt', 'gte', 'lt', 'lte', 'in', 'order', 'match', 'is', 'limit'];
       for (const m of methods) q[m] = vi.fn(() => q);
       // page_views 의 페이지네이션(.range)만 에러 → fetchAllRows throw → safe() 가 catch
       q.range = vi.fn(() =>

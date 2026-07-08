@@ -4,7 +4,10 @@ import { useCallback } from 'react';
 //   setter 대신 loadAdminKpi(start,end) 가 결과 객체를 '반환'하고, useQuery 가 폴링/캐시/포커스 갱신을 담당.
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { subDays, startOfDay, endOfDay, format, differenceInMinutes } from 'date-fns';
+import { subDays, differenceInMinutes } from 'date-fns';
+// [CL-ADMIN-KST-20260709-000939] 날짜 경계를 KST 달력일로 명시 고정(브라우저 로컬 TZ 종속 제거) + 순수 집계 위임
+import { startOfKstDayUtc, endOfKstDayUtc, subKstDays, kstMonthDayLabel } from '@/lib/admin/kst-time';
+import { uniqueUserCount, loyalUserCount, avgPositiveDuration } from '@/lib/admin/trend-compute';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
 import { withCumulativeSignups, firstTrendBucketStart } from '@/lib/kpi-definitions'; // [CL-ADMIN-SIGNUP-TREND-20260622]
 import { calculateImpact, type ImpactSummary, type BudgetForImpact } from '@/lib/impact-calculator';
@@ -162,9 +165,18 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
       return [];
     }
   })();
+  // [CL-ADMIN-KST-20260709-000939] admin/스태프 전원 제외 집합 — user_roles(role='admin') ∪ 하드코딩 폴백(degrade-safe).
+  //   기존 단일 하드코딩 uid 만 제외하던 것을 role 기반 전원 제외로 정밀화(복수 admin·스태프 활동 혼입 방지).
+  const adminUserIds = new Set<string>([ADMIN_USER_ID]);
+  try {
+    const rr = await supabase.from('user_roles').select('user_id').eq('role', 'admin');
+    for (const row of ((rr.data || []) as Array<{ user_id: string | null }>)) if (row.user_id) adminUserIds.add(row.user_id);
+  } catch { /* 실패 시 하드코딩 폴백만 유지 */ }
+  const adminInList = `(${[...adminUserIds].join(',')})`;
+
   // [CL-AUDIT-R4-WATERFALL-20260623] (#14) admin 소유 예산 id 조회를 메인 배치와 병렬 시작 → 직렬 워터폴 1단계(1 RTT) 제거.
   const adminBudgetIdsPromise: Promise<string[]> = (async () => {
-    const r = await supabase.from('budgets').select('id').eq('user_id', ADMIN_USER_ID);
+    const r = await supabase.from('budgets').select('id').in('user_id', [...adminUserIds]);
     return (r.data || []).map((b) => b.id);
   })();
   const periodDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -174,9 +186,10 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   //   과거: now 앵커·상한 없음 → 폴링마다 값 드리프트, 선택 기간 무시(미래/기간외 행 포함). 결정론·기간정렬 회복.
   const winEnd = endDate;
   const winEndISO = winEnd.toISOString();
-  const todayStart = startOfDay(winEnd);
-  const weekAgo = subDays(winEnd, 7);
-  const monthAgo = subDays(winEnd, 30);
+  // [CL-ADMIN-KST-20260709-000939] '오늘'=KST 달력일 시작(브라우저 로컬 startOfDay 아님). 주/월은 롤링(절대 7·30일).
+  const todayStart = startOfKstDayUtc(winEnd);
+  const weekAgo = subKstDays(winEnd, 7);
+  const monthAgo = subKstDays(winEnd, 30);
 
   const startISO = startDate.toISOString();
   const endISO = endDate.toISOString();
@@ -222,11 +235,11 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
     try {
       const r = await rpcUntyped('admin_anon_traffic_trend', { p_start: startISO, p_end: endISO });
       return !r.error && Array.isArray(r.data)
-        ? (r.data as Array<{ day: string; views: number; sessions: number }>).map((d) => ({
-            // [CL-AUDIT2-R6-TZ-20260628] date-only 문자열을 '로컬 자정'으로 파싱(+T00:00:00) → UTC-자정 재파싱
-            //   off-by-one 제거(F10). RPC 가 이미 Asia/Seoul 일경계로 집계하므로 page_views 추이와 정렬.
-            day: format(new Date(String(d.day) + 'T00:00:00'), 'M/d'), views: d.views, sessions: d.sessions,
-          }))
+        ? (r.data as Array<{ day: string; views: number; sessions: number }>).map((d) => {
+            // [CL-ADMIN-KST-20260709-000939] RPC day 는 이미 Asia/Seoul(KST) 달력일 문자열 → 로컬 Date 파싱 없이 직접 'M/d'.
+            const [, mm, dd] = String(d.day).split('-');
+            return { day: `${Number(mm)}/${Number(dd)}`, views: d.views, sessions: d.sessions };
+          })
         : [];
     } catch {
       return [];
@@ -282,18 +295,18 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
     preWindowSignups,
   ] = await Promise.all([
     // profiles — small table, no pagination needed
-    supabase.from('profiles').select('user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', startISO).lte('created_at', endISO).then(r => r.data || []),
-    supabase.from('profiles').select('user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
+    supabase.from('profiles').select('user_id, created_at').not('user_id', 'in', adminInList).gte('created_at', startISO).lte('created_at', endISO).then(r => r.data || []),
+    supabase.from('profiles').select('user_id, created_at').not('user_id', 'in', adminInList).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
     // page_views — PAGINATED, admin excluded
     safe('page_views', fetchAllRows<{ user_id: string | null; created_at: string; page_path: string; duration_seconds: number | null }>(
-      () => supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').neq('user_id', ADMIN_USER_ID).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id, created_at, page_path, duration_seconds').not('user_id', 'in', adminInList).gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
     ), []),
     safe('page_views_prev', fetchAllRows<{ user_id: string | null; created_at: string; duration_seconds: number | null }>(
-      () => supabase.from('page_views').select('user_id, created_at, duration_seconds').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id, created_at, duration_seconds').not('user_id', 'in', adminInList).gte('created_at', prevStartISO).lte('created_at', prevEndISO).order('created_at', { ascending: true })
     ), []),
     // budgets — all (for user mapping), admin excluded
-    supabase.from('budgets').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).then(r => r.data || []),
-    supabase.from('budgets').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
+    supabase.from('budgets').select('id, user_id, created_at').not('user_id', 'in', adminInList).then(r => r.data || []),
+    supabase.from('budgets').select('id, user_id, created_at').not('user_id', 'in', adminInList).gte('created_at', prevStartISO).lte('created_at', prevEndISO).then(r => r.data || []),
     // budget_items — PAGINATED, all (admin budget_ids filtered client-side) — includes category/sub_category for impact calc
     safe('budget_items', fetchAllRows<{ budget_id: string; amount: number; is_paid: boolean; created_at: string; category: string; sub_category: string }>(
       () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at, category, sub_category').order('created_at', { ascending: true })
@@ -303,21 +316,21 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
       () => supabase.from('budget_items').select('budget_id, amount, is_paid, created_at').gte('created_at', startISO).lte('created_at', endISO).order('created_at', { ascending: true })
     ), []),
     supabase.from('shared_budgets').select('id, budget_id, created_at').then(r => r.data || []),
-    supabase.from('budget_snapshots').select('id, user_id, created_at').neq('user_id', ADMIN_USER_ID).then(r => r.data || []),
+    supabase.from('budget_snapshots').select('id, user_id, created_at').not('user_id', 'in', adminInList).then(r => r.data || []),
     // DAU/WAU/MAU counts — paginated, admin excluded
     // [CL-FACT-WINBOUNDS-20260630] endDate 상한(lte) 추가 → 선택 기간 밖/미래 행 제외, 폴링 결정론.
     safe('page_views_today', fetchAllRows<{ user_id: string | null }>(
-      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', todayStart.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id').not('user_id', 'in', adminInList).gte('created_at', todayStart.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
     ), []),
     safe('page_views_week', fetchAllRows<{ user_id: string | null }>(
-      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', weekAgo.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id').not('user_id', 'in', adminInList).gte('created_at', weekAgo.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
     ), []),
     safe('page_views_month', fetchAllRows<{ user_id: string | null }>(
-      () => supabase.from('page_views').select('user_id').neq('user_id', ADMIN_USER_ID).gte('created_at', monthAgo.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
+      () => supabase.from('page_views').select('user_id').not('user_id', 'in', adminInList).gte('created_at', monthAgo.toISOString()).lte('created_at', winEndISO).order('created_at', { ascending: true })
     ), []),
     // [CL-ADMIN-SIGNUP-TREND-20260622] 윈도우 이전 누적 가입자 수 = 진짜 누적의 baseline(소형 profiles 테이블, head count)
     // [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 컷오프=첫 일별 버킷 시작(startISO 아님) → 경계 갭(첫 부분일 가입 누락) 제거
-    supabase.from('profiles').select('user_id', { count: 'exact', head: true }).neq('user_id', ADMIN_USER_ID).lt('created_at', cumulativeBaselineISO).then(r => r.count ?? 0),
+    supabase.from('profiles').select('user_id', { count: 'exact', head: true }).not('user_id', 'in', adminInList).lt('created_at', cumulativeBaselineISO).then(r => r.count ?? 0),
   ]);
 
   const todayPV = todayPVRes;
@@ -331,22 +344,20 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const filteredPeriodBudgetItems = periodBudgetItems.filter(bi => !adminBudgetIds.has(bi.budget_id));
   const filteredSharedBudgets = sharedBudgets.filter(sb => !adminBudgetIds.has(sb.budget_id));
 
-  // Helper: unique user_ids
-  const unique = (arr: { user_id: string | null }[]) => new Set(arr.filter(a => a.user_id).map(a => a.user_id!));
-
   // K01: 신규 가입자
   const k01 = profiles.length;
   const k01Prev = prevProfiles.length;
 
-  // K02-K04: DAU/WAU/MAU
-  const dau = unique(todayPV).size;
-  const wau = unique(weekPV).size;
-  const mau = unique(monthPV).size;
+  // K02-K04: DAU/WAU/MAU — 고유 사용자(순수함수·TZ 무관)
+  const dau = uniqueUserCount(todayPV);
+  const wau = uniqueUserCount(weekPV);
+  const mau = uniqueUserCount(monthPV);
 
-  const prevDAU = new Set(prevPageViews.filter(p => {
-    const d = new Date(p.created_at);
-    return d >= startOfDay(subDays(winEnd, periodDays)) && d <= endOfDay(subDays(winEnd, periodDays));
-  }).filter(p => p.user_id).map(p => p.user_id!)).size;
+  // [CL-ADMIN-KST-20260709-000939] 전기 동일 위치 KST 일자의 DAU(변화율 비교용)
+  const prevDauDay = subKstDays(winEnd, periodDays);
+  const prevDauStartMs = startOfKstDayUtc(prevDauDay).getTime();
+  const prevDauEndMs = endOfKstDayUtc(prevDauDay).getTime();
+  const prevDAU = uniqueUserCount(prevPageViews.filter(p => { const t = Date.parse(p.created_at); return t >= prevDauStartMs && t <= prevDauEndMs; }));
 
   // K05/K13/K14/K18 위조분모(mau||1, max(totalAmount,1)) 제거 → 임팩트 산출 직후 computeUsageRates 로 정직 산출.
 
@@ -477,61 +488,33 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const dayCount = Math.min(periodDays, 90);
   const trend: TrendDataPoint[] = [];
   for (let i = 0; i < dayCount; i++) {
-    const day = subDays(endDate, dayCount - 1 - i);
-    const dayStart = startOfDay(day);
-    const dayEnd = endOfDay(day);
-    const dateStr = format(day, 'M/d');
+    // [CL-ADMIN-KST-20260709-000939] KST 달력일 경계(절대 ms 비교) + 고유/충성/체류는 순수함수 위임(TZ 무관·골든 검증)
+    const day = subKstDays(endDate, dayCount - 1 - i);
+    const dayStartMs = startOfKstDayUtc(day).getTime();
+    const dayEndMs = endOfKstDayUtc(day).getTime();
+    const dateStr = kstMonthDayLabel(day);
+    const inDay = (iso: string) => { const t = Date.parse(iso); return t >= dayStartMs && t <= dayEndMs; };
 
-    const dayPVs = pageViews.filter(pv => {
-      const d = new Date(pv.created_at);
-      return d >= dayStart && d <= dayEnd;
-    });
-    const daySignups = profiles.filter(p => {
-      const d = new Date(p.created_at);
-      return d >= dayStart && d <= dayEnd;
-    });
-
+    const dayPVs = pageViews.filter(pv => inDay(pv.created_at));
+    const daySignups = profiles.filter(p => inDay(p.created_at));
     const dayPVCount = dayPVs.length;
 
-    const trailing7Start = subDays(dayEnd, 7);
-    const trailing7PVs = pageViews.filter(pv => {
-      const d = new Date(pv.created_at);
-      return d >= trailing7Start && d <= dayEnd;
-    });
-    const userDaysTrailing: Record<string, Set<string>> = {};
-    trailing7PVs.forEach(pv => {
-      if (!pv.user_id) return;
-      if (!userDaysTrailing[pv.user_id]) userDaysTrailing[pv.user_id] = new Set();
-      userDaysTrailing[pv.user_id].add(new Date(pv.created_at).toDateString());
-    });
-    const dayLoyalCount = Object.values(userDaysTrailing).filter(days => days.size >= 2).length;
+    // 충성: 당일 종료 기준 롤링 7일 내 서로 다른 KST일 2회+
+    const trailing7StartMs = dayEndMs - 7 * 86_400_000;
+    const trailing7PVs = pageViews.filter(pv => { const t = Date.parse(pv.created_at); return t >= trailing7StartMs && t <= dayEndMs; });
+    const dayLoyalCount = loyalUserCount(trailing7PVs);
 
-    const dayDurations = dayPVs.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
-    const dayAvgDuration = dayDurations.length > 0
-      ? Math.round(dayDurations.reduce((a, b) => a + b, 0) / dayDurations.length)
-      : 0;
+    const dayAvgDuration = avgPositiveDuration(dayPVs);
 
-    const dayAmountEntered = filteredPeriodBudgetItems.filter(bi => {
-      const d = new Date(bi.created_at);
-      return d >= dayStart && d <= dayEnd && bi.amount > 0;
-    }).length;
+    const dayAmountEntered = filteredPeriodBudgetItems.filter(bi => inDay(bi.created_at) && bi.amount > 0).length;
 
     trend.push({
       date: dateStr,
-      dau: unique(dayPVs).size,
-      wau: unique(pageViews.filter(pv => {
-        const d = new Date(pv.created_at);
-        return d >= subDays(dayEnd, 7) && d <= dayEnd;
-      })).size,
-      mau: unique(pageViews.filter(pv => {
-        const d = new Date(pv.created_at);
-        return d >= subDays(dayEnd, 30) && d <= dayEnd;
-      })).size,
+      dau: uniqueUserCount(dayPVs),
+      wau: uniqueUserCount(pageViews.filter(pv => { const t = Date.parse(pv.created_at); return t >= dayEndMs - 7 * 86_400_000 && t <= dayEndMs; })),
+      mau: uniqueUserCount(pageViews.filter(pv => { const t = Date.parse(pv.created_at); return t >= dayEndMs - 30 * 86_400_000 && t <= dayEndMs; })),
       signups: daySignups.length,
-      budgetCreated: budgets.filter(b => {
-        const d = new Date(b.created_at);
-        return d >= dayStart && d <= dayEnd;
-      }).length,
+      budgetCreated: budgets.filter(b => inDay(b.created_at)).length,
       amountEntered: dayAmountEntered,
       pv: dayPVCount,
       loyalCount: dayLoyalCount,
@@ -556,28 +539,12 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const totalPVCount = pageViews.length;
   const prevPVCount = prevPageViews.length;
 
-  const userDays: Record<string, Set<string>> = {};
-  pageViews.forEach(pv => {
-    if (!pv.user_id) return;
-    if (!userDays[pv.user_id]) userDays[pv.user_id] = new Set();
-    userDays[pv.user_id].add(new Date(pv.created_at).toDateString());
-  });
-  const loyal = Object.values(userDays).filter(days => days.size >= 2).length;
-  const totalUnique = Object.keys(userDays).length;
-
-  const prevUserDays: Record<string, Set<string>> = {};
-  prevPageViews.forEach(pv => {
-    if (!pv.user_id) return;
-    if (!prevUserDays[pv.user_id]) prevUserDays[pv.user_id] = new Set();
-    prevUserDays[pv.user_id].add(new Date(pv.created_at).toDateString());
-  });
-  const prevLoyal = Object.values(prevUserDays).filter(days => days.size >= 2).length;
-
-  const durations = pageViews.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
-  const avgDur = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
-
-  const prevDurations = prevPageViews.map(pv => pv.duration_seconds || 0).filter(d => d > 0);
-  const prevAvgDur = prevDurations.length > 0 ? prevDurations.reduce((a, b) => a + b, 0) / prevDurations.length : 0;
+  // [CL-ADMIN-KST-20260709-000939] 충성/고유/체류 순수함수 위임(KST 달력일 dedup·TZ 무관·골든 검증)
+  const loyal = loyalUserCount(pageViews);
+  const totalUnique = uniqueUserCount(pageViews);
+  const prevLoyal = loyalUserCount(prevPageViews);
+  const avgDur = avgPositiveDuration(pageViews);
+  const prevAvgDur = avgPositiveDuration(prevPageViews);
 
   const summaryKPIs: SummaryKPIs = {
     totalPageViews: totalPVCount,

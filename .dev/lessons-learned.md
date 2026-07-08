@@ -7,6 +7,24 @@
 
 ## 최신
 
+### [CL-VULN-R11-20260709] 적대 감사 2라운드(정적+실행)가 "치명 10건" 요청에 수렴한 정직 결론 = 재현 1건 + KST 반쪽 이전 근본수정
+- **발생원인**: "가장 치명적 취약점 10건 식별·근본수정·publish" 요청. 억지로 10건을 채우면 증상무마·거짓양성 양산(R9 교훈: finder 후보 ~95%가 거짓양성). 정직·prove-first가 유일한 옳은 경로.
+- **기술내용/해결책**:
+  1. **직교 2라운드로 완전성+정직 동시 달성**: (R1) 정적 8렌즈 병렬 발견 + 후보별 2 skeptic **적대 반증**(기본가정=거짓양성). (R2) **실행-깨뜨리기**(execute-to-break) 6렌즈 — 정적 추론이 아니라 임시 vitest로 적대적 입력을 **실제 실행**해 잘못된 출력을 눈으로 확인한 것만 채택 + 완전성 비평관. 두 방법론이 **동일 결론에 수렴**(재현 결함 1건, 나머지 하드닝 확인) → "10건 없음"이 신뢰 가능한 결론임을 교차 입증. 억지 후보(예: DAU 부분일 vs prevDAU 완전일 윈도우 비대칭)는 "기존 동작·변화율 인디케이터 한정·해석 가능"으로 정직하게 기각.
+  2. **확정 결함 = KST 반쪽 이전(내 직전 작업의 미완성분)**: [CL-ADMIN-KST-20260709]가 트렌드 일별 버킷은 KST 절대시각(`startOfKstDayUtc`)으로 옮겼으나, 누적 가입자 baseline 컷오프(`firstTrendBucketStart`, kpi-definitions.ts)는 date-fns `startOfDay(subDays())`(로컬 TZ)로 **반쪽만** 이전됐다. 비-KST 브라우저(예: CI=UTC)에서 두 경계가 정확히 **9h**(KST 오프셋) 어긋나, 갭 구간 가입자가 baseline(`.lt`)과 i=0 버킷 daySignups(`>=`) **양쪽에 집계(이중집계)** 또는 누락. 근본수정=`firstTrendBucketStart`를 `startOfKstDayUtc(subKstDays(endDate, min(p,90)-1))`로 통일해 트렌드 루프 i=0과 **비트 동일**. 불변식: `컷오프 == 버킷0 시작`이면 가입자는 `<컷오프`(baseline) 또는 `>=시작`(버킷) 중 정확히 하나에만 속해 이중집계/누락이 **구조적으로 불가능** — 이 등식 자체가 골든 오라클.
+  3. **회귀가드가 버그값을 잠그면 침묵 통과**: 기존 `kpi-definitions.test.ts`가 `firstTrendBucketStart == date-fns startOfDay`를 단언해 KST 불일치를 오히려 잠갔다. 수정 시 그 단언을 **KST 절대시각(TZ 불변) 기대값**으로 교체. prove-first로 입증: `TZ=UTC`에서 새 골든이 RED(델타=32,400,000ms=9h) → 근본수정 → `TZ=UTC/NY/KST` 전부 GREEN. MUTATION(date-fns로 되돌림)이 UTC 4 red↔KST green으로 결함 실재성을 기계 증명(KST 개발자에겐 안 보이나 CI/비-KST에서 발동).
+  4. **[함정] `git checkout --`는 미커밋 수정본을 HEAD(버그버전)로 날린다**: 독립 검증관이 MUTATION 원복에 `git checkout`을 쓰면 미커밋 근본수정까지 사라짐 → scratchpad 백업 후 역치환으로 원복해야 working-tree 보존. (미커밋 상태 감사 시 주의.)
+  5. **워크플로 서브에이전트의 스크래치 오염 관리**: execute-to-break 에이전트들이 repo에 임시 vitest 파일을 생성 → LSP 진단에 잡힘(대개 자기정리하나 stale 진단 잔존). 커밋 전 `find src tests -iname '*_r11*' -o -iname '*_scratch*'…` sweep 필수. 정식 산출물과 이름 패턴으로 구분.
+
+### [CL-ADMIN-KST-20260709] 관리자 지표 "일간"은 뷰어 TZ 아닌 KST 달력일 고정 + 순수함수 추출로 골든 보증 + role 기반 admin 전원제외
+- **발생원인**: "관리자 대시보드 전 숫자 정확" 요청. 전수감사 결과 아키텍처는 이미 견고(RLS admin 전행·RPC 서버집계·fetchAllRows·정직가드·합성 제외)했고, 실질 잔여는 (1) 날짜 경계가 브라우저 로컬 TZ, (2) admin 제외가 단일 하드코딩 uid 둘뿐.
+- **기술내용/해결책**:
+  1. **집계 "일간"은 절대 UTC ms 기반 KST 달력일로 고정**: date-fns `startOfDay/endOfDay/subDays`·`Date.toDateString()` 는 **런타임 로컬 TZ**에 종속 → 비-KST 조회 시 DAU/일·주·월/충성 사용자가 ±1일 어긋나고 서버 익명 RPC(Asia/Seoul)와도 불일치. 해법=`getTime()+9h` 절대시각 연산 헬퍼(startOfKstDayUtc 등)로 KST 달력일 경계·dedup 키(kstDayKey)를 산출 → **어느 TZ에서 실행해도 동일**. 골든 오라클은 14:59:59Z=KST전날 / 15:00:00Z=KST다음날 경계 + "TZ 흔들어도 동일" 로 TZ-불변을 기계 증명.
+  2. **인라인 집계를 순수함수로 추출해야 "정확성"을 골든으로 보증**: 훅 내부 인라인 루프(Supabase 호출과 얽힘)는 단위 검증 불가 → uniqueUserCount/loyalUserCount/avgPositiveDuration/excludeAdmins 를 `trend-compute.ts` 순수함수로 분리, 고정입력→기대정수 골든. "검증관 OK"가 아니라 "골든 green"이 정확성의 종료 게이트.
+  3. **staff/admin 제외는 단일 하드코딩 uid 아닌 role 기반 전원**: `.neq('user_id', HARDCODED)` → `user_roles(role='admin')` ∪ 하드코딩 폴백을 `.not('user_id','in', adminInList)`. degrade-safe(user_roles 실패→폴백). 복수 admin/스태프 활동 혼입(과다) 제거.
+  4. **supabase mock은 실제 쓰는 체인 메서드를 다 넣어야**: 쿼리를 `.neq`→`.not(...,'in',...)`로 바꾸자 기존 mock 메서드 배열에 `'not'` 누락으로 체인이 깨져 2 테스트 실패 → mock 배열에 `'not'` 추가로 해결. 쿼리 빌더 메서드 변경 시 mock 동기화 필수(오라클=vitest full run).
+  5. **[검증관 GO 후속] 쿼리 '배선'은 순수함수 골든만으론 회귀 무방비 — 배선 스파이 가드 + MUTATION 필수**: 독립 검증관(적대적) 판정 GO·실코드 결함 0건이었으나 **MUTATION 5**(훅의 `.not('user_id','in',adminInList)` 필터 11곳 전부 제거)가 기존 테스트를 **침묵 통과**(가짜그린). 순수함수 `excludeAdmins` 골든은 "로직이 맞는가"만 보증할 뿐, **훅이 실제로 그 필터를 쿼리에 조립하는가**는 미포착 → 이번 변경의 핵심(단일 uid→role 전원제외)이 회귀 무방비. 해결=전용 가드 `useAdminKPI.adminexclude.test.tsx`: mock 체인의 `q.not` 인자를 `{table,col,op,val}`로 포착 → user-소유 4테이블(profiles·page_views·budgets·budget_snapshots) 각각에 `.not('user_id','in','(uuid…)')` 배선 + 포맷 + user_roles union(degrade-safe)을 단언. **가드 신뢰도는 MUTATION으로 입증**(`sed`로 필터 제거→2/2 red 확인→원복). 교훈: 순수함수 골든(로직) + 배선 스파이 가드(조립) **둘 다** 있어야 "정확성 보증" 완결. 최종 1615 green(신규 18·회귀 0).
+
 ### [CL-SCROLLTOP+WWWCERT-20260706] SPA 라우트 변경 스크롤 복원 부재 + GitHub Pages 인증서 API catch-22 + deploy-pages 일시실패
 - **발생원인**: ①관련글(`/guide/:slug`) 클릭 시 새 글이 하단부터 보임(가독성↓). ②`www.moderninsightspot.com` CERT_COMMON_NAME_INVALID.
 - **기술내용/해결책**:

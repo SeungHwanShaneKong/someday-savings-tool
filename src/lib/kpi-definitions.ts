@@ -1,6 +1,7 @@
 // KPI 정의, 임계값, 데모 데이터
 // 15개 핵심 지표의 메타데이터와 상태 배지 판별 로직
-import { startOfDay, subDays } from 'date-fns';
+// [CL-ADMIN-KST-CUMSUM-20260709-073000] 누적 baseline 경계를 트렌드 루프(KST)와 동일 진실원으로 통일 → date-fns 로컬 TZ 제거.
+import { startOfKstDayUtc, subKstDays } from '@/lib/admin/kst-time';
 
 export type KPIStatus = '정상' | '주의' | '위험' | '참고';
 
@@ -103,13 +104,17 @@ export function withCumulativeSignups(points: TrendDataPoint[], baseline = 0): T
   });
 }
 
-// [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 누적 가입자 baseline 컷오프 = 첫 일별 트렌드 버킷의 시작(startOfDay).
-//   트렌드 루프 첫 버킷 = startOfDay(subDays(endDate, dayCount-1)), dayCount = min(periodDays, 90).
-//   baseline(<이 시점)과 일별 버킷(>=이 시점)이 동일 경계를 공유하게 만들어, 시각 보존 startISO 와의
-//   경계 갭(첫 부분-캘린더-일의 신규 가입자가 baseline·버킷 양쪽에서 누락되던 결함)을 제거한다.
+// [CL-AUDIT-CUMSUM-BOUNDARY-20260622] 누적 가입자 baseline 컷오프 = 첫 일별 트렌드 버킷의 시작.
+//   baseline(<이 시점)과 일별 버킷(>=이 시점)이 '동일 인스턴트'를 공유하게 만들어, 가입자가 정확히
+//   한쪽에만 속하도록 한다(경계 갭·이중집계 제거).
+// [CL-ADMIN-KST-CUMSUM-20260709-073000] R11 근본수정: 트렌드 루프 첫 버킷은 KST 절대시각
+//   (useAdminKPI.tsx:492-493 `startOfKstDayUtc(subKstDays(endDate, dayCount-1))`)인데, 이 컷오프는
+//   date-fns `startOfDay`(로컬 TZ)였다 → 비-KST 브라우저(예: CI=UTC)에서 최대 9h 어긋나 갭 구간 가입자가
+//   baseline·버킷 양쪽에 집계(이중집계)되거나 누락. 트렌드 루프와 '비트 동일'한 KST 경계로 통일해 근본 제거.
+//   dayCount = min(periodDays, 90) 는 useAdminKPI.tsx:488 과 동일.
 export function firstTrendBucketStart(endDate: Date, periodDays: number): Date {
   const dayCount = Math.min(periodDays, 90);
-  return startOfDay(subDays(endDate, dayCount - 1));
+  return startOfKstDayUtc(subKstDays(endDate, dayCount - 1));
 }
 
 export interface TopPage {

@@ -60,6 +60,7 @@ export default function Checklist() {
     setPraiseEvent,
     toggleItem,
     addCustomItem,
+    addCustomItems, // [CL-AUDIT6-D1-20260710] "모두 적용" 배치 추가(sort_order 중복 차단)
     deleteItem,
     updateNotes,
     updateDueDate, // [CL-CHECKUX-20260709-232512] AI 타임라인 '기한 적용'
@@ -493,6 +494,7 @@ export default function Checklist() {
         applyPlan={timelinePlan}
         onApplyDueDate={updateDueDate}
         onAddTask={(title, period, dueDate) => addCustomItem(title, period, dueDate)}
+        onAddTasks={(additions) => addCustomItems(additions)}
       />
     </div>
   );

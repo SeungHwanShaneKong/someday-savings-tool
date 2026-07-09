@@ -45,12 +45,20 @@ interface TimelinePanelProps {
   applyPlan?: TimelineApplyPlan<TimelineTask> | null;
   /** 매치 항목 기한 적용(성공 boolean) */
   onApplyDueDate?: (itemId: string, dueDate: string) => Promise<boolean> | boolean | void;
-  /** 무매치 task 를 내 리스트에 추가(성공 boolean) */
+  /** 무매치 task 를 내 리스트에 추가(성공 boolean) — 개별 "추가" 버튼용(단건) */
   onAddTask?: (
     title: string,
     period: ChecklistPeriod,
     dueDate: string
   ) => Promise<boolean> | boolean | void;
+  /**
+   * [CL-AUDIT6-D1-20260710] "모두 적용"의 다건 추가 배치 — sort_order 중복 근본차단.
+   *   단건 onAddTask 를 for+await 로 연속 호출하면 훅 클로저 items 스냅샷이 갱신 안 돼 sort_order 가
+   *   전부 중복되므로, 여러 add 는 반드시 이 배치 경로로 원자 처리한다. 미제공 시 단건 순차 폴백(하위호환).
+   */
+  onAddTasks?: (
+    additions: ReadonlyArray<{ title: string; period: ChecklistPeriod; dueDate: string }>
+  ) => Promise<{ added: number; failed: number }>;
 }
 
 /** 적용 상태 로컬 키 — 같은 달의 같은 task 문구는 계획상 1개(중복은 plan 이 skip 처리) */
@@ -361,6 +369,7 @@ export default function TimelinePanel({
   applyPlan,
   onApplyDueDate,
   onAddTask,
+  onAddTasks,
 }: TimelinePanelProps) {
   const { toast } = useToast();
   // 이 세션에서 적용/추가 완료한 task — key `${month}:${task}` → 종류
@@ -421,18 +430,50 @@ export default function TimelinePanel({
     let added = 0;
     let failed = 0;
     try {
-      // 순차 적용 — sort_order 계산·낙관적 상태가 경쟁하지 않도록 직렬화
+      // [CL-AUDIT6-D1-20260710] 기한 적용(apply)은 서로 다른 항목이라 순차 안전.
+      //   추가(add)는 같은 period 다건일 때 단건 순차 호출이 sort_order 중복을 유발하므로 배치로 원자 처리.
+      const addGroup: { month: string; task: TimelineTask; title: string; period: ChecklistPeriod; deadline: string }[] = [];
       for (const { month, task, decision } of pending) {
-        const ok = await runDecision(decision);
-        if (ok && (decision.kind === 'apply' || decision.kind === 'add')) {
-          const kind = decision.kind;
-          if (kind === 'apply') applied++;
-          else added++;
-          setAppliedKinds((prev) => new Map(prev).set(taskKey(month, task), kind));
-        } else {
-          failed++;
+        if (decision.kind === 'apply') {
+          const ok = await runDecision(decision);
+          if (ok) {
+            applied++;
+            setAppliedKinds((prev) => new Map(prev).set(taskKey(month, task), 'apply'));
+          } else {
+            failed++;
+          }
+        } else if (decision.kind === 'add') {
+          addGroup.push({ month, task, title: decision.title, period: decision.period, deadline: decision.deadline });
         }
       }
+
+      if (addGroup.length > 0) {
+        if (onAddTasks) {
+          // 배치(원자적 단일 insert) — 성공 시 그룹 전체 적용 표시, 실패 시 전체 실패로 집계
+          const res = await onAddTasks(
+            addGroup.map((a) => ({ title: a.title, period: a.period, dueDate: a.deadline })),
+          );
+          added += res.added;
+          failed += res.failed;
+          if (res.added > 0) {
+            for (const a of addGroup) {
+              setAppliedKinds((prev) => new Map(prev).set(taskKey(a.month, a.task), 'add'));
+            }
+          }
+        } else {
+          // 하위호환 폴백: onAddTasks 미제공 → 단건 순차(구 동작 유지)
+          for (const a of addGroup) {
+            const ok = await Promise.resolve(onAddTask?.(a.title, a.period, a.deadline));
+            if (ok !== false) {
+              added++;
+              setAppliedKinds((prev) => new Map(prev).set(taskKey(a.month, a.task), 'add'));
+            } else {
+              failed++;
+            }
+          }
+        }
+      }
+
       toast({
         title: 'AI 일정이 체크리스트에 반영되었어요',
         description: `기한 적용 ${applied}건 · 새 항목 ${added}건${failed > 0 ? ` · 실패 ${failed}건` : ''}`,

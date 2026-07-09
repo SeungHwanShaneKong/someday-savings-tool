@@ -16,22 +16,33 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** 제어문자(C0 0x00-0x1F · DEL 0x7F · C1 0x80-0x9F) 여부 — regex 대신 코드포인트 판정(순수 ASCII 소스). */
+/** 제어문자 여부 — C0(0x00-0x1F)·DEL(0x7F)·C1(0x80-0x9F) + U+2028/U+2029(줄·문단 구분자).
+ *  [CL-AUDIT6-DEF-20260710] U+2028/U+2029 추가: isControlChar 범위 밖이라 제목에서 줄바꿈처럼 렌더될 수
+ *  있던 cosmetic 결함 차단(JSON transport 라 헤더 인젝션은 불가했으나 표시 무결성 근본강화). */
 function isControlChar(code: number): boolean {
-  return code <= 0x1f || code === 0x7f || (code >= 0x80 && code <= 0x9f);
+  return (
+    code <= 0x1f ||
+    code === 0x7f ||
+    (code >= 0x80 && code <= 0x9f) ||
+    code === 0x2028 ||
+    code === 0x2029
+  );
 }
 
-/** V10: 헤더(제목)용 — 제어문자/개행 제거 + trim + 길이 상한(헤더 주입·과장 차단). */
+/** V10: 헤더(제목)용 — 제어문자/개행/줄구분자 제거 + trim + 길이 상한(헤더 주입·과장 차단).
+ *  [CL-AUDIT6-DEF-20260710] 길이 절단을 코드유닛(slice) → 코드포인트 단위로 교정: 이모지(서로게이트 페어)가
+ *  경계에 걸쳐 상위 서로게이트만 남아 깨진 문자(U+FFFD)로 렌더되던 cosmetic 결함을 구조적으로 차단. */
 export function sanitizeHeaderText(raw: string | null | undefined, maxLen = 60): string {
   if (raw == null) return '';
-  let out = '';
+  const chars: string[] = [];
   for (const ch of String(raw)) {
     const code = ch.codePointAt(0) ?? 0;
-    if (isControlChar(code)) continue; // 개행/제어문자 → 헤더 인젝션 차단
-    out += ch;
+    if (isControlChar(code)) continue; // 개행/제어문자/줄구분자 → 헤더 인젝션·다중행 차단
+    chars.push(ch);
   }
-  out = out.trim();
-  return out.length > maxLen ? out.slice(0, maxLen) : out;
+  const trimmed = chars.join('').trim();
+  const cps = [...trimmed]; // 코드포인트 배열(서로게이트 페어 = 1 요소) → 페어 중간 절단 방지
+  return cps.length > maxLen ? cps.slice(0, maxLen).join('') : trimmed;
 }
 
 /** V10: 발신자 표시명 정규화 — 제어문자 제거 + 40자 상한(DB CHECK 와 정합) + 빈값 폴백. */

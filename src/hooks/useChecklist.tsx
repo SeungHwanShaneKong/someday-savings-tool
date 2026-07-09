@@ -316,6 +316,74 @@ export function useChecklist() {
     [user, items, weddingDate, toast]
   );
 
+  // ─── Add custom items (batch) ───
+  // [CL-AUDIT6-D1-20260710] 적대 감사 확정결함 D-1 근본수정 — 다건 추가 시 sort_order 중복 차단.
+  //   근본원인: 단건 addCustomItem 의 클로저 items 스냅샷은 리렌더 커밋 전까지 갱신되지 않아,
+  //     같은 period 로 리렌더 없이 연속 호출하면 maxOrder 가 동일 → sort_order 전부 중복 저장.
+  //     신규 진입점 "모두 적용"(TimelinePanel.handleApplyAll)이 이를 현실화(같은 달 다건 add).
+  //   근본해결: 배치는 단일 호출 안에서 period별 순번을 직접 증가시키고 단일 insert(원자적·DB 왕복 1회) →
+  //     연속 호출 패턴 자체를 제거해 stale 클로저 결함을 구조적으로 소거.
+  const addCustomItems = useCallback(
+    async (
+      additions: ReadonlyArray<{ title: string; period: ChecklistPeriod; dueDate?: string | null }>,
+    ): Promise<{ added: number; failed: number }> => {
+      if (!user || additions.length === 0) return { added: 0, failed: additions.length };
+
+      // period별로 이 시점 최신 items 의 maxOrder 를 1회 계산한 뒤, 배치 내에서 순번을 직접 증가.
+      const nextOrder = new Map<ChecklistPeriod, number>();
+      const addCountByPeriod = new Map<ChecklistPeriod, number>();
+      for (const a of additions) {
+        addCountByPeriod.set(a.period, (addCountByPeriod.get(a.period) ?? 0) + 1);
+      }
+
+      const rows = additions.map((a) => {
+        let cur = nextOrder.get(a.period);
+        if (cur === undefined) {
+          const periodItems = items.filter((i) => i.period === a.period);
+          cur = Math.max(0, ...periodItems.map((i) => i.sort_order));
+        }
+        const sortOrder = cur + 1;
+        nextOrder.set(a.period, sortOrder); // 같은 period 다음 항목은 +1 (중복 불가)
+
+        const existingInPeriod = items.filter((i) => i.period === a.period).length;
+        const totalInPeriod = existingInPeriod + (addCountByPeriod.get(a.period) ?? 0);
+        return {
+          user_id: user.id,
+          title: a.title,
+          period: a.period,
+          sort_order: sortOrder,
+          is_custom: true,
+          due_date:
+            a.dueDate !== undefined
+              ? a.dueDate
+              : weddingDate
+                ? calculateDueDate(weddingDate, a.period, sortOrder, totalInPeriod)
+                : null,
+        };
+      });
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabase as any)
+          .from('user_checklist_items')
+          .insert(rows)
+          .select();
+        if (error) throw error;
+        const inserted = (data ?? []) as ChecklistItem[];
+        if (inserted.length > 0) setItems((prev) => [...prev, ...inserted]);
+        return { added: inserted.length, failed: additions.length - inserted.length };
+      } catch (error: unknown) {
+        toast({
+          title: '추가 실패',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        });
+        return { added: 0, failed: additions.length };
+      }
+    },
+    [user, items, weddingDate, toast]
+  );
+
   // ─── Delete item ───
   const deleteItem = useCallback(
     async (itemId: string) => {
@@ -571,6 +639,7 @@ export function useChecklist() {
     setPraiseEvent,
     toggleItem,
     addCustomItem,
+    addCustomItems, // [CL-AUDIT6-D1-20260710] 배치 추가(sort_order 중복 차단) — "모두 적용"용
     deleteItem,
     updateNotes,
     updateDueDate, // [CL-CHECKUX-20260709-232512] AI 타임라인 "기한 적용"

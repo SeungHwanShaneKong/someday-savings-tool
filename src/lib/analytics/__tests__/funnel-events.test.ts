@@ -18,15 +18,16 @@ describe('trackFunnel', () => {
     });
   });
 
+  // [CL-LOGIN-GATE-20260709-233447] demo_* 이벤트 폐지 → 생존 이벤트로 스왑(로직 불변)
   it('gtag 부재(차단기/프리렌더) 시 throw 없이 무음 no-op', () => {
-    expect(() => trackFunnel('demo_start')).not.toThrow();
+    expect(() => trackFunnel('wizard_enter')).not.toThrow();
   });
 
   it('gtag 가 내부에서 throw 해도 호출부로 전파되지 않는다', () => {
     (window as { gtag?: unknown }).gtag = () => {
       throw new Error('boom');
     };
-    expect(() => trackFunnel('auth_view', { from: 'demo' })).not.toThrow();
+    expect(() => trackFunnel('auth_view', { from: 'landing' })).not.toThrow();
   });
 
   it('params 미전달 시에도 app_area 기본값으로 전송한다', () => {
@@ -50,16 +51,16 @@ describe('trackFunnelOnce', () => {
   it('같은 세션에서 같은 이벤트는 1회만 전송한다', () => {
     const gtag = vi.fn();
     (window as { gtag?: unknown }).gtag = gtag;
-    trackFunnelOnce('demo_start');
-    trackFunnelOnce('demo_start');
-    trackFunnelOnce('demo_start');
+    trackFunnelOnce('wizard_enter');
+    trackFunnelOnce('wizard_enter');
+    trackFunnelOnce('wizard_enter');
     expect(gtag).toHaveBeenCalledTimes(1);
   });
 
   it('서로 다른 이벤트는 각각 전송된다', () => {
     const gtag = vi.fn();
     (window as { gtag?: unknown }).gtag = gtag;
-    trackFunnelOnce('demo_start');
+    trackFunnelOnce('auth_view');
     trackFunnelOnce('social_proof_view');
     expect(gtag).toHaveBeenCalledTimes(2);
   });

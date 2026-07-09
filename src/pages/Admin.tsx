@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useAdminKPI } from '@/hooks/useAdminKPI';
@@ -47,6 +47,10 @@ import { SEOAmplifierPanel } from '@/components/admin/SEOAmplifierPanel';
 // [CL-ADMIN-FEATURE-REQ-20260403] 기능 요청 패널
 import { FeatureRequestPanel } from '@/components/admin/FeatureRequestPanel';
 import { useFeatureRequests } from '@/hooks/useFeatureRequests';
+// [CL-ADMIN-VISITOR-20260709-231827] 일별 접속자(익명 vs 로그인) 카드 + 7일 이동평균(전부 클라이언트 계산)
+import { VisitorTrendCard } from '@/components/admin/VisitorTrendCard';
+import { mergeVisitorTrend } from '@/lib/admin/trend-compute';
+import { withMovingAverage } from '@/lib/admin/moving-average';
 
 // ========= 기간 프리셋 =========
 const PERIOD_OPTIONS = [
@@ -78,6 +82,7 @@ function calcChangePercent(current: number, prev: number): number {
 
 export default function Admin() {
   const navigate = useNavigate();
+  const location = useLocation(); // [CL-LOGIN-GATE-20260709-233447] returnTo 원위치 캡처
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const qc = useQueryClient();
@@ -158,10 +163,31 @@ export default function Admin() {
     return { views, sessions };
   }, [anonTrafficTrend]);
 
+  // [CL-ADMIN-VISITOR-20260709-231827] 일별 접속자 = 익명 세션(sparse, 'M/d' 조인) + 로그인 DAU(dense 프레임)
+  //   + total 7일 MA. keepPreviousData 와 정합: 이전 참조 유지 시 useMemo 재계산 없음.
+  const visitorPoints = useMemo(
+    () => withMovingAverage(mergeVisitorTrend(trendData, anonTrafficTrend), 'total', 7, 'totalMA7'),
+    [trendData, anonTrafficTrend],
+  );
+
+  // [CL-ADMIN-VISITOR-20260709-231827] 주요 추이 차트 7일 MA 오버레이(pv/loyal/duration/dau) — null-head(가짜 0 없음)
+  const trendWithMA = useMemo(() => {
+    const withPv = withMovingAverage(trendData, 'pv', 7, 'pvMA7');
+    const withLoyal = withMovingAverage(withPv, 'loyalCount', 7, 'loyalMA7');
+    const withDur = withMovingAverage(withLoyal, 'avgDuration', 7, 'durMA7');
+    return withMovingAverage(withDur, 'dau', 7, 'dauMA7');
+  }, [trendData]);
+
   useEffect(() => {
-    if (!authLoading && !user) { navigate('/auth'); return; }
+    // [CL-LOGIN-GATE-20260709-233447] 비로그인 → /auth (returnTo state 전달로 로그인 후 원위치 복귀)
+    if (!authLoading && !user) {
+      navigate('/auth', {
+        state: { returnTo: location.pathname + location.search },
+      });
+      return;
+    }
     if (!adminLoading && !isAdmin) { navigate('/'); return; }
-  }, [user, authLoading, isAdmin, adminLoading, navigate]);
+  }, [user, authLoading, isAdmin, adminLoading, navigate, location.pathname, location.search]);
 
   // [EF-RESILIENCE-20260308-041500] 초기 1회 Edge 헬스 체크(데이터 폴링은 React Query 가 자동 수행).
   useEffect(() => {
@@ -375,15 +401,23 @@ export default function Admin() {
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">활성 사용자 추이 (DAU / WAU / MAU)</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
+                    {/* [CL-ADMIN-VISITOR-20260709-231827] DAU 7일 MA 점선만 추가(WAU/MAU MA 는 과밀 방지 생략) */}
+                    <LineChart data={trendWithMA}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
-                      <RechartsTooltip contentStyle={chartTooltipStyle} />
+                      <RechartsTooltip
+                        contentStyle={chartTooltipStyle}
+                        formatter={(value: number | null, name: string) =>
+                          value === null || value === undefined
+                            ? ['—', name]
+                            : [name === 'DAU 7일 평균' ? Math.round(value * 10) / 10 : value, name]}
+                      />
                       <Legend wrapperStyle={{ fontSize: '13px' }} />
                       <Line type="monotone" dataKey="dau" name="DAU" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
                       <Line type="monotone" dataKey="wau" name="WAU" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
                       <Line type="monotone" dataKey="mau" name="MAU" stroke="#06b6d4" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="dauMA7" name="DAU 7일 평균" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 4" dot={false} legendType="plainline" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -617,12 +651,16 @@ export default function Admin() {
                 )}
               </Card>
 
+              {/* [CL-ADMIN-VISITOR-20260709-231827] 일별 접속자(익명 vs 로그인 + 비율) — 페이지뷰 추이 바로 위 */}
+              <VisitorTrendCard points={visitorPoints} anonAvailable={anonTotals.sessions > 0} />
+
               {/* 페이지뷰 추이 */}
+              {/* [CL-ADMIN-VISITOR-20260709-231827] AreaChart→ComposedChart(AreaChart 는 Line 자식 무음 미렌더) + 7일 MA 점선 */}
               <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">페이지뷰 추이</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData}>
+                    <ComposedChart data={trendWithMA}>
                       <defs>
                         <linearGradient id="gradPV" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
@@ -634,22 +672,27 @@ export default function Admin() {
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <RechartsTooltip
                         contentStyle={chartTooltipStyle}
-                        formatter={(value: number) => [`${value}건`, 'PV']}
+                        formatter={(value: number | null, name: string) =>
+                          value === null || value === undefined
+                            ? ['—', name]
+                            : [`${Math.round(value * 10) / 10}건`, name]}
                         labelFormatter={(label) => `날짜: ${label}`}
                       />
                       <Legend wrapperStyle={{ fontSize: '13px' }} />
                       <Area type="monotone" dataKey="pv" name="페이지뷰" stroke="#3b82f6" strokeWidth={2} fill="url(#gradPV)" dot={false} activeDot={{ r: 6 }} />
-                    </AreaChart>
+                      <Line type="monotone" dataKey="pvMA7" name="7일 평균" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 4" dot={false} legendType="plainline" />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
               {/* 충성 고객 추이 */}
+              {/* [CL-ADMIN-VISITOR-20260709-231827] AreaChart→ComposedChart + 7일 MA 점선 */}
               <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">충성 고객 추이</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData}>
+                    <ComposedChart data={trendWithMA}>
                       <defs>
                         <linearGradient id="gradLoyal" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15} />
@@ -661,22 +704,27 @@ export default function Admin() {
                       <YAxis tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
                       <RechartsTooltip
                         contentStyle={chartTooltipStyle}
-                        formatter={(value: number) => [`${value}명`, '충성 고객']}
+                        formatter={(value: number | null, name: string) =>
+                          value === null || value === undefined
+                            ? ['—', name]
+                            : [`${Math.round(value * 10) / 10}명`, name]}
                         labelFormatter={(label) => `날짜: ${label}`}
                       />
                       <Legend wrapperStyle={{ fontSize: '13px' }} />
                       <Area type="monotone" dataKey="loyalCount" name="충성 고객" stroke="#8b5cf6" strokeWidth={2} fill="url(#gradLoyal)" dot={false} activeDot={{ r: 6 }} />
-                    </AreaChart>
+                      <Line type="monotone" dataKey="loyalMA7" name="7일 평균" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 4" dot={false} legendType="plainline" />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </Card>
 
               {/* 평균 체류 시간 추이 */}
+              {/* [CL-ADMIN-VISITOR-20260709-231827] AreaChart→ComposedChart + 7일 MA 점선(기존 m분 s초 formatter 재사용) */}
               <Card className="p-4 sm:p-5 hover:shadow-md transition-shadow">
                 <h3 className="text-sm sm:text-base font-semibold mb-3 leading-relaxed">평균 체류 시간 추이</h3>
                 <div className="h-56 sm:h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData}>
+                    <ComposedChart data={trendWithMA}>
                       <defs>
                         <linearGradient id="gradDuration" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15} />
@@ -696,16 +744,18 @@ export default function Admin() {
                       />
                       <RechartsTooltip
                         contentStyle={chartTooltipStyle}
-                        formatter={(value: number) => {
+                        formatter={(value: number | null, name: string) => {
+                          if (value === null || value === undefined) return ['—', name];
                           const m = Math.floor(value / 60);
                           const s = Math.round(value % 60);
-                          return [`${m}분 ${s < 10 ? '0' : ''}${s}초`, '체류 시간'];
+                          return [`${m}분 ${s < 10 ? '0' : ''}${s}초`, name];
                         }}
                         labelFormatter={(label) => `날짜: ${label}`}
                       />
                       <Legend wrapperStyle={{ fontSize: '13px' }} />
                       <Area type="monotone" dataKey="avgDuration" name="체류 시간" stroke="#f59e0b" strokeWidth={2} fill="url(#gradDuration)" dot={false} activeDot={{ r: 6 }} />
-                    </AreaChart>
+                      <Line type="monotone" dataKey="durMA7" name="7일 평균" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 4" dot={false} legendType="plainline" />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               </Card>

@@ -410,6 +410,33 @@ export function getActivePeriod(weddingDate: string): ChecklistPeriod | null {
   return null; // 결혼식 이후
 }
 
+// [CL-CHECKUX-20260709-232512] getActivePeriod 의 일반화(역함수) — "오늘" 대신 임의 날짜가
+//   어느 기간 버킷에 속하는지 계산. AI 타임라인 결과(deadline)를 체크리스트 기간으로 사상할 때 사용.
+//   경계·월 산술(30.44일)은 getActivePeriod 와 완전 동일 프레임 유지(두 함수가 어긋나면 안 됨).
+//   반환 null = 결혼식 1개월 이후(기간 밖). 잘못된 날짜 입력도 null.
+export function getPeriodForDate(
+  weddingDate: string,
+  date: string,
+): ChecklistPeriod | null {
+  const wedding = new Date(weddingDate);
+  const target = new Date(date);
+  if (Number.isNaN(wedding.getTime()) || Number.isNaN(target.getTime())) return null;
+
+  const diffMs = wedding.getTime() - target.getTime();
+  const diffMonths = diffMs / (1000 * 60 * 60 * 24 * 30.44);
+
+  if (diffMonths > 10) return 'D-12~10m';
+  if (diffMonths > 8) return 'D-10~8m';
+  if (diffMonths > 6) return 'D-8~6m';
+  if (diffMonths > 5) return 'D-6~5m';
+  if (diffMonths > 4) return 'D-5~4m';
+  if (diffMonths > 3) return 'D-4~3m';
+  if (diffMonths > 2) return 'D-3~2m';
+  if (diffMonths > 1) return 'D-2~1m';
+  if (diffMonths > -1) return 'D-1~0';
+  return null; // 결혼식 이후
+}
+
 /**
  * D-day 기반 due_date 계산
  * 각 기간의 중간 시점을 due_date로 설정

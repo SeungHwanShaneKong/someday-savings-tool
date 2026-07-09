@@ -1,6 +1,6 @@
 /** [CL-QA100-BTN-20260531] Landing/ChatFab 버튼 검증 */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithProviders, screen, fireEvent, within, currentPath } from '@/test/test-utils';
+import { renderWithProviders, screen, fireEvent, within, currentPath, waitFor } from '@/test/test-utils';
 import Landing from '../Landing';
 
 /* ─── useAuth mock (hoisted) ─── */
@@ -177,26 +177,61 @@ describe('Landing — 버튼/네비게이션', () => {
 });
 
 /* ─── [CL-TOP20-P2-VERIFY-20260703-031500] 허브↔방문자 도구 상호배타 게이팅 (독립검증 관찰 1 반영) ─── */
+/* [CL-LOGIN-GATE-20260709-233447] 시뮬레이터 폐지 → HeroSignupCard(직접 Google 로그인) 재타깃 */
 describe('로그인 허브 게이팅 (Top20 #9)', () => {
-  it('비로그인: 시뮬레이터 표시 + 허브 미표시', () => {
+  it('비로그인: 히어로 가입 카드 표시 + 허브 미표시', () => {
     renderWithProviders(<Landing />);
-    expect(screen.getByText('우리 결혼, 얼마나 들까요?')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Google로 10초 만에 시작' }),
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
   });
 
-  it('로그인: 허브(빠른 이동 카드) 표시 + 시뮬레이터·챗프리뷰 미표시', () => {
+  it('로그인: 허브(빠른 이동 카드) 표시 + 가입 카드·챗프리뷰 미표시', () => {
     mockAuth.user = { id: 'u1', email: 't@t.dev' };
     renderWithProviders(<Landing />);
     expect(screen.getByLabelText('내 결혼 준비 현황')).toBeInTheDocument();
     expect(screen.getByText('예산 이어하기')).toBeInTheDocument();
-    expect(screen.queryByText('우리 결혼, 얼마나 들까요?')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Google로 10초 만에 시작' }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI 웨딩 챗봇 미리보기')).not.toBeInTheDocument();
   });
 
-  it('인증 확정 전(loading): 허브·시뮬레이터 둘 다 미표시(오표시 플래시 방지)', () => {
+  it('인증 확정 전(loading): 허브·가입 카드 둘 다 미표시(오표시 플래시 방지)', () => {
     mockAuth.loading = true;
     renderWithProviders(<Landing />);
     expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
-    expect(screen.queryByText('우리 결혼, 얼마나 들까요?')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Google로 10초 만에 시작' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+/* ─── [CL-LOGIN-GATE-20260709-233447] 히어로 가입 카드 — 랜딩에서 직접 Google 로그인 ─── */
+describe('HeroSignupCard 통합 — 직접 Google 로그인', () => {
+  it('G1: Google 버튼 클릭 → signInWithGoogle 1회 호출', async () => {
+    renderWithProviders(<Landing />);
+    fireEvent.click(screen.getByRole('button', { name: 'Google로 10초 만에 시작' }));
+    await waitFor(() => expect(mockAuth.signInWithGoogle).toHaveBeenCalledTimes(1));
+  });
+
+  it('G2: "다른 방법으로 시작" 클릭 → /auth 이동(보조 경로)', () => {
+    renderWithProviders(<Landing />);
+    fireEvent.click(screen.getByRole('button', { name: '다른 방법으로 시작' }));
+    expect(currentPath()).toBe('/auth');
+  });
+
+  it('G3: 폐지된 "가입 없이 둘러보기"(/demo) CTA 는 렌더되지 않는다(회귀 가드)', () => {
+    renderWithProviders(<Landing />);
+    expect(screen.queryByText('가입 없이 둘러보기')).not.toBeInTheDocument();
+  });
+
+  it('G4: 신뢰 칩 3종이 카드에 렌더된다', () => {
+    renderWithProviders(<Landing />);
+    // 칩 li 는 이모지(aria-hidden) + 텍스트 복합 노드 → 부분 매칭(regex)
+    expect(screen.getByText(/이메일 주소만 사용해요/)).toBeInTheDocument();
+    expect(screen.getByText(/비밀번호 없이 10초/)).toBeInTheDocument();
+    expect(screen.getByText(/평생 무료·카드 등록 없음/)).toBeInTheDocument();
   });
 });

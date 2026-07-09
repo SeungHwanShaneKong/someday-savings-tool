@@ -1,0 +1,38 @@
+<!-- [CL-BRAND-HEART-20260709-231800] 웨딩셈 브랜드 마크 마스터(벡터 단일소스).
+     컨셉: 서로 기울어 겹친 두 하트(신랑·신부) — 뒤 하트는 블러시 톤, 앞 하트는 딥 핑크 그라데이션.
+     모든 래스터 자산(og/pwa/favicon)은 scripts/generate-brand-assets.mjs 가 이 파일에서 렌더한다.
+     수정 시 반드시 `pnpm run brand:assets` 재실행. -->
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="웨딩셈 하트 마크">
+  <defs>
+    <linearGradient id="gFront" x1="18%" y1="8%" x2="82%" y2="96%">
+      <stop offset="0%" stop-color="#FF8FB3"/>
+      <stop offset="52%" stop-color="#F2547F"/>
+      <stop offset="100%" stop-color="#DE2F63"/>
+    </linearGradient>
+    <linearGradient id="gBack" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#FFDCE7"/>
+      <stop offset="100%" stop-color="#FFAEC6"/>
+    </linearGradient>
+    <radialGradient id="gShine" cx="32%" cy="24%" r="45%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#D42A5E" flood-opacity="0.28"/>
+    </filter>
+    <!-- 하트 원형 패스 (100x90 좌표계) — 양쪽 로브가 부드럽게 만나는 클래식 실루엣 -->
+    <path id="heart" d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z"/>
+  </defs>
+
+  <!-- 뒤 하트(블러시) — 좌상단으로 살짝 밀고 반시계 기울임 -->
+  <g transform="translate(150 132) rotate(-14 150 135) scale(3.1)">
+    <use href="#heart" fill="url(#gBack)" opacity="0.92"/>
+  </g>
+
+  <!-- 앞 하트(딥 핑크) — 우하단, 시계 방향 기울임 + 소프트 섀도 -->
+  <g transform="translate(112 130) rotate(9 200 180) scale(3.34)" filter="url(#softShadow)">
+    <use href="#heart" fill="url(#gFront)"/>
+    <!-- 좌상단 로브 하이라이트 — 유리질 광택 -->
+    <ellipse cx="30" cy="22" rx="17" ry="12" fill="url(#gShine)" transform="rotate(-18 30 22)"/>
+  </g>
+</svg>

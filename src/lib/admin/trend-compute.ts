@@ -55,3 +55,43 @@ export function avgPositiveDuration(rows: { duration_seconds?: number | null }[]
   if (ds.length === 0) return 0;
   return Math.round(ds.reduce((a, b) => a + b, 0) / ds.length);
 }
+
+// [CL-ADMIN-VISITOR-20260709-231827] 일별 접속자(익명 세션 + 로그인 사용자) 병합 — '일별 접속자 (추정)' 카드용.
+//   모집단 상호배타 근거: usePageTracking 이 page_views(로그인)와 track-visit(익명, user 있으면 return)를
+//   분기하므로 같은 인스턴트에 이중 기록 없음(같은 날 로그인 전 방문은 익명 1회 포함 가능 — 카드 각주로 고지).
+//   조인 키 = 'M/d' KST 라벨(양쪽 소스 모두 KST 달력일에서 파생) → TZ 불변성은 라벨 생성부(kst-time 골든)가 보증.
+export interface VisitorTrendPoint {
+  date: string;
+  /** 익명 방문 세션 수(anon_page_views RPC, sparse day 는 0 필) */
+  anonSessions: number;
+  /** 로그인 활성 사용자 수(DAU) */
+  loginUsers: number;
+  /** 총 접속자(추정) = anonSessions + loginUsers */
+  total: number;
+  /** 로그인 비율 %(0~100). total=0 이면 null(0% 오도 금지) */
+  loginRatio: number | null;
+}
+
+/**
+ * trend(dense, 일별 프레임)를 기준으로 순회하며 anon(sparse)을 'M/d' 라벨로 조인.
+ * anon 에만 존재하는 날(트렌드 프레임 밖)은 무시 — 결과 길이 = trend 길이.
+ */
+export function mergeVisitorTrend(
+  trend: ReadonlyArray<{ date: string; dau?: number }>,
+  anon: ReadonlyArray<{ day: string; sessions: number }>,
+): VisitorTrendPoint[] {
+  const anonByDay = new Map<string, number>();
+  for (const a of anon) anonByDay.set(a.day, (anonByDay.get(a.day) ?? 0) + (a.sessions || 0));
+  return trend.map((t) => {
+    const anonSessions = anonByDay.get(t.date) ?? 0;
+    const loginUsers = t.dau ?? 0;
+    const total = anonSessions + loginUsers;
+    return {
+      date: t.date,
+      anonSessions,
+      loginUsers,
+      total,
+      loginRatio: total > 0 ? (loginUsers / total) * 100 : null,
+    };
+  });
+}

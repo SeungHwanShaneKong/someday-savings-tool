@@ -259,6 +259,9 @@ export default function Article() {
     description: article?.description,
     path: article ? `/guide/${article.slug}/` : '/guide/',
     jsonLd,
+    // [CL-OGIMG-20260710-005500] 아티클별 OG 카드(/og/<slug>.png, 머지 루프 기본값) — 프리렌더 verify 가
+    // 정적 HTML 주입을 강제. ⚠️ 병렬 작업 중 1회 소실된 이력(프리렌더가 적발) — 삭제 금지.
+    image: article?.image,
   });
 
   // 존재하지 않는 slug → 가이드 허브로 리다이렉트

@@ -1,5 +1,7 @@
 // [CL-TOP20-P3-CHECK-20260703-030000] Checklist 페이지 — 긴급도 위계 배선 통합 검증
-// (오버듀 배너 세션 1회 · 스크롤 앵커 · 긴급순 토글 end-to-end)
+// [CL-CHECKUX-20260709-232512] C1/C2 재타깃: 세션 1회 OverdueAlertBanner → 상시 FocusNowCard 승계.
+//   "세션 1회" 단언은 설계상 삭제 — 카드는 새로고침/재방문에도 항상 보이는 것이 새 계약이다.
+// (지금 할 일 카드 · 스크롤 앵커 · 긴급순 토글 end-to-end)
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { renderWithProviders } from '@/test/test-utils';
@@ -102,32 +104,43 @@ beforeEach(() => {
 });
 
 describe('Checklist 페이지 — 긴급도 위계 통합', () => {
-  it('C1 overdue 존재 → 상단 배너 노출, "밀린 일정 보러 가기" → 대상 기간 앵커로 scrollIntoView', () => {
+  it('C1 overdue 존재 → 지금 할 일 카드에 카운트 노출, 행 클릭 → 대상 기간 앵커로 scrollIntoView', () => {
     renderWithProviders(<Checklist />, { route: '/checklist' });
 
-    const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('기한이 지난 할 일이 1개 있어요');
-    expect(alert).toHaveTextContent('12~10개월 전');
+    const card = screen.getByRole('region', { name: '지금 할 일' });
+    expect(card).toHaveTextContent('기한 지난 할 일 1개');
+    // overdue 항목 행이 최상단(위계 정렬)에 노출
+    expect(card).toHaveTextContent('item-overdue');
 
     // 스크롤 앵커가 실제 DOM 에 존재
     const anchor = document.getElementById('checklist-period-D-12~10m');
     expect(anchor).not.toBeNull();
 
-    fireEvent.click(within(alert).getByRole('button', { name: /밀린 일정 보러 가기/ }));
+    fireEvent.click(
+      within(card).getByRole('button', {
+        name: 'item-overdue — 12~10개월 전 구간으로 이동',
+      }),
+    );
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
-  it('C2 세션 내 이미 노출됨 → 배너 미노출(세션 1회)', () => {
+  it('C2 상시 노출 — 구 배너의 세션 1회 마킹이 있어도 카드는 항상 보인다(설계 변경)', () => {
+    // 의도 문서화: OverdueAlertBanner 는 세션 1회 후 사라져 "한눈에 안 들어옴" 문제를 남겼다.
+    // FocusNowCard 는 sessionStorage 게이트 없이 상시 노출이 새 계약이다.
     sessionStorage.setItem('wsem-checklist-overdue-banner-seen', '1');
     renderWithProviders(<Checklist />, { route: '/checklist' });
-    expect(screen.queryByRole('alert')).toBeNull();
+
+    const card = screen.getByRole('region', { name: '지금 할 일' });
+    expect(card).toHaveTextContent('기한 지난 할 일 1개');
   });
 
   it('C3 긴급순 토글 → 첫 기간 섹션 항목이 due 임박순으로 재배열, off 복귀 시 원순서', () => {
     renderWithProviders(<Checklist />, { route: '/checklist' });
 
+    // [CL-CHECKUX-20260709-232512] FocusNowCard 도 항목 제목을 렌더하므로 기간 섹션으로 스코핑
+    const section = document.getElementById('checklist-period-D-12~10m')!;
     const order = () =>
-      screen
+      within(section)
         .getAllByText(/^item-(future|overdue)$/)
         .map((el) => el.textContent as string);
 

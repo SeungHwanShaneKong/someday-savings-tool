@@ -42,9 +42,10 @@ import { useAIExternalNavigation } from '@/hooks/useAIExternalNavigation';
 // [CL-GAMIFY-INT-20260418-222329] 로그인 streak 노출
 import { StreakFlame } from '@/components/gamification/StreakFlame';
 import { useStreak } from '@/hooks/useStreak';
-// [CL-TOP20-P1-LANDING-20260703-014500] Top20 P1 방문자 대도약 — 웨딩 마크·미니 시뮬레이터·챗 프리뷰·신뢰 섹션·퍼널 계측
+// [CL-TOP20-P1-LANDING-20260703-014500] Top20 P1 방문자 대도약 — 웨딩 마크·챗 프리뷰·신뢰 섹션·퍼널 계측
 import { WeddingMark } from '@/components/landing/WeddingMark';
-import { LandingBudgetSimulator } from '@/components/landing/LandingBudgetSimulator';
+// [CL-LOGIN-GATE-20260709-233447] 시뮬레이터/데모 폐지 → 직접 Google 로그인 가입 카드
+import { HeroSignupCard } from '@/components/landing/HeroSignupCard';
 import { ChatPreview } from '@/components/landing/ChatPreview';
 import TrustSection from '@/components/landing/TrustSection';
 import { trackFunnel } from '@/lib/analytics/funnel-events';
@@ -420,16 +421,16 @@ export default function Landing() {
           </section>
         )}
 
-        {/* ─── [CL-TOP20-P1-LANDING-20260703-014500] 인터랙티브 미니 시뮬레이터 (Top20 #3) — 비로그인 전용 ─── */}
+        {/* ─── [CL-LOGIN-GATE-20260709-233447] 히어로 가입 카드 — 비로그인 전용(시뮬레이터/데모 폐지 슬롯) ─── */}
         {!loading && !user && (
           <section
             className="w-full max-w-lg mb-10 animate-fade-up"
             style={{ animationDelay: '0.22s' }}
-            aria-label="예상 결혼 예산 미니 계산기"
+            aria-label="Google 계정으로 빠른 시작"
           >
-            <LandingBudgetSimulator
-              onStartClick={() => navigate('/auth')}
-              onDemoClick={() => navigate('/demo')}
+            <HeroSignupCard
+              isInAppBrowser={browserInfo.isInAppBrowser}
+              onInAppEscape={handleRetryBreakout}
             />
           </section>
         )}
@@ -547,21 +548,7 @@ export default function Landing() {
             30초면 시작할 수 있어요 · 카드 등록 없음
           </p>
 
-          {/* [CL-TOP20-P1-DEMO-20260703-014500] 가입 전 체험 브리지(Top20 #1) — 비로그인만 */}
-          {!loading && !user && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                // [CL-TOP20-P1-VERIFY-20260703-022000] 검증관 지적: convert(데모→가입)와 의미 분리 — 진입 전용 이벤트
-                trackFunnel('demo_enter_click', { from: 'landing_cta' });
-                navigate('/demo');
-              }}
-              className="mt-3 w-full h-11 rounded-xl border-wedding-rose/30 text-foreground hover:bg-wedding-rose-soft/60"
-            >
-              가입 없이 둘러보기
-            </Button>
-          )}
-
+          {/* [CL-LOGIN-GATE-20260709-233447] "가입 없이 둘러보기"(/demo) CTA 폐지 — 로그인 필수화 */}
           {!loading && !user && (
             <button
               onClick={() => navigate('/auth')}
@@ -650,8 +637,9 @@ export default function Landing() {
               </Link>
             ))}
           </div>
+          {/* [CL-ADSENSE-MAX-20260710-002000] 콘텐츠 볼륨 노출 — 편수는 레지스트리 파생(하드코딩 금지) */}
           <Link to="/guide/" className="inline-flex items-center gap-1 text-sm text-primary hover:underline mb-8">
-            결혼 예산 가이드 전체 보기 →
+            결혼 예산 가이드 {ARTICLES.length}편 전체 보기 →
           </Link>
 
           {/* FAQ 프리뷰 */}
@@ -735,8 +723,9 @@ const FeatureCard = forwardRef<HTMLDivElement, { feature: Feature; onNavigate?: 
             {feature.description}
           </p>
           {onNavigate && (
+            /* [CL-LOGIN-GATE-20260709-233447] 기능이 로그인 게이트이므로 '체험' 카피는 부정확 → '바로가기' */
             <p className={cn('text-xs text-primary font-medium mt-1.5')}>
-              체험하기 →
+              바로가기 →
             </p>
           )}
         </div>

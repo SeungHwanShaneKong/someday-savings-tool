@@ -10,8 +10,9 @@ import type { Article } from './articles';
 
 type Source = NonNullable<Article['sources']>[number];
 
-/** 자주 인용되는 공개 출처(중복 정의 방지용 상수). */
-const S = {
+/** 자주 인용되는 공개 출처(중복 정의 방지용 상수).
+ *  [CL-ADSENSE-MAX-20260709-234500] t5/t6 신규 아티클이 재사용하도록 export 승격(중복 정의 금지). */
+export const S = {
   duo: {
     title: '2024 결혼비용 보고서 — 신혼부부 1,000명 조사',
     url: 'https://www.beyondpost.co.kr/view.php?ud=2025030410152157439aeda69934_30',
@@ -57,6 +58,19 @@ const S = {
     url: 'https://www.kca.go.kr/webzine/board/view?menuId=MENU00307&linkId=868&div=kca_2507',
     publisher: '한국소비자원 웹진',
   } as Source,
+  // [CL-ADSENSE-MAX-20260709-234500] 신규 공식 출처 2건 — 2026-07-09 WebFetch 실접근 확인(혼인신고·신혼부부 대출 메뉴 실재).
+  efamilyCourt: {
+    title: '전자가족관계등록시스템 — 혼인신고 등 가족관계 신고 안내',
+    url: 'https://efamily.scourt.go.kr/index.jsp',
+    publisher: '대한민국 법원',
+    note: '2026-07 접속 확인',
+  } as Source,
+  nhuf: {
+    title: '주택도시기금 — 신혼부부전용 전세·구입자금 대출 안내',
+    url: 'https://nhuf.molit.go.kr/',
+    publisher: '국토교통부 주택도시기금',
+    note: '2026-07 접속 확인 · 금리·조건은 수시 변동(공식 페이지 기준)',
+  } as Source,
 } as const;
 
 /** slug → 참고 자료(검증된 실제 공개 출처). */
@@ -72,7 +86,9 @@ export const ARTICLE_SOURCES: Record<string, Source[]> = {
   'newlywed-home': [S.duo, S.statNewlywed],
   'honsu-appliances': [S.kcaWedding],
   'wedding-gift-money': [S.gift, S.guests],
-  'wedding-prep-timeline': [S.statMarriage],
+  // [CL-ADSENSE-MAX-20260710-010500] 감수 필수수정 B/C — invitation-guide 출처 0건 보강 + timeline 출처 규격(≥2) 충족
+  'invitation-guide': [S.duo, S.kcaPrice],
+  'wedding-prep-timeline': [S.statMarriage, S.duo],
   'wedding-contract-checklist': [S.kcaDisclosure, S.kcaWedding],
 };
 

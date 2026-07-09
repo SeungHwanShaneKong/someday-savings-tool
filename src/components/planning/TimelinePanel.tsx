@@ -1,19 +1,38 @@
 // [AGENT-TEAM-9-20260307]
 // [CL-AI-LOADING-MSG-20260308-201500] skeleton → AI 로딩 메시지
 // [CL-TIMELINE-FALLBACK-20260403] Toss 스타일 폴백 UI
+// [CL-CHECKUX-20260709-232512] AI 결과를 체크리스트에 '기한 적용'/'리스트에 추가' — 겉돌던 AI 실효화
 import { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AsyncButton } from '@/components/ui/async-button';
+import { Sparkles, CalendarCheck, ListPlus, Check } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import type { TimelineResult, TimelineMonth, TimelineTask } from '@/hooks/useTimelineOptimizer';
+import type { TimelineApplyPlan, TimelineTaskDecision } from '@/lib/timeline-apply';
+import type { ChecklistPeriod } from '@/lib/checklist-templates';
 
 // [CL-TIMELINE-FALLBACK-20260403] isFallback prop 추가
+// [CL-CHECKUX-20260709-232512] applyPlan/onApplyDueDate/onAddTask — 미전달 시 기존 조회 전용(회귀 0)
 interface TimelinePanelProps {
   result: TimelineResult | null;
   loading: boolean;
@@ -22,6 +41,28 @@ interface TimelinePanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRetry?: () => void;
+  /** matchTimelineToChecklist(result, items, weddingDate) 결과 — 부모(Checklist)에서 memo 계산 */
+  applyPlan?: TimelineApplyPlan<TimelineTask> | null;
+  /** 매치 항목 기한 적용(성공 boolean) */
+  onApplyDueDate?: (itemId: string, dueDate: string) => Promise<boolean> | boolean | void;
+  /** 무매치 task 를 내 리스트에 추가(성공 boolean) */
+  onAddTask?: (
+    title: string,
+    period: ChecklistPeriod,
+    dueDate: string
+  ) => Promise<boolean> | boolean | void;
+}
+
+/** 적용 상태 로컬 키 — 같은 달의 같은 task 문구는 계획상 1개(중복은 plan 이 skip 처리) */
+function taskKey(month: string, task: TimelineTask): string {
+  return `${month}:${task.task}`;
+}
+
+function formatShortDue(due: string | null): string {
+  if (!due) return '기한 없음';
+  const d = new Date(`${due}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return due;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 const PRIORITY_STYLES: Record<TimelineTask['priority'], { label: string; className: string }> = {
@@ -138,8 +179,90 @@ function LoadingSkeleton() {
   );
 }
 
+/* ── [CL-CHECKUX-20260709-232512] task 별 적용 액션 행 ── */
+function TaskActionRow({
+  month,
+  task,
+  decision,
+  appliedKind,
+  onRun,
+}: {
+  month: string;
+  task: TimelineTask;
+  decision: TimelineTaskDecision | undefined;
+  appliedKind: 'apply' | 'add' | undefined;
+  onRun: (month: string, task: TimelineTask, decision: TimelineTaskDecision) => Promise<void>;
+}) {
+  // 이미 이 세션에서 적용/추가한 행 — 결정이 재계산돼도(기한 일치로 skip 전환) 완료 표기 유지
+  if (appliedKind) {
+    return (
+      <div className="flex items-center gap-1 text-[11px] font-medium text-green-600 dark:text-green-400">
+        <Check className="w-3.5 h-3.5" aria-hidden="true" />
+        {appliedKind === 'apply' ? '적용됨 ✓' : '추가됨 ✓'}
+      </div>
+    );
+  }
+  if (!decision) return null;
+
+  if (decision.kind === 'apply') {
+    return (
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[11px] text-gray-500 dark:text-gray-400">
+          {formatShortDue(decision.oldDue)} → {formatShortDue(decision.newDue)} ·{' '}
+          <span className="text-gray-700 dark:text-gray-300">{decision.title}</span>
+        </span>
+        <AsyncButton
+          size="sm"
+          variant="outline"
+          className="min-h-11 md:min-h-0 md:h-7 text-xs px-2.5"
+          onClick={() => onRun(month, task, decision)}
+        >
+          <CalendarCheck className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
+          기한 적용
+        </AsyncButton>
+      </div>
+    );
+  }
+
+  if (decision.kind === 'add') {
+    return (
+      <div className="flex items-center justify-end">
+        <AsyncButton
+          size="sm"
+          variant="outline"
+          className="min-h-11 md:min-h-0 md:h-7 text-xs px-2.5"
+          onClick={() => onRun(month, task, decision)}
+        >
+          <ListPlus className="w-3.5 h-3.5 mr-1" aria-hidden="true" />
+          내 리스트에 추가
+        </AsyncButton>
+      </div>
+    );
+  }
+
+  // skip — 사용자 액션 불필요 사유를 조용히 안내
+  if (decision.reason === 'same-due') {
+    return <p className="text-[11px] text-green-600/80 dark:text-green-400/80">내 체크리스트 기한과 일치 ✓</p>;
+  }
+  if (decision.reason === 'already-done') {
+    return <p className="text-[11px] text-gray-400">이미 완료한 항목이에요</p>;
+  }
+  return null;
+}
+
 /* ── Collapsible month section ── */
-function MonthSection({ monthData }: { monthData: TimelineMonth }) {
+function MonthSection({
+  monthData,
+  decisions,
+  appliedKinds,
+  onRun,
+}: {
+  monthData: TimelineMonth;
+  // [CL-CHECKUX-20260709-232512] 적용 계획(없으면 기존 조회 전용 렌더)
+  decisions?: Map<TimelineTask, TimelineTaskDecision>;
+  appliedKinds: Map<string, 'apply' | 'add'>;
+  onRun: (month: string, task: TimelineTask, decision: TimelineTaskDecision) => Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(true);
 
   // [CL-TOP20-R50-UI-20260703-094000] 하드코딩 blue/white/gray 에 dark: 변형 추가(라이트 모습 불변)
@@ -180,6 +303,16 @@ function MonthSection({ monthData }: { monthData: TimelineMonth }) {
                     <span>📌</span>
                     <span>{formatDeadline(task.deadline)}</span>
                   </div>
+                  {/* [CL-CHECKUX-20260709-232512] 체크리스트 적용 액션 */}
+                  {decisions && (
+                    <TaskActionRow
+                      month={monthData.month}
+                      task={task}
+                      decision={decisions.get(task)}
+                      appliedKind={appliedKinds.get(taskKey(monthData.month, task))}
+                      onRun={onRun}
+                    />
+                  )}
                 </CardContent>
               </Card>
             );
@@ -216,6 +349,7 @@ function FallbackBanner({ onRetry }: { onRetry?: () => void }) {
 
 /* ── Main Panel ── */
 // [CL-TIMELINE-FALLBACK-20260403] isFallback 추가
+// [CL-CHECKUX-20260709-232512] 적용 계획 배선 — 개별 적용 + '모두 적용(n건)' 일괄 처리
 export default function TimelinePanel({
   result,
   loading,
@@ -224,7 +358,91 @@ export default function TimelinePanel({
   open,
   onOpenChange,
   onRetry,
+  applyPlan,
+  onApplyDueDate,
+  onAddTask,
 }: TimelinePanelProps) {
+  const { toast } = useToast();
+  // 이 세션에서 적용/추가 완료한 task — key `${month}:${task}` → 종류
+  const [appliedKinds, setAppliedKinds] = useState<Map<string, 'apply' | 'add'>>(new Map());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  // 새 결과가 오면 로컬 적용 상태 초기화(이전 결과의 '적용됨' 잔존 방지)
+  useEffect(() => {
+    setAppliedKinds(new Map());
+  }, [result]);
+
+  const canApply = !!applyPlan && (!!onApplyDueDate || !!onAddTask);
+
+  const runDecision = async (decision: TimelineTaskDecision): Promise<boolean> => {
+    if (decision.kind === 'apply') {
+      if (!onApplyDueDate) return false;
+      const ok = await Promise.resolve(onApplyDueDate(decision.itemId, decision.newDue));
+      return ok !== false;
+    }
+    if (decision.kind === 'add') {
+      if (!onAddTask) return false;
+      const ok = await Promise.resolve(onAddTask(decision.title, decision.period, decision.deadline));
+      return ok !== false;
+    }
+    return false;
+  };
+
+  const handleRunOne = async (
+    month: string,
+    task: TimelineTask,
+    decision: TimelineTaskDecision
+  ): Promise<void> => {
+    const ok = await runDecision(decision);
+    if (ok && (decision.kind === 'apply' || decision.kind === 'add')) {
+      const kind = decision.kind;
+      setAppliedKinds((prev) => new Map(prev).set(taskKey(month, task), kind));
+    }
+    // 실패는 useChecklist 가 destructive 토스트로 안내(무음실패 없음)
+  };
+
+  // 미처리(적용 가능·아직 안 누른) 결정 수집 — '모두 적용 (n건)'
+  const pending: { month: string; task: TimelineTask; decision: TimelineTaskDecision }[] = [];
+  if (canApply && result && applyPlan) {
+    for (const monthData of result.timeline) {
+      for (const task of monthData.tasks) {
+        const decision = applyPlan.decisions.get(task);
+        if (!decision || (decision.kind !== 'apply' && decision.kind !== 'add')) continue;
+        if (appliedKinds.has(taskKey(monthData.month, task))) continue;
+        pending.push({ month: monthData.month, task, decision });
+      }
+    }
+  }
+
+  const handleApplyAll = async (): Promise<void> => {
+    if (bulkBusy || pending.length === 0) return;
+    setBulkBusy(true);
+    let applied = 0;
+    let added = 0;
+    let failed = 0;
+    try {
+      // 순차 적용 — sort_order 계산·낙관적 상태가 경쟁하지 않도록 직렬화
+      for (const { month, task, decision } of pending) {
+        const ok = await runDecision(decision);
+        if (ok && (decision.kind === 'apply' || decision.kind === 'add')) {
+          const kind = decision.kind;
+          if (kind === 'apply') applied++;
+          else added++;
+          setAppliedKinds((prev) => new Map(prev).set(taskKey(month, task), kind));
+        } else {
+          failed++;
+        }
+      }
+      toast({
+        title: 'AI 일정이 체크리스트에 반영되었어요',
+        description: `기한 적용 ${applied}건 · 새 항목 ${added}건${failed > 0 ? ` · 실패 ${failed}건` : ''}`,
+        variant: failed > 0 && applied + added === 0 ? 'destructive' : undefined,
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
@@ -239,6 +457,10 @@ export default function TimelinePanel({
               </Badge>
             )}
           </SheetTitle>
+          {/* [CL-CHECKUX-20260709-232512] a11y — Radix DialogContent 설명 경고 해소(sr-only 컨벤션) */}
+          <SheetDescription className="sr-only">
+            AI가 산출한 월별 결혼 준비 일정과 체크리스트 기한 적용 액션
+          </SheetDescription>
         </SheetHeader>
 
         <div className="mt-4">
@@ -292,10 +514,49 @@ export default function TimelinePanel({
                 </p>
               </div>
 
+              {/* [CL-CHECKUX-20260709-232512] 모두 적용 — 파괴적이지 않지만 다건 일괄이라 확인 다이얼로그 */}
+              {canApply && pending.length > 0 && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      className="w-full min-h-11 md:min-h-0"
+                      disabled={bulkBusy}
+                      aria-busy={bulkBusy || undefined}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5" aria-hidden="true" />
+                      {bulkBusy ? '적용 중…' : `모두 적용 (${pending.length}건)`}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>AI 일정을 한 번에 반영할까요?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        기한 변경 {pending.filter((p) => p.decision.kind === 'apply').length}건, 새 항목 추가{' '}
+                        {pending.filter((p) => p.decision.kind === 'add').length}건이 내 체크리스트에
+                        반영돼요. 기한은 항목별로 언제든 다시 바꿀 수 있어요.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>취소</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => void handleApplyAll()}>
+                        모두 적용
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
               {/* Monthly sections */}
               <div className="space-y-2">
                 {result.timeline.map((monthData) => (
-                  <MonthSection key={monthData.month} monthData={monthData} />
+                  <MonthSection
+                    key={monthData.month}
+                    monthData={monthData}
+                    decisions={canApply ? applyPlan?.decisions : undefined}
+                    appliedKinds={appliedKinds}
+                    onRun={handleRunOne}
+                  />
                 ))}
               </div>
             </div>

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+// [CL-LOGIN-GATE-20260709-233447] 게이트 공용 리다이렉트 — 로그인 후 원위치 복귀(returnTo)
+import { NavigateToAuth } from '@/components/auth/NavigateToAuth';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -63,8 +65,9 @@ export default function Chat() {
     toastOnError: '대화 삭제에 실패했어요. 잠시 후 다시 시도해주세요.',
   });
 
+  // [CL-LOGIN-GATE-20260709-233447] returnTo state 전달
   if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <NavigateToAuth />;
   }
 
   return (

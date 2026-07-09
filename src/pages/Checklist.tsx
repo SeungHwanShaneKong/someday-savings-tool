@@ -1,9 +1,12 @@
-import { useState, useCallback, useMemo } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+// [CL-LOGIN-GATE-20260710-001500] 게이트 공용 리다이렉트 — 로그인 후 /checklist 원위치 복귀(returnTo)
+import { NavigateToAuth } from '@/components/auth/NavigateToAuth';
 import { useSEO } from '@/hooks/useSEO';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -15,11 +18,13 @@ import {
 import { ArrowLeft, Plus, Sparkles, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useChecklist } from '@/hooks/useChecklist';
+import { supabase } from '@/integrations/supabase/client';
 // [CL-TREE-REDESIGN-20260403] 긴급도 카운트용
 import { getUrgencyLevel } from '@/lib/checklist-nudges';
-// [CL-TOP20-P3-CHECK-20260703-030000] 긴급도 위계 집계 + 오버듀 배너 + 긴급순 보기
-import { aggregateUrgency } from '@/lib/checklist-urgency';
-import { OverdueAlertBanner } from '@/components/checklist/OverdueAlertBanner';
+// [CL-CHECKUX-20260709-232512] 세션 1회 오버듀 배너 → 상시 "지금 할 일" 포커스 카드로 승계
+import { FocusNowCard } from '@/components/checklist/FocusNowCard';
+// [CL-CHECKUX-20260709-232512] AI 타임라인 → 체크리스트 적용 계획
+import { matchTimelineToChecklist } from '@/lib/timeline-apply';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 // [AGENT-TEAM-9-20260307] P2 일정 최적화 에이전트
 import { useTimelineOptimizer } from '@/hooks/useTimelineOptimizer';
@@ -57,6 +62,7 @@ export default function Checklist() {
     addCustomItem,
     deleteItem,
     updateNotes,
+    updateDueDate, // [CL-CHECKUX-20260709-232512] AI 타임라인 '기한 적용'
     updateWeddingDate,
     hasWeddingDate,
     weddingDate,
@@ -86,9 +92,6 @@ export default function Checklist() {
     }
     return { overdueCount, urgentCount, soonCount };
   }, [items]);
-
-  // [CL-TOP20-P3-CHECK-20260703-030000] 긴급도 위계 요약 — 상단 오버듀 배너/스크롤 타깃
-  const urgencySummary = useMemo(() => aggregateUrgency(items), [items]);
 
   // [CL-SEC-AUDIT-20260703-101500] #1+#3 perf — 기간별 파생 배열을 items 참조 기준 memo.
   //   기존엔 렌더 본문에서 매번 items.filter(...) 로 기간마다 새 배열을 만들어
@@ -130,8 +133,60 @@ export default function Checklist() {
   const [newItemPeriod, setNewItemPeriod] = useState<ChecklistPeriod>(
     activePeriod || 'D-12~10m'
   );
+  // [CL-CHECKUX-20260709-232512] 초기 렌더 시 activePeriod(useWeddingDate 비동기)가 아직 null 이라
+  //   기본값이 'D-12~10m' 로 고정되던 문제 — 해석 완료 시 사용자가 손대기 전까지만 동기화.
+  const [periodTouched, setPeriodTouched] = useState(false);
+  useEffect(() => {
+    if (activePeriod && !periodTouched) setNewItemPeriod(activePeriod);
+  }, [activePeriod, periodTouched]);
   // [CL-ANIM-UPGRADE-20260621-150000] 빈 값 Enter 시 입력창 흔들림(넛지)
   const [shakeAdd, setShakeAdd] = useState(false);
+
+  // [CL-CHECKUX-20260709-232512] AI 타임라인 결과 → 체크리스트 적용 계획(순수·memo)
+  const timelinePlan = useMemo(
+    () =>
+      timelineResult
+        ? matchTimelineToChecklist(timelineResult, items, weddingDate ?? null)
+        : null,
+    [timelineResult, items, weddingDate]
+  );
+
+  // [CL-CHECKUX-20260709-232512] 예산 총액(선택 파라미터) — AI 버튼 노출 조건에서 1회 best-effort 조회.
+  //   실패/빈 값은 undefined 로 조용히 degrade(최적화 요청 자체를 막지 않음).
+  const [budgetTotal, setBudgetTotal] = useState<number | undefined>(undefined);
+  const budgetTotalFetchedRef = useRef(false);
+  useEffect(() => {
+    if (!user || !hasWeddingDate || budgetTotalFetchedRef.current) return;
+    budgetTotalFetchedRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data: budgets } = await supabase
+          .from('budgets')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        const budgetId = budgets?.[0]?.id;
+        if (!budgetId || cancelled) return;
+        const { data: rows, error } = await supabase
+          .from('budget_items')
+          .select('amount')
+          .eq('budget_id', budgetId);
+        if (error || !rows || cancelled) return;
+        const total = rows.reduce(
+          (sum: number, r: { amount: number | null }) => sum + (r.amount ?? 0),
+          0
+        );
+        if (total > 0) setBudgetTotal(total);
+      } catch {
+        // 선택 파라미터 — 조회 실패는 무시(AI 요청은 budget 없이 진행)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, hasWeddingDate]);
 
   // Budget link state
   const [budgetLinkOpen, setBudgetLinkOpen] = useState(false);
@@ -163,9 +218,9 @@ export default function Checklist() {
     [navigate]
   );
 
-  // Auth redirect
+  // Auth redirect — [CL-LOGIN-GATE-20260710-001500] returnTo 동반(로그인 후 원위치 복귀)
   if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <NavigateToAuth />;
   }
 
   return (
@@ -197,6 +252,14 @@ export default function Checklist() {
             추가
           </Button>
         </div>
+        {/* [CL-CHECKUX-20260709-232512] 스티키 헤더 미니 진행률 스트립 — 스크롤 중에도 전체 진행 한눈에 */}
+        {!loading && items.length > 0 && (
+          <Progress
+            value={stats.percentage}
+            className="h-1 rounded-none"
+            aria-label={`전체 진행률 ${stats.percentage}퍼센트`}
+          />
+        )}
       </header>
 
       <main className="max-w-lg sm:max-w-2xl lg:max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 pb-24 space-y-5 sm:space-y-6">
@@ -210,15 +273,6 @@ export default function Checklist() {
               </div>
             ))}
           </div>
-        )}
-
-        {/* [CL-TOP20-P3-CHECK-20260703-030000] 오버듀 배너 — 기한 초과 존재 시 세션 1회 */}
-        {!loading && items.length > 0 && urgencySummary.overdue > 0 && urgencySummary.firstOverduePeriod && (
-          <OverdueAlertBanner
-            overdueCount={urgencySummary.overdue}
-            targetPeriodLabel={PERIOD_LABELS[urgencySummary.firstOverduePeriod]}
-            onScrollToPeriod={() => scrollToPeriod(urgencySummary.firstOverduePeriod!)}
-          />
         )}
 
         {/* [DDAY-INLINE-PICKER-2026-03-07] No D-day nudge — 인라인 날짜 선택기 */}
@@ -244,6 +298,17 @@ export default function Checklist() {
           />
         )}
 
+        {/* [CL-CHECKUX-20260709-232512] "지금 할 일" 포커스 카드 — 상시 노출(세션 1회 배너 승계).
+            원탭 체크 + 행 클릭 시 해당 기간 섹션으로 스크롤 */}
+        {!loading && items.length > 0 && (
+          <FocusNowCard
+            items={items}
+            activePeriod={activePeriod}
+            onToggle={toggleItem}
+            onNavigateToPeriod={scrollToPeriod}
+          />
+        )}
+
         {/* [AGENT-TEAM-9-20260307] P2 AI 일정 최적화 버튼 */}
         {/* [CL-TIMELINE-FIX-20260308-203000] items[0].due_date → 실제 weddingDate 사용 */}
         {!loading && hasWeddingDate && items.length > 0 && (
@@ -251,7 +316,8 @@ export default function Checklist() {
             onClick={() => {
               const completedItems = items.filter(i => i.is_completed).map(i => i.title);
               if (weddingDate) {
-                optimizeTimeline(weddingDate, completedItems);
+                // [CL-CHECKUX-20260709-232512] 미전달이던 budgetTotal 전달(best-effort 사전 조회값)
+                optimizeTimeline(weddingDate, completedItems, budgetTotal);
                 setTimelineOpen(true);
               }
             }}
@@ -288,7 +354,11 @@ export default function Checklist() {
             />
             <Select
               value={newItemPeriod}
-              onValueChange={(v) => setNewItemPeriod(v as ChecklistPeriod)}
+              onValueChange={(v) => {
+                // [CL-CHECKUX-20260709-232512] 수동 변경 후엔 activePeriod 자동 동기화 중단
+                setPeriodTouched(true);
+                setNewItemPeriod(v as ChecklistPeriod);
+              }}
             >
               <SelectTrigger className="h-10">
                 <SelectValue />
@@ -302,17 +372,18 @@ export default function Checklist() {
               </SelectContent>
             </Select>
             <div className="flex gap-2">
+              {/* [CL-CHECKUX-20260709-232512] 모바일 터치타깃 44px(h-11), 데스크톱 기존 크기 유지 */}
               <Button
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 h-11 sm:h-9"
                 onClick={() => setShowAddForm(false)}
               >
                 취소
               </Button>
               <Button
                 size="sm"
-                className="flex-1"
+                className="flex-1 h-11 sm:h-9"
                 onClick={handleAddItem}
                 disabled={!newItemTitle.trim()}
               >
@@ -410,6 +481,7 @@ export default function Checklist() {
       {/* [AGENT-TEAM-9-20260307] P2 일정 최적화 패널 */}
       {/* [CL-TIMELINE-FIX-20260308-203000] onRetry 추가 */}
       {/* [CL-TIMELINE-FALLBACK-20260403] isFallback 전달 */}
+      {/* [CL-CHECKUX-20260709-232512] 적용 계획 + 기한 적용/항목 추가 콜백 배선 — AI 결과 실효화 */}
       <TimelinePanel
         open={timelineOpen}
         onOpenChange={setTimelineOpen}
@@ -418,6 +490,9 @@ export default function Checklist() {
         error={timelineError}
         isFallback={timelineFallback}
         onRetry={retryTimeline}
+        applyPlan={timelinePlan}
+        onApplyDueDate={updateDueDate}
+        onAddTask={(title, period, dueDate) => addCustomItem(title, period, dueDate)}
       />
     </div>
   );

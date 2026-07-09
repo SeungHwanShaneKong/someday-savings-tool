@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+// [CL-LOGIN-GATE-20260709-233447] 게이트 공용 리다이렉트 — 로그인 후 원위치 복귀(returnTo)
+import { NavigateToAuth } from '@/components/auth/NavigateToAuth';
 import { useSEO } from '@/hooks/useSEO';
 import { CoffeeDonationModal, CoffeeDonationFab } from '@/components/CoffeeDonationModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -417,9 +419,9 @@ export default function BudgetFlow() {
     setIsHistoryOpen(false);
   };
 
-  // Auth check
+  // Auth check — [CL-LOGIN-GATE-20260709-233447] returnTo state 전달
   if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <NavigateToAuth />;
   }
 
   // Loading state
@@ -821,6 +823,8 @@ export default function BudgetFlow() {
                   onEditMyNickname={() => setOwnNickOpen(true)}
                   /* [CL-AUDIT-RPC-DEDUP-20260622] 상위 단일 useCollaboration 주입 → 중복 RPC 제거 */
                   external={collaboration}
+                  /* [CL-POKE-20260709-231909] 콕 찌르기 실발송(sent:true)에만 +2p — 증분(increment)이라 동시 보상 유실 없음 */
+                  onPoked={() => increment({ total_points: 2 })}
                 />
               </div>
             )}

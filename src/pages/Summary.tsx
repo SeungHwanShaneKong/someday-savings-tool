@@ -1,5 +1,7 @@
 import { useState, useRef, type RefObject } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+// [CL-LOGIN-GATE-20260709-233447] 게이트 공용 리다이렉트 — 로그인 후 원위치 복귀(returnTo)
+import { NavigateToAuth } from '@/components/auth/NavigateToAuth';
 import { useSEO } from '@/hooks/useSEO';
 import { useAuth } from '@/hooks/useAuth';
 import { useMultipleBudgets } from '@/hooks/useMultipleBudgets';
@@ -222,9 +224,9 @@ export default function Summary() {
   const maxBudget = sortedByTotal[sortedByTotal.length - 1];
   const difference = maxBudget?.total - minBudget?.total || 0;
 
-  // Auth check
+  // Auth check — [CL-LOGIN-GATE-20260709-233447] returnTo state 전달
   if (!authLoading && !user) {
-    return <Navigate to="/auth" replace />;
+    return <NavigateToAuth />;
   }
 
   // Loading state

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -130,10 +130,27 @@ const HOW_TO_STEPS = [
   },
 ];
 
+/* ─── 아티클 카테고리 4분류 (CONTENT_GUIDE §5 — articles.category 와 동일 값 유지) ─── */
+// [CL-ADSENSE-MAX-20260710-000500] 28편 규모 대응: 기본 DOM 에 전 편 노출(SEO/프리렌더 보존) +
+// 필터 칩은 클라이언트 점진 강화(선택 시 해당 그룹만 표시, 기본='전체').
+const CATEGORY_ORDER = ['결혼 비용·데이터', '예식 준비', '예절·관계', '신혼 준비·행정'];
+const FALLBACK_CATEGORY = '결혼 준비 가이드';
+
 /* ─── Guide Page ─── */
 export default function Guide() {
   const navigate = useNavigate();
   const breadcrumbItems = [{ label: '결혼 예산 가이드', href: '/guide/' }];
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const articleGroups = useMemo(() => {
+    const map = new Map<string, typeof ARTICLES>();
+    for (const c of [...CATEGORY_ORDER, FALLBACK_CATEGORY]) map.set(c, []);
+    for (const a of ARTICLES) {
+      const key = a.category && CATEGORY_ORDER.includes(a.category) ? a.category : FALLBACK_CATEGORY;
+      map.get(key)!.push(a);
+    }
+    return [...map.entries()].filter(([, list]) => list.length > 0);
+  }, []);
 
   const jsonLd = useMemo(
     () => [
@@ -307,33 +324,76 @@ export default function Guide() {
             </div>
           </section>
 
-          {/* [CL-SSG-PRERENDER-20260531] 주제별 가이드 허브 (W6) */}
+          {/* [CL-SSG-PRERENDER-20260531] 주제별 가이드 허브 (W6)
+              [CL-ADSENSE-MAX-20260710-000500] 카테고리 그룹 렌더 + 필터 칩(기본=전체 노출·SEO 보존) */}
           <section className="mb-10">
             <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-primary" aria-hidden="true" />
               주제별 심화 가이드
+              <span className="text-xs font-medium text-muted-foreground">총 {ARTICLES.length}편</span>
             </h2>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               더 깊이 있는 결혼 준비 정보를 주제별로 확인하세요.
             </p>
-            <div className="space-y-3">
-              {ARTICLES.map((article) => (
-                <Link key={article.slug} to={`/guide/${article.slug}/`} className="block">
-                  <Card className="p-4 hover:border-primary/40 transition-colors">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-foreground mb-1">
-                          {article.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {article.description}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
-                    </div>
-                  </Card>
-                </Link>
+
+            {/* 카테고리 필터 칩 — 클라이언트 점진 강화(프리렌더 기본 상태는 전체) */}
+            <div className="flex flex-wrap gap-2 mb-5" role="group" aria-label="가이드 카테고리 필터">
+              <button
+                type="button"
+                onClick={() => setActiveCategory(null)}
+                aria-pressed={activeCategory === null}
+                className={`min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                  activeCategory === null
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-background text-foreground hover:bg-primary/5'
+                }`}
+              >
+                전체
+              </button>
+              {articleGroups.map(([category, list]) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setActiveCategory(category)}
+                  aria-pressed={activeCategory === category}
+                  className={`min-h-9 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                    activeCategory === category
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-background text-foreground hover:bg-primary/5'
+                  }`}
+                >
+                  {category} {list.length}
+                </button>
               ))}
+            </div>
+
+            <div className="space-y-7">
+              {articleGroups
+                .filter(([category]) => activeCategory === null || activeCategory === category)
+                .map(([category, list]) => (
+                  <div key={category}>
+                    <h3 className="text-sm font-semibold text-foreground/80 mb-3">{category}</h3>
+                    <div className="space-y-3">
+                      {list.map((article) => (
+                        <Link key={article.slug} to={`/guide/${article.slug}/`} className="block">
+                          <Card className="p-4 hover:border-primary/40 transition-colors">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-semibold text-foreground mb-1">
+                                  {article.title}
+                                </h4>
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  {article.description}
+                                </p>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true" />
+                            </div>
+                          </Card>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ))}
             </div>
           </section>
 

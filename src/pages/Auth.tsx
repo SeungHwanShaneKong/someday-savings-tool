@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -14,14 +14,39 @@ import { EDGE_FUNCTION_URL, EDGE_FUNCTION_KEY } from '@/lib/edge-function-config
 import { useSEO } from '@/hooks/useSEO';
 // [CL-TOP20-P1-FUNNEL-20260703-013000] 방문자 퍼널 종점 계측(auth_view) — Top20 #20
 import { trackFunnelOnce } from '@/lib/analytics/funnel-events';
+// [CL-LOGIN-GATE-20260709-233447] 신뢰 칩(랜딩 HeroSignupCard 와 공용)
+import { TrustChips } from '@/components/auth/TrustChips';
 
 const DEV_TEST_EMAIL = 'dev-test@wedsem-local.dev';
 const DEV_TEST_PASSWORD = 'devtest123456';
 
+// [CL-LOGIN-GATE-20260709-233447] returnTo — 게이트 페이지 이탈 → 로그인 → 원래 목적지 복귀.
+// OAuth 는 풀 리다이렉트(페이지 이탈)라 라우터 state 가 소실되므로 sessionStorage 에 보관해 생존시킨다.
+const RETURN_TO_KEY = 'wedsem_auth_return_to';
+
+/**
+ * 오픈 리다이렉트 방지 살균 — 내부 절대경로만 허용.
+ * 규칙: '/'로 시작 · '//'(프로토콜 상대 URL) 금지 · 백슬래시 금지(브라우저 \→/ 정규화 트릭) ·
+ *       '/auth' 재진입 금지(리다이렉트 루프 방지). 통과 실패 시 null → 호출부가 '/budget' 폴백.
+ */
+function sanitizeReturnTo(raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.length === 0 || raw.length > 512) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  if (raw.includes('\\')) return null;
+  if (raw === '/auth' || raw.startsWith('/auth/') || raw.startsWith('/auth?')) return null;
+  return raw;
+}
+
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, signInWithGoogle, signIn, signUp, loading } = useAuth();
   const { toast } = useToast();
+
+  // [CL-LOGIN-GATE-20260709-233447] 게이트 페이지가 전달한 returnTo(살균 후) — NavigateToAuth 와 한 쌍
+  const stateReturnTo = sanitizeReturnTo(
+    (location.state as { returnTo?: unknown } | null)?.returnTo,
+  );
 
   useSEO({
     title: '로그인 - 웨딩셈',
@@ -35,11 +60,21 @@ export default function Auth() {
   const [browserInfo] = useState(() => getBrowserInfo());
   const [copied, setCopied] = useState(false);
 
-  // [CL-TOP20-P1-FUNNEL-20260703-013000] /auth 도달 계측 — 유입 표면은 sessionStorage 최근 경로 대신
-  // referrer 경로만(PII 0). 세션 1회.
+  // [CL-TOP20-P1-FUNNEL-20260703-013000] /auth 도달 계측 — 세션 1회.
+  // [CL-LOGIN-GATE-20260709-233447] 게이트 유입이면 from=원래 경로(PII 0 — 내부 경로만), 아니면 direct.
   useEffect(() => {
-    trackFunnelOnce('auth_view');
-  }, []);
+    trackFunnelOnce('auth_view', { from: stateReturnTo ?? 'direct' });
+  }, [stateReturnTo]);
+
+  // [CL-LOGIN-GATE-20260709-233447] returnTo 를 sessionStorage 에 기록 — OAuth 풀 리다이렉트에도 생존.
+  useEffect(() => {
+    if (!stateReturnTo) return;
+    try {
+      sessionStorage.setItem(RETURN_TO_KEY, stateReturnTo);
+    } catch {
+      /* 프라이빗 모드 등 — state 경로로만 동작(동일 세션 내 복귀는 유지) */
+    }
+  }, [stateReturnTo]);
 
   // 페이지 진입 시 즉시 인앱 브라우저 감지 → 다중 탈출 전략 실행
   useEffect(() => {
@@ -66,9 +101,29 @@ export default function Auth() {
     );
   }, []);
 
-  // Redirect if already logged in
-  if (!loading && user) {
-    return <Navigate to="/budget" replace />;
+  // [CL-LOGIN-GATE-20260709-233447] 로그인 확정 시 복귀 목적지 — state 우선, 없으면 sessionStorage(OAuth 생존분).
+  // 렌더는 순수 읽기만 하고, 키 소진(removeItem)은 커밋 시점(useEffect)에 수행한다(StrictMode 이중 렌더 안전).
+  const isAuthedRedirect = !loading && !!user;
+  let storedReturnTo: string | null = null;
+  try {
+    storedReturnTo = sessionStorage.getItem(RETURN_TO_KEY);
+  } catch {
+    storedReturnTo = null;
+  }
+  const redirectTarget = stateReturnTo ?? sanitizeReturnTo(storedReturnTo) ?? '/budget';
+
+  useEffect(() => {
+    if (!isAuthedRedirect) return;
+    try {
+      sessionStorage.removeItem(RETURN_TO_KEY);
+    } catch {
+      /* noop */
+    }
+  }, [isAuthedRedirect]);
+
+  // Redirect if already logged in — 원래 목적지(살균 통과분) 또는 /budget
+  if (isAuthedRedirect) {
+    return <Navigate to={redirectTarget} replace />;
   }
 
   const handleGoogleSignIn = async () => {
@@ -260,11 +315,12 @@ export default function Auth() {
           </p>
         </div>
 
-        {/* Google Login Button */}
+        {/* Google Login Button — [CL-LOGIN-GATE-20260709-233447] aria-busy(진행 상태 보조기기 전달) */}
         <Button
           type="button"
           onClick={handleGoogleSignIn}
           disabled={isGoogleLoading}
+          aria-busy={isGoogleLoading}
           className="w-full h-14 text-body-lg font-medium rounded-xl flex items-center justify-center gap-3"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -276,8 +332,11 @@ export default function Auth() {
           {isGoogleLoading ? '연결 중...' : 'Google로 계속하기'}
         </Button>
 
-        {/* Info text */}
-        <p className="text-center text-small text-muted-foreground mt-6">
+        {/* [CL-LOGIN-GATE-20260709-233447] 신뢰 칩(공용 TrustChips) — 버튼 직하 배치로 거부감 최소화 */}
+        <TrustChips className="mt-5" />
+
+        {/* Info text — 안심 문구는 칩 아래로 정리 */}
+        <p className="text-center text-small text-muted-foreground mt-4">
           로그인하면 예산 데이터가 안전하게 저장되어<br />
           언제든 다시 확인할 수 있어요
         </p>

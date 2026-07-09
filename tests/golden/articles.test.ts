@@ -10,8 +10,9 @@ import {
 } from '../../src/content/articles';
 
 describe('golden: Article JSON-LD 구조화데이터', () => {
-  it('아티클이 12편 이상 존재(콘텐츠 충실도)', () => {
-    expect(ARTICLES.length).toBeGreaterThanOrEqual(12);
+  // [CL-ADSENSE-MAX-20260709-234500] 최대 보강 라운드 결승선 — 15편 증강 + 신규 13편 = 28편
+  it('아티클이 28편 이상 존재(콘텐츠 충실도)', () => {
+    expect(ARTICLES.length).toBeGreaterThanOrEqual(28);
   });
 
   for (const a of ARTICLES) {

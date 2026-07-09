@@ -19,7 +19,6 @@ import { InstallAppButton } from "@/components/install/InstallAppButton";
  */
 export const APP_HEADER_ROUTES = [
   "/",
-  // [CL-TOP20-P2-HEADER-20260703-023500] /demo 제외(PM 결정) — 전용 전환 헤더(가입 CTA 스티키)가 우선
   "/guide",
   "/faq",
   "/privacy",

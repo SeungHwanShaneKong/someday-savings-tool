@@ -55,7 +55,29 @@ const ROUTES = [
   { path: '/contact/',                  marker: '문의하기',                         jsonLdType: null },
   // [CL-ADSENSE-CONTENT-20260630] 편집·제작 원칙(E-E-A-T 신뢰 신호)
   { path: '/editorial/',                marker: '편집·제작 원칙',                   jsonLdType: null },
+  // [CL-ADSENSE-MAX-20260709-235500] 최대 보강 라운드 — 신규 pillar 13편 (t5/t5b/t6/t6b)
+  { path: '/guide/wedding-cost-by-region/',    marker: '지역별 결혼 비용 비교 가이드',      jsonLdType: 'Article' },
+  { path: '/guide/honeymoon-budget/',          marker: '신혼여행 예산·비용 완벽 가이드',    jsonLdType: 'Article' },
+  { path: '/guide/sanggyeonrye-guide/',        marker: '상견례 준비 완벽 가이드',           jsonLdType: 'Article' },
+  { path: '/guide/wedding-day-schedule/',      marker: '결혼식 당일 타임라인 완벽 가이드',  jsonLdType: 'Article' },
+  { path: '/guide/marriage-registration/',     marker: '혼인신고 절차·서류 완벽 가이드',    jsonLdType: 'Article' },
+  { path: '/guide/newlywed-support-overview/', marker: '신혼부부 주거·지원 제도 한눈에',    jsonLdType: 'Article' },
+  { path: '/guide/wedding-dress-guide/',       marker: '웨딩드레스 종류·체형별 선택 가이드', jsonLdType: 'Article' },
+  { path: '/guide/groom-suit-guide/',          marker: '신랑 예복 완벽 가이드',             jsonLdType: 'Article' },
+  { path: '/guide/hanbok-honju-guide/',        marker: '한복·혼주 의상 가이드',             jsonLdType: 'Article' },
+  { path: '/guide/self-wedding-items/',        marker: '셀프 웨딩 준비 가이드',             jsonLdType: 'Article' },
+  { path: '/guide/wedding-date-guide/',        marker: '결혼 날짜·시즌 선택 가이드',        jsonLdType: 'Article' },
+  { path: '/guide/guest-etiquette/',           marker: '결혼식 하객 매너 완벽 가이드',      jsonLdType: 'Article' },
+  { path: '/guide/wedding-budget-split/',      marker: '결혼 비용 분담, 어떻게 나눌까',     jsonLdType: 'Article' },
 ];
+
+// [CL-OGIMG-20260709-235500] 아티클 라우트 전부에 아티클별 OG 이미지 자동 부여(/og/<slug>.png).
+//   useSEO(image)가 라우트별 og:image 를 재작성하고, verify()가 정적 HTML 에 박혔는지 강제한다.
+//   PNG 는 scripts/generate-og-images.mjs 가 생성(누락은 tests/golden/brand-assets 계열이 적발).
+for (const r of ROUTES) {
+  const m = r.path.match(/^\/guide\/([^/]+)\/$/);
+  if (m) r.ogImage = `/og/${m[1]}.png`;
+}
 
 // 프리렌더 중 abort 할 외부 도메인 (광고/애널리틱스) — 태그는 DOM에 남아 유저 런타임엔 정상 로드
 const BLOCK_RE = /googlesyndication|googletagmanager|google-analytics|doubleclick|adservice|adsbygoogle|pagead/i;
@@ -71,8 +93,12 @@ function outFile(routePath) {
 //   - jsonLdType: useSEO 가 #dynamic-jsonld 에 주입하는 주 @type(대기/검증).
 //   - requireTypes: 그 외 정적 블록 포함 반드시 존재해야 하는 @type 배열(예: 홈의 WebApplication/WebSite/Organization).
 //   - Article/FAQPage/HowTo 페이지는 BreadcrumbList 를 동반 주입(Article.tsx/FAQ.tsx/Guide.tsx) → 자동 동반 검증.
-function verify(routePath, html, marker, jsonLdType, requireTypes) {
+function verify(routePath, html, marker, jsonLdType, requireTypes, ogImage) {
   const errs = [];
+  // [CL-OGIMG-20260709-235500] 아티클 라우트는 자기 OG 카드가 정적 HTML 에 박혀야 한다(소셜 크롤러는 JS 미실행).
+  if (ogImage && !html.includes(`property="og:image" content="${BASE_DOMAIN}${ogImage}"`)) {
+    errs.push(`og:image ${ogImage} 누락(정적 HTML)`);
+  }
   // [CL-AUDIT-R9-MARKER-20260630] 본문 마커는 <main> 영역에서만 검증(근본수정).
   //   과거: 전체 HTML includes → Footer 링크 텍스트('자주 묻는 질문'·'개인정보처리방침'·'이용약관'·'편집·제작 원칙')와
   //   충돌해 페이지 본문 미렌더에도 통과할 수 있었음(검증 무력화). <main> 스코핑으로 페이지별 본문만 변별.
@@ -160,7 +186,7 @@ async function run() {
       await new Promise((r) => setTimeout(r, 250));
 
       const html = await page.content();
-      const errs = verify(route.path, html, route.marker, route.jsonLdType, route.requireTypes);
+      const errs = verify(route.path, html, route.marker, route.jsonLdType, route.requireTypes, route.ogImage);
       if (errs.length) {
         throw new Error(`검증 실패 [${route.path}]:\n  - ${errs.join('\n  - ')}`);
       }

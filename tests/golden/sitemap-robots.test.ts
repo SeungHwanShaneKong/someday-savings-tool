@@ -20,8 +20,9 @@ describe.skipIf(!sitemapBuilt)('golden: sitemap.xml 정합(dist)', () => {
   const xml = sitemapBuilt ? readFileSync(distSitemap, 'utf-8') : '';
   const locs = (xml.match(/<loc>([^<]+)<\/loc>/g) || []).map((m: string) => m.replace(/<\/?loc>/g, ''));
 
-  it('<loc> 가 19개 이상(전 라우트 포함)', () => {
-    expect(locs.length).toBeGreaterThanOrEqual(19);
+  // [CL-ADSENSE-MAX-20260709-234500] 결승선 — 아티클 28편 + 허브/법적 페이지 = 36 라우트
+  it('<loc> 가 36개 이상(전 라우트 포함)', () => {
+    expect(locs.length).toBeGreaterThanOrEqual(36);
   });
   it('모든 <loc> 는 SITE_ORIGIN 절대URL + trailing-slash', () => {
     for (const loc of locs) {

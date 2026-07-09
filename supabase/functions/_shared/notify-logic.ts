@@ -136,3 +136,54 @@ export class DailyReservationLedger {
 export function utcDayString(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [CL-POKE-20260709-231909] 파트너 '콕 찌르기'(수동 이메일 넛지) — kind 허용목록 + kind별 제목/본문.
+//  - 유니크 인덱스 uq_partner_notif_pair_day 가 (sender,recipient,notify_day,kind)를 포함하므로
+//    kind='poke' 는 partner_edit_2min 과 독립된 일일 슬롯(마이그레이션 불필요).
+//  - 기존 함수(buildSubject/buildEmailHtml 등)는 바이트 수준 보존 — 기존 kind 동작 회귀 0.
+//  - 살균은 기존 sanitizeSenderName/escapeHtml 재사용(헤더 개행·HTML 주입 차단 계약 동일).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 허용된 알림 종류(허용목록). 목록 외 입력은 coerceKind 가 기본값으로 강등. */
+export const NOTIFY_KINDS = ['partner_edit_2min', 'poke'] as const;
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+
+/** kind 허용목록 검증 — 비문자열/목록 외 값은 'partner_edit_2min'(기존 동작)으로 강등. */
+export function coerceKind(raw: unknown): NotifyKind {
+  return typeof raw === 'string' && (NOTIFY_KINDS as readonly string[]).includes(raw)
+    ? (raw as NotifyKind)
+    : 'partner_edit_2min';
+}
+
+/** kind별 이메일 제목 — poke 는 전용 카피, 그 외는 기존 buildSubject 위임(바이트 동일). */
+export function subjectForKind(kind: NotifyKind, senderName: string | null | undefined): string {
+  if (kind === 'poke') {
+    return `${sanitizeSenderName(senderName)}님이 콕! 예산 보러 오라고 살짝 불렀어요 💍`;
+  }
+  return buildSubject(senderName);
+}
+
+/** poke 전용 본문 — 한 줄 개인화 넛지 + 기존 CTA 버튼 + 기존 '하루 한 번' 푸터(따뜻·비스팸). */
+export function buildPokeEmailHtml(senderName: string | null | undefined, appUrl: string): string {
+  const safe = escapeHtml(sanitizeSenderName(senderName));
+  const href = escapeHtml(appUrl);
+  return `<!doctype html><html lang="ko"><body style="margin:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <div style="max-width:480px;margin:0 auto;padding:32px 20px;">
+      <div style="background:#fff;border-radius:16px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="font-size:40px;text-align:center;">👉💍</div>
+        <h1 style="font-size:18px;color:#111;text-align:center;margin:12px 0 6px;">${safe}님이 콕 찔렀어요</h1>
+        <p style="font-size:14px;color:#555;line-height:1.6;text-align:center;margin:0 0 20px;">
+          ${safe}님이 우리 결혼 예산을 같이 보고 싶어해요. 잠깐 들러 함께 다듬어 주실래요? 😊
+        </p>
+        <a href="${href}" style="display:block;text-align:center;background:#3b82f6;color:#fff;text-decoration:none;font-weight:600;padding:13px 0;border-radius:10px;font-size:15px;">우리 예산 보러 가기</a>
+        <p style="font-size:11px;color:#aaa;text-align:center;margin:18px 0 0;">웨딩셈 · 하루 한 번만 보내드려요</p>
+      </div>
+    </div></body></html>`;
+}
+
+/** kind별 이메일 본문 — poke 는 전용 템플릿, 그 외는 기존 buildEmailHtml 위임(바이트 동일). */
+export function htmlForKind(kind: NotifyKind, senderName: string | null | undefined, appUrl: string): string {
+  if (kind === 'poke') return buildPokeEmailHtml(senderName, appUrl);
+  return buildEmailHtml(senderName, appUrl);
+}

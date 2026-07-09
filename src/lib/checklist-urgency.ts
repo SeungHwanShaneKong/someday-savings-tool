@@ -129,6 +129,71 @@ export function sortItemsByUrgency<
     .map(({ item }) => item);
 }
 
+// ─── "지금 할 일" 포커스 셀렉터 ───
+
+// [CL-CHECKUX-20260709-232512] FocusNowCard 입력 — 순수 셀렉터.
+// 정렬 위계: ① overdue(due 오래된 순) → ② dueSoon(≤7일, getUrgencyLevel 'urgent'와 동일 프레임
+//   — 항목 배지와 카드가 항상 일치) → ③ activePeriod 미완료(sort_order 순).
+// 완료 항목 제외 · ①②에 이미 포함된 항목은 ③에서 중복 제거 · limit 캡 + 전체 후보 수 반환.
+// 내부 정렬은 기존 sortItemsByUrgency 재사용(안정 정렬·null due 후순위 규약 공유).
+
+/** 포커스 선정에 필요한 최소 형태 — useChecklist.ChecklistItem 의 부분집합 */
+export interface FocusItemLike extends UrgencyItemLike {
+  id: string;
+  sort_order: number;
+}
+
+export interface FocusSelection<T> {
+  /** 상위 limit 개 포커스 항목(위계 정렬 완료) */
+  focus: T[];
+  /** limit 적용 전 전체 후보 수 — "+n개 더 보기" 계산용 */
+  totalCandidates: number;
+}
+
+export function selectFocusItems<T extends FocusItemLike>(
+  items: readonly T[],
+  activePeriod: ChecklistPeriod | null,
+  { limit = 5 }: { limit?: number } = {},
+): FocusSelection<T> {
+  const overdue: T[] = [];
+  const dueSoon: T[] = [];
+  const seen = new Set<string>();
+
+  for (const item of items) {
+    if (item.is_completed) continue;
+    const level = getUrgencyLevel(item.due_date, false);
+    if (level === 'overdue') {
+      overdue.push(item);
+      seen.add(item.id);
+    } else if (level === 'urgent') {
+      dueSoon.push(item);
+      seen.add(item.id);
+    }
+  }
+
+  // activePeriod 미완료 — ①②와 중복 제거 후 sort_order 순
+  const activeRest: T[] = [];
+  if (activePeriod) {
+    for (const item of items) {
+      if (item.is_completed || seen.has(item.id) || item.period !== activePeriod) continue;
+      activeRest.push(item);
+    }
+    activeRest.sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  // overdue: due 오름차순 = 가장 오래 밀린 순 · dueSoon: due 오름차순 = 임박순
+  const ordered = [
+    ...sortItemsByUrgency(overdue),
+    ...sortItemsByUrgency(dueSoon),
+    ...activeRest,
+  ];
+
+  return {
+    focus: ordered.slice(0, Math.max(0, limit)),
+    totalCandidates: ordered.length,
+  };
+}
+
 // ─── D-day 온보딩 프리뷰 ───
 
 const KO_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;

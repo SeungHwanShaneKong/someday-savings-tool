@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- [CL-BRAND-HEART-20260709-231800] OG 카드 템플릿(1200×630) — 홈/아티클 겸용.
+     플레이스홀더(이 주석엔 중괄호 토큰을 절대 쓰지 말 것 — replaceAll 이 주석 내부까지 치환해
+     mark.svg 내부 주석의 종료 시퀀스가 바깥 주석을 조기 종료시키는 사고 방지): BADGE, TITLE,
+     SUBTITLE, TITLE_SIZE, MARK_SVG. scripts/generate-brand-assets.mjs 가 치환 후 Puppeteer로 캡처. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="preload" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #FFF7FA 0%, #FFECF3 48%, #FFDDE9 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  /* 장식 하트 아웃라인 — 아주 연하게 */
+  .deco { position: absolute; opacity: 0.5; }
+  .deco svg path { fill: none; stroke: #FFC7D8; }
+  .deco-tr { top: -70px; right: -50px; width: 340px; height: 306px; transform: rotate(14deg); }
+  .deco-bl { bottom: -90px; left: 430px; width: 260px; height: 234px; transform: rotate(-12deg); opacity: 0.38; }
+  .mark { width: 330px; height: 330px; margin-left: 84px; flex-shrink: 0; }
+  .mark svg { width: 100%; height: 100%; }
+  .text { margin-left: 64px; margin-right: 80px; min-width: 0; }
+  .badge {
+    display: inline-block;
+    background: rgba(242, 84, 127, 0.12);
+    color: #D42A5E;
+    font-size: 26px; font-weight: 700;
+    padding: 10px 26px; border-radius: 999px;
+    letter-spacing: -0.01em;
+    margin-bottom: 26px;
+  }
+  h1 {
+    font-size: {{TITLE_SIZE}}px;
+    font-weight: 800;
+    color: #40222F;
+    letter-spacing: -0.03em;
+    line-height: 1.22;
+    word-break: keep-all;
+  }
+  .subtitle {
+    margin-top: 24px;
+    font-size: 30px; font-weight: 500;
+    color: #A9647F;
+    letter-spacing: -0.015em;
+    line-height: 1.45;
+    word-break: keep-all;
+  }
+  .domain {
+    position: absolute; left: 116px; bottom: 44px;
+    display: flex; align-items: center; gap: 12px;
+    font-size: 24px; font-weight: 600; color: #C4849B;
+    letter-spacing: 0.01em;
+  }
+  .domain .dot { width: 10px; height: 10px; border-radius: 50%; background: #F2547F; }
+</style>
+</head>
+<body>
+  <div class="deco deco-tr">
+    <svg viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" stroke-width="1.6"/></svg>
+  </div>
+  <div class="deco deco-bl">
+    <svg viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" stroke-width="2"/></svg>
+  </div>
+  <div class="mark">{{MARK_SVG}}</div>
+  <div class="text">
+    <div class="badge">{{BADGE}}</div>
+    <h1>{{TITLE}}</h1>
+    <p class="subtitle">{{SUBTITLE}}</p>
+  </div>
+  <div class="domain"><span class="dot"></span>moderninsightspot.com</div>
+</body>
+</html>

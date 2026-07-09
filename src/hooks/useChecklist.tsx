@@ -262,9 +262,16 @@ export function useChecklist() {
   );
 
   // ─── Add custom item ───
+  // [CL-CHECKUX-20260709-232512] dueDateOverride(옵션) — AI 타임라인 "내 리스트에 추가"가
+  //   AI 가 산출한 deadline 을 그대로 쓰도록 확장. 미전달 시 기존 균등분배 계산 그대로(회귀 0).
+  //   반환 boolean = 성공 여부(무음실패 방지 — 호출부가 "추가됨 ✓" 표기 판단에 사용).
   const addCustomItem = useCallback(
-    async (title: string, period: ChecklistPeriod) => {
-      if (!user) return;
+    async (
+      title: string,
+      period: ChecklistPeriod,
+      dueDateOverride?: string | null
+    ): Promise<boolean> => {
+      if (!user) return false;
 
       const periodItems = items.filter((i) => i.period === period);
       const maxOrder = Math.max(0, ...periodItems.map((i) => i.sort_order));
@@ -278,9 +285,12 @@ export function useChecklist() {
             period,
             sort_order: maxOrder + 1,
             is_custom: true,
-            due_date: weddingDate
-              ? calculateDueDate(weddingDate, period, maxOrder + 1, periodItems.length + 1)
-              : null,
+            due_date:
+              dueDateOverride !== undefined
+                ? dueDateOverride
+                : weddingDate
+                  ? calculateDueDate(weddingDate, period, maxOrder + 1, periodItems.length + 1)
+                  : null,
           })
           .select()
           .single();
@@ -293,12 +303,14 @@ export function useChecklist() {
           title: '항목이 추가되었어요',
           description: title,
         });
+        return true;
       } catch (error: unknown) {
         toast({
           title: '추가 실패',
           description: error instanceof Error ? error.message : String(error),
           variant: 'destructive',
         });
+        return false;
       }
     },
     [user, items, weddingDate, toast]
@@ -330,8 +342,10 @@ export function useChecklist() {
   );
 
   // ─── Update notes ───
+  // [CL-CHECKUX-20260709-232512] 반환 boolean = 성공 여부 — "저장됨 ✓" 인디케이터가
+  //   실패를 성공으로 오표시하지 않도록(기존 호출부는 반환 무시 → 회귀 0).
   const updateNotes = useCallback(
-    async (itemId: string, notes: string) => {
+    async (itemId: string, notes: string): Promise<boolean> => {
       try {
         const { error } = await (supabase as any)
           .from('user_checklist_items')
@@ -343,15 +357,57 @@ export function useChecklist() {
         setItems((prev) =>
           prev.map((i) => (i.id === itemId ? { ...i, notes } : i))
         );
+        return true;
       } catch (error: unknown) {
         toast({
           title: '메모 저장 실패',
           description: error instanceof Error ? error.message : String(error),
           variant: 'destructive',
         });
+        return false;
       }
     },
     [toast]
+  );
+
+  // ─── Update due date ───
+  // [CL-CHECKUX-20260709-232512] AI 타임라인 "기한 적용" — 낙관적 set → update → 에러 롤백.
+  //   롤백은 toggleItem 규약과 동일하게 진입 시점 원본 스냅샷(item)을 그대로 복원.
+  //   동일 기한이면 쓰기 생략(no-op true). 반환 boolean = 성공 여부(무음실패 방지).
+  const updateDueDate = useCallback(
+    async (itemId: string, dueDate: string): Promise<boolean> => {
+      const item = items.find((i) => i.id === itemId);
+      if (!item) return false;
+      if ((item.due_date ? item.due_date.slice(0, 10) : null) === dueDate) return true;
+
+      // 낙관적 반영
+      setItems((prev) =>
+        prev.map((i) => (i.id === itemId ? { ...i, due_date: dueDate } : i))
+      );
+
+      try {
+        // 파일 전반의 (supabase as any) 패턴과 동일 사유(user_checklist_items 미생성 타입) —
+        // 신규 라인만 lint 부채 0 유지를 위해 명시적 disable(기존 9건은 baseline).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any)
+          .from('user_checklist_items')
+          .update({ due_date: dueDate, updated_at: new Date().toISOString() })
+          .eq('id', itemId);
+
+        if (error) throw error;
+        return true;
+      } catch (error: unknown) {
+        // 실패 시 원본 스냅샷 복원(재계산 금지 — 완료시각 파괴 방지 규약 동일)
+        setItems((prev) => prev.map((i) => (i.id === itemId ? item : i)));
+        toast({
+          title: '기한 변경 실패',
+          description: error instanceof Error ? error.message : String(error),
+          variant: 'destructive',
+        });
+        return false;
+      }
+    },
+    [items, toast]
   );
 
   // ─── Stats calculation ───
@@ -517,6 +573,7 @@ export function useChecklist() {
     addCustomItem,
     deleteItem,
     updateNotes,
+    updateDueDate, // [CL-CHECKUX-20260709-232512] AI 타임라인 "기한 적용"
     updateWeddingDate, // [DDAY-INLINE-PICKER-2026-03-07] 체크리스트 페이지에서 직접 D-day 설정
     refetch: fetchItems,
     generateFromTemplates,

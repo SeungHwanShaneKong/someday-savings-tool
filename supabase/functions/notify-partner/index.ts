@@ -13,8 +13,10 @@ import { corsHeaders, handleCors } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
 import { verifyUserToken } from '../_shared/jwt.ts';
 import {
-  buildSubject, buildEmailHtml, coerceBudgetId, utcDayString,
+  coerceBudgetId, utcDayString,
   isUnverifiedSharedSender, isConfigErrorStatus, mapReserveError,
+  // [CL-POKE-20260709-231909] kind 허용목록 + kind별 제목/본문(기존 kind 는 buildSubject/buildEmailHtml 위임 — 동작 불변)
+  coerceKind, subjectForKind, htmlForKind,
 } from '../_shared/notify-logic.ts';
 
 const DAILY_GLOBAL_CAP = 100; // 글로벌 하루 발송 상한(요청: ≤100, best-effort)
@@ -49,11 +51,16 @@ serve(async (req: Request) => {
     if (!senderId) return json({ error: '유효하지 않은 인증입니다' }, 401);
 
     // [V4] budgetId: 형식(UUID) 검증 후 소유/협업 확인 — 미검증이면 null 강등(임의 UUID 기록·FK 프로빙 차단)
+    // [CL-POKE-20260709-231909] kind: 허용목록('partner_edit_2min'|'poke') 외/비문자열 → 기본값 강등(임의 kind 기록 차단).
+    //  degrade: 구버전 배포 Edge 는 kind 를 무시 → 구템플릿 발송 + partner_edit_2min 슬롯 소모(수용된 잔여 리스크, 재배포로 해소).
     let rawBudgetId: unknown = null;
+    let rawKind: unknown = null;
     try {
       const body = await req.json();
       rawBudgetId = (body as { budgetId?: unknown })?.budgetId ?? null;
+      rawKind = (body as { kind?: unknown })?.kind ?? null;
     } catch { /* body 없음 허용 */ }
+    const kind = coerceKind(rawKind);
     let budgetId = coerceBudgetId(rawBudgetId);
     if (budgetId) {
       const { data: owned } = await admin
@@ -101,11 +108,12 @@ serve(async (req: Request) => {
 
     // [V2] 원자 예약(reserve-before-send) — (sender,recipient,notify_day,kind) 부분 유니크.
     //   23505(중복) → 이미 오늘 발송됨 → rate_limited(무발송). 동시 invoke/다탭/재시도 모두 1건만 통과.
+    //   [CL-POKE-20260709-231909] kind 가 유니크 키에 포함 → poke 는 partner_edit_2min 과 독립 일일 슬롯.
     const { error: reserveErr } = await admin.from('partner_notifications').insert({
       sender_id: senderId,
       recipient_id: partner.user_id,
       budget_id: budgetId,
-      kind: 'partner_edit_2min',
+      kind,
       notify_day: notifyDay,
     });
     if (reserveErr) {
@@ -132,8 +140,9 @@ serve(async (req: Request) => {
       body: JSON.stringify({
         from: NOTIFY_FROM, // [V(R6-B)] env 외부화 — 도메인 인증된 발신자만(위 가드로 샌드박스 차단됨)
         to: [partner.email],
-        subject: buildSubject(senderName),
-        html: buildEmailHtml(senderName, APP_URL),
+        // [CL-POKE-20260709-231909] kind별 제목/본문 — 기존 kind 는 buildSubject/buildEmailHtml 그대로 위임(불변)
+        subject: subjectForKind(kind, senderName),
+        html: htmlForKind(kind, senderName, APP_URL),
       }),
     });
     if (!resp.ok) {
@@ -143,12 +152,13 @@ serve(async (req: Request) => {
       //  - 403/422(설정성·영구 실패: 미인증 도메인/잘못된 from) → 이번 예약 행만 회수(scoped DELETE) → 설정 교정 후 같은 날 재발송 가능.
       //  - 그 외(5xx/네트워크 = 일시) → [V5] fail-closed: 예약 보존 → 같은 날 재발송 루프/외부 API 폭주 차단.
       if (isConfigErrorStatus(resp.status)) {
+        // [CL-POKE-20260709-231909] 회수도 이번 요청의 kind 로 스코프 — 다른 kind 슬롯 오회수 방지
         await admin.from('partner_notifications')
           .delete()
           .eq('sender_id', senderId)
           .eq('recipient_id', partner.user_id)
           .eq('notify_day', notifyDay)
-          .eq('kind', 'partner_edit_2min');
+          .eq('kind', kind);
       }
       return json({ ok: false, error: 'send_failed', status: resp.status }, 502);
     }

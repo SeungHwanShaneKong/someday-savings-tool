@@ -14,13 +14,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   renderWithProviders,
+  render,
   screen,
   fireEvent,
   waitFor,
   currentPath,
   act,
   within,
+  LocationProbe,
 } from '@/test/test-utils';
+// [CL-LOGIN-GATE-20260709-233447] returnTo(R 블록) — 라우터 state 주입은 MemoryRouter 직접 구성
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Auth from '../Auth';
 
 // ── kakao-browser: 가변 홀더로 환경 전환 ──
@@ -533,6 +537,92 @@ describe('Auth — Dev 바이패스 로그인 (F)', () => {
     // Dev 버튼 클릭은 signInWithGoogle을 건드리지 않는다
     fireEvent.click(devBtn);
     expect(mockAuth.signInWithGoogle).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// R. returnTo 원위치 복귀 — 게이트 이탈 → 로그인 → 복귀(살균 포함)
+//    [CL-LOGIN-GATE-20260709-233447] NavigateToAuth(state) ↔ Auth(sessionStorage) 계약 검증.
+//    routePath: '/auth' 로 실제 라우트 언마운트를 재현한다(복귀 후 Auth 재평가 방지).
+// ─────────────────────────────────────────────────────────────
+describe('Auth — returnTo 원위치 복귀 (R)', () => {
+  const RETURN_TO_KEY = 'wedsem_auth_return_to';
+
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('R1: 로그인 확정 + 저장된 returnTo(/checklist) → 해당 경로로 복귀하고 키를 소진한다', async () => {
+    sessionStorage.setItem(RETURN_TO_KEY, '/checklist');
+    mockAuth.user = { id: 'u-1' };
+    renderWithProviders(<Auth />, { route: '/auth', routePath: '/auth' });
+    expect(currentPath()).toBe('/checklist');
+    await waitFor(() => expect(sessionStorage.getItem(RETURN_TO_KEY)).toBeNull());
+  });
+
+  it('R2: 악성 절대 URL(https://evil.com) → /budget 폴백(오픈 리다이렉트 차단)', () => {
+    sessionStorage.setItem(RETURN_TO_KEY, 'https://evil.com');
+    mockAuth.user = { id: 'u-1' };
+    renderWithProviders(<Auth />, { route: '/auth', routePath: '/auth' });
+    expect(currentPath()).toBe('/budget');
+  });
+
+  it('R3: 프로토콜 상대 URL(//evil.com) → /budget 폴백', () => {
+    sessionStorage.setItem(RETURN_TO_KEY, '//evil.com');
+    mockAuth.user = { id: 'u-1' };
+    renderWithProviders(<Auth />, { route: '/auth', routePath: '/auth' });
+    expect(currentPath()).toBe('/budget');
+  });
+
+  it('R4: /auth 재진입 값 → /budget 폴백(리다이렉트 루프 방지)', () => {
+    sessionStorage.setItem(RETURN_TO_KEY, '/auth');
+    mockAuth.user = { id: 'u-1' };
+    renderWithProviders(<Auth />, { route: '/auth', routePath: '/auth' });
+    expect(currentPath()).toBe('/budget');
+  });
+
+  it('R5: 게이트 state.returnTo 는 마운트 시 sessionStorage 에 기록된다(OAuth 풀 리다이렉트 생존)', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: '/auth', state: { returnTo: '/summary?tab=chart' } }]}
+      >
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="*" element={<div data-testid="elsewhere" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(sessionStorage.getItem(RETURN_TO_KEY)).toBe('/summary?tab=chart');
+    // 비로그인 상태 — 로그인 폼은 그대로 렌더
+    expect(screen.getByText('Google로 계속하기')).toBeInTheDocument();
+  });
+
+  it('R6: state.returnTo + 로그인 확정 → 즉시 해당 경로(쿼리 포함)로 복귀한다(state 우선)', () => {
+    mockAuth.user = { id: 'u-1' };
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: '/auth', state: { returnTo: '/chat?topic=venue' } }]}
+      >
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="*" element={<div data-testid="elsewhere" />} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+    expect(currentPath()).toBe('/chat');
+    expect(
+      document.querySelector('[data-testid="loc"]')?.getAttribute('data-search'),
+    ).toBe('?topic=venue');
+  });
+
+  it('R7: returnTo 부재 시 기존 기본값 /budget 유지(회귀 가드)', () => {
+    mockAuth.user = { id: 'u-1' };
+    renderWithProviders(<Auth />, { route: '/auth', routePath: '/auth' });
+    expect(currentPath()).toBe('/budget');
   });
 });
 

@@ -28,7 +28,10 @@ vi.mock('@/lib/analytics/funnel-events', async (importOriginal) => ({
   trackFunnelOnce: vi.fn(),
 }));
 
-const DEFAULT_SLUG = '2026-wedding-cost'; // contextualCta 미설정(기본 CTA 회귀 앵커)
+// [CL-ADSENSE-MAX-20260710-004500] 최대 보강 라운드에서 전편 contextualCta 필수화(골든 AC.8) —
+// "미설정 아티클" 회귀 앵커는 계약 변경으로 정식 소멸. 공통 CTA 폴백은 Article.tsx 에 방어 코드로만
+// 남는다(레지스트리 경유 도달 불가 — E4 가 데이터 수준에서 이 불변식을 고정).
+const DEFAULT_SLUG = '2026-wedding-cost'; // E1/E2/E7~E10 공용 렌더 앵커(CTA 유무와 무관한 시나리오)
 const CTA_SLUG = 'sdm-checklist'; // contextualCta 설정(/budget)
 
 const renderArticle = (slug: string) =>
@@ -63,13 +66,14 @@ describe('Article 소비경험 — ② 컨텍스추얼 CTA 분기', () => {
     expect(screen.queryByRole('link', { name: '예산 시뮬레이터로 계산하기' })).toBeNull();
   });
 
-  it('E4: contextualCta 미설정 슬러그 → 기존 공통 CTA 그대로(회귀 0)', () => {
+  it('E4: 전편 contextualCta 보유(공통 CTA 폴백은 레지스트리 경유 도달 불가 — AC.8 계약)', () => {
+    // [CL-ADSENSE-MAX-20260710-004500] 구 E4(미설정 슬러그 → 공통 CTA)는 계약 변경으로 대체:
+    // 전 아티클이 맞춤 CTA 를 갖고, 공통 CTA 고정 라벨은 어떤 아티클에서도 렌더되지 않아야 한다.
+    const missing = ARTICLES.filter((a) => !a.contextualCta).map((a) => a.slug);
+    expect(missing).toEqual([]);
     renderArticle(DEFAULT_SLUG);
-    expect(screen.getByRole('link', { name: '예산 시뮬레이터로 계산하기' })).toHaveAttribute('href', '/budget');
-    expect(
-      screen.getByRole('heading', { name: '내 결혼 예산, 직접 계산해보세요' }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('읽은 내용, 웨딩셈에서 바로 실행해보세요')).toBeNull();
+    expect(screen.queryByRole('link', { name: '예산 시뮬레이터로 계산하기' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '내 결혼 예산, 직접 계산해보세요' })).toBeNull();
   });
 
   it('E5: 맞춤 CTA 클릭 → trackFunnel("article_cta_click", { slug }) 1회 계측', () => {
@@ -80,12 +84,14 @@ describe('Article 소비경험 — ② 컨텍스추얼 CTA 분기', () => {
     expect(trackFunnel).toHaveBeenCalledWith('article_cta_click', { slug: CTA_SLUG });
   });
 
-  it('E6: [무결성] contextualCta 는 4~6편·내부 경로 allowlist·라벨/설명 비어있지 않음', () => {
+  it('E6: [무결성] contextualCta 는 4편 이상·내부 앱 경로 allowlist·라벨/설명 비어있지 않음', () => {
     const withCta = ARTICLES.filter((a) => a.contextualCta);
     expect(withCta.length).toBeGreaterThanOrEqual(4);
-    expect(withCta.length).toBeLessThanOrEqual(6);
+    // [CL-LOGIN-GATE-20260709-233447] 콘텐츠 확장으로 상한(6) 폐지 — 레지스트리 규모 내면 허용
+    expect(withCta.length).toBeLessThanOrEqual(ARTICLES.length);
     for (const a of withCta) {
-      expect(['/budget', '/checklist', '/demo']).toContain(a.contextualCta!.to);
+      // [CL-LOGIN-GATE-20260709-233447] /demo 폐지 — 목적지는 내부 앱 경로(로그인 게이트)만 허용
+      expect(['/budget', '/checklist', '/chat']).toContain(a.contextualCta!.to);
       expect(a.contextualCta!.label.trim().length).toBeGreaterThan(0);
       expect(a.contextualCta!.description.trim().length).toBeGreaterThan(0);
     }

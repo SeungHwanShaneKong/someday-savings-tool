@@ -14,9 +14,11 @@ export interface UseCategoryOrderOptions {
 
 // ── 모듈 레벨 스코프 오버라이드 ────────────────────────────────────────────────
 // BudgetTable 내부는 useCategoryOrder() 를 no-arg 로 호출하므로 prop 으로 스코프를
-// 주입할 수 없다. /demo 같은 격리 셸이 마운트 동안 활성 스코프를 지정할 수 있도록
+// 주입할 수 없다. 격리 셸이 마운트 동안 활성 스코프를 지정할 수 있도록
 // 모듈 레벨 오버라이드를 제공한다. no-arg 호출은 이 오버라이드를 우선 참조한다.
 // (명시적 storageKey 인자는 오버라이드보다 항상 우선한다 — 인자 > 오버라이드 > 기본.)
+// [CL-LOGIN-GATE-20260709-233447] 원 소비자였던 /demo(체험판)는 폐지 — 스코프 격리는
+// 범용 메커니즘(scope.test 계약·미래 격리 소비자)이므로 유지한다.
 let categoryOrderScopeOverride: string | null = null;
 
 /**

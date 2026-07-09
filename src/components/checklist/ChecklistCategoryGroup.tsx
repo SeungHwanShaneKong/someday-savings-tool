@@ -34,7 +34,8 @@ interface ChecklistCategoryGroupProps {
   urgencySort?: boolean;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
-  onUpdateNotes: (id: string, notes: string) => void;
+  // [CL-CHECKUX-20260709-232512] 저장 인디케이터 계약 — 성공 여부(boolean/Promise) 투과 허용
+  onUpdateNotes: (id: string, notes: string) => void | boolean | Promise<void | boolean>;
   onBudgetLink?: (categoryLink: string, subCategoryLink: string) => void;
 }
 

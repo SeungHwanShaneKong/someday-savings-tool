@@ -5,7 +5,7 @@
 // 설계:
 // - 수치는 AVERAGE_COSTS(2025 전국 평균, src/lib/average-costs.ts) 단일소스 파생 — 하드코딩 금지.
 // - 식대는 하객수 비례: 평균 14,000,000원의 note '200명 기준' → 1인 식대 70,000원 × 하객수.
-// - 스타일 배수 0.75 / 1.0 / 1.4 — LandingBudgetSimulator(P1 #3)와 동일 계수 유지(랜딩 추정치와 일관).
+// - 스타일 배수 0.75 / 1.0 / 1.4 — 구 랜딩 시뮬레이터(P1 #3, [CL-LOGIN-GATE-20260709] 폐지)에서 승계한 계수.
 // - 평균 0원 항목(웨딩 플래너·가방순이)은 제안에서 제외(0원 프리필은 무의미).
 // - 금액은 만원 단위 반올림(프리필 제안치는 원 단위 정밀도가 무의미 — 랜딩과 동일 정책).
 // - 템플릿은 기존 BUDGET_CATEGORIES 만으로 구성(카테고리 파일 무수정):
@@ -28,7 +28,7 @@ export const MEAL_COST_PER_GUEST =
 /** 만원 단위 반올림 — 제안치는 원 단위 정밀도가 무의미(랜딩과 동일 정책). */
 const roundToManwon = (value: number): number => Math.round(value / 10_000) * 10_000;
 
-// ── 예식 스타일 (LandingBudgetSimulator 와 동일 계수) ──────────────────────────
+// ── 예식 스타일 (구 랜딩 시뮬레이터에서 승계한 계수 — 파일 헤더 주석 참조) ────────
 export type WizardStyleId = 'saving' | 'standard' | 'premium';
 
 export interface WizardStyleOption {

@@ -4,7 +4,7 @@
  * - 로그인 사용자 전용 (미로그인 시 /auth로 리다이렉트)
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 // [CL-COEDIT-NICK-20260622-233012] 닉네임 상시 변경(개선8)
@@ -25,6 +25,7 @@ import type { UserEarnedBadge } from '@/lib/gamification/types';
 
 export default function Profile() {
   const navigate = useNavigate();
+  const location = useLocation(); // [CL-LOGIN-GATE-20260709-233447] returnTo 원위치 캡처
   const { user, loading: authLoading } = useAuth();
   const { state, nextLevelPoints, isLoading: stateLoading } =
     useGamificationState();
@@ -112,11 +113,15 @@ export default function Profile() {
     path: '/profile',
   });
 
+  // [CL-LOGIN-GATE-20260709-233447] 로그인 후 원위치 복귀 — returnTo state 전달(Auth.tsx 살균과 한 쌍)
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/auth');
+      navigate('/auth', {
+        replace: true,
+        state: { returnTo: location.pathname + location.search },
+      });
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, location.pathname, location.search]);
 
   const earned = useMemo<UserEarnedBadge[]>(
     () =>

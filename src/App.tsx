@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+// [CL-LOGIN-GATE-20260709-233447] Navigate — 폐지된 /demo 구 링크/북마크를 /auth 로 보존 리다이렉트
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // [CL-TOP20-P2-THEME-20260703-023500] 다크모드(Top20 #8) — next-themes class 전략(.dark 토큰은 기완비)
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
@@ -57,8 +58,6 @@ const Profile = lazyWithRetry(() => import("./pages/Profile"), { routeId: "Profi
 const StaticPage = lazyWithRetry(() => import("./pages/StaticPage"), { routeId: "StaticPage" });
 // [CL-COEDIT-E2E-20260620-130000] 공동 예산 초대 수락 페이지
 const AcceptInvite = lazyWithRetry(() => import("./pages/AcceptInvite"), { routeId: "AcceptInvite" });
-// [CL-TOP20-P1-DEMO-20260703-014500] 게스트 체험 모드 — lazy 필수(BudgetTable+dnd-kit 체인의 초기 번들 유입 방지)
-const Demo = lazyWithRetry(() => import("./pages/Demo"), { routeId: "Demo" });
 
 // [CL-PERF-QUERY-20260418-230000] React Query 기본 설정 최적화
 const queryClient = new QueryClient({
@@ -103,8 +102,8 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
-          {/* [CL-TOP20-P1-DEMO-20260703-014500] 가입 전 가치 체험(Top20 #1) — SPA 라우트(canonical 슬래시 없음) */}
-          <Route path="/demo" element={<Demo />} />
+          {/* [CL-LOGIN-GATE-20260709-233447] /demo 체험판 폐지 — 구 링크/북마크는 /auth 로 리다이렉트 */}
+          <Route path="/demo" element={<Navigate to="/auth" replace />} />
           <Route path="/budget" element={<BudgetFlow />} />
           <Route path="/summary" element={<Summary />} />
           <Route path="/checklist" element={<Checklist />} />

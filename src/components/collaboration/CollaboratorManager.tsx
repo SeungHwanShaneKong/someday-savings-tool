@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCollaboration, type UseCollaborationResult } from '@/hooks/useCollaboration';
+// [CL-POKE-20260709-231909] 파트너 '콕 찌르기'(이메일 넛지) — myPartner 블록에 배치
+import { PokeButton } from '@/components/collaboration/PokeButton';
 
 interface CollaboratorManagerProps {
   budgetId: string | null;
@@ -39,9 +41,11 @@ interface CollaboratorManagerProps {
   onEditMyNickname?: () => void;
   /** [CL-AUDIT-RPC-DEDUP-20260622] 상위에서 단일 useCollaboration 을 주입(중복 RPC 제거). */
   external?: UseCollaborationResult;
+  /** [CL-POKE-20260709-231909] '콕 찌르기' 실발송(sent:true) 시 1회 — 상위가 게이미피케이션 보상 배선 */
+  onPoked?: () => void;
 }
 
-export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit, onEditMyNickname, external }: CollaboratorManagerProps) {
+export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit, onEditMyNickname, external, onPoked }: CollaboratorManagerProps) {
   // external 주입 시 내부 훅은 null 로 비활성(RPC 최소화). 미주입 시 자체 조회(독립 사용·테스트 호환).
   const internal = useCollaboration(external ? null : budgetId);
   const { collaborators, inviteUrl, busy, myPartner, createInvite, removeCollaborator, releasePartner } = external ?? internal;
@@ -189,6 +193,9 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
             <span className="font-medium text-foreground">{myPartner.display_name?.trim() || '파트너'}</span>
             {myPartner.email && <span className="text-muted-foreground/70"> · {myPartner.email}</span>}
           </p>
+          {/* [CL-POKE-20260709-231909] 콕 찌르기(이메일 넛지) + 파트너 해지 — myPartner 를 prop 주입(RPC 재호출 없음) */}
+          <div className="flex flex-wrap items-start gap-2">
+          <PokeButton budgetId={budgetId} partner={myPartner} onPoked={onPoked} />
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-destructive hover:text-destructive">
@@ -211,6 +218,7 @@ export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInvit
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </div>
         </div>
       )}
 

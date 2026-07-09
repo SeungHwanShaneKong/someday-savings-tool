@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderWithProviders, screen, fireEvent, currentPath, within } from '@/test/test-utils';
 import Article from '../Article';
+import { getArticle } from '@/content/articles';
 
 const VALID = '/guide/2026-wedding-cost/';
 
@@ -19,9 +20,13 @@ describe('Article — 버튼/네비게이션', () => {
     expect(currentPath()).toBe('/guide/');
   });
 
-  it('A3: CTA "예산 시뮬레이터로 계산하기" 링크 href=/budget', () => {
+  // [CL-ADSENSE-MAX-20260710-004500] 전편 contextualCta 필수화(AC.8)로 공통 CTA 고정 라벨 단언 →
+  // 레지스트리 파생 단언으로 전환(라벨/목적지는 데이터가 진실, 하드코딩 회귀 제거).
+  it('A3: 맞춤 CTA 링크 — 레지스트리 contextualCta 라벨/목적지와 일치', () => {
     renderWithProviders(<Article />, { route: VALID, routePath: '/guide/:slug' });
-    expect(screen.getByRole('link', { name: '예산 시뮬레이터로 계산하기' })).toHaveAttribute('href', '/budget');
+    const cta = getArticle('2026-wedding-cost')!.contextualCta!;
+    expect(cta).toBeTruthy();
+    expect(screen.getByRole('link', { name: cta.label })).toHaveAttribute('href', cta.to);
   });
 
   it('A4: CTA "가이드 더 보기" 링크 href=/guide/', () => {

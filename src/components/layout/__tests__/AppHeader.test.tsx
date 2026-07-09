@@ -121,10 +121,4 @@ describe("isAppHeaderRoute — 허용 목록 판정 (순수 함수)", () => {
       expect(isAppHeaderRoute(blocked), blocked).toBe(false);
     }
   });
-
-  // [CL-TOP20-P2-VERIFY-20260703-031500] 독립검증 관찰 3 반영 — /demo 제외(전용 전환 헤더 우선, PM 결정) 회귀 가드
-  it("/demo 는 전용 전환 헤더가 우선이므로 전역 헤더 비표시", () => {
-    expect(isAppHeaderRoute("/demo")).toBe(false);
-    expect(isAppHeaderRoute("/demo/")).toBe(false);
-  });
 });

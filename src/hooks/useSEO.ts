@@ -8,6 +8,9 @@ interface SEOConfig {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   /** [CL-TOP20-R50-TRACK-20260703-094000] true 시 robots noindex 메타 주입(체험성 라우트 색인 제외) */
   noindex?: boolean;
+  /** [CL-OGIMG-20260709-233100] 라우트별 og:image/twitter:image 재작성 — 절대 URL 또는 '/'로 시작하는
+   *  public 경로. 미지정 시 index.html 의 전역 og-image 유지. 프리렌더가 이 값을 정적 HTML 에 캡처한다. */
+  image?: string;
 }
 
 const BASE_DOMAIN = SITE_ORIGIN; // [CL-DOMAIN-PROMOTE-20260621] 단일 소스(src/config/site.ts)
@@ -19,7 +22,7 @@ const JSON_LD_ID = 'dynamic-jsonld';
 // [CL-TOP20-R50-TRACK-20260703-094000] SPA 라우트별 noindex 메타 전용 슬롯(id 로 단일 인스턴스 보장)
 const ROBOTS_ID = 'dynamic-robots';
 
-export function useSEO({ title, description, path, jsonLd, noindex }: SEOConfig) {
+export function useSEO({ title, description, path, jsonLd, noindex, image }: SEOConfig) {
   useEffect(() => {
     // Capture previous values for full cleanup on unmount
     const prevTitle = document.title;
@@ -37,6 +40,13 @@ export function useSEO({ title, description, path, jsonLd, noindex }: SEOConfig)
     const prevTwTitle = twTitle?.getAttribute('content') ?? '';
     const twDesc = document.querySelector('meta[name="twitter:description"]');
     const prevTwDesc = twDesc?.getAttribute('content') ?? '';
+    // [CL-OGIMG-20260709-233100] og:image 계열 캡처 — image 미지정이어도 캡처/복원 대칭 유지
+    const ogImage = document.querySelector('meta[property="og:image"]');
+    const prevOgImage = ogImage?.getAttribute('content') ?? '';
+    const ogImageAlt = document.querySelector('meta[property="og:image:alt"]');
+    const prevOgImageAlt = ogImageAlt?.getAttribute('content') ?? '';
+    const twImage = document.querySelector('meta[name="twitter:image"]');
+    const prevTwImage = twImage?.getAttribute('content') ?? '';
 
     // Update document title
     document.title = title || DEFAULT_TITLE;
@@ -74,6 +84,14 @@ export function useSEO({ title, description, path, jsonLd, noindex }: SEOConfig)
     // Update twitter:description
     if (twDesc) {
       twDesc.setAttribute('content', description || DEFAULT_DESCRIPTION);
+    }
+
+    // [CL-OGIMG-20260709-233100] 라우트별 og:image — image 지정 시에만 재작성(전역 카드 폴백 유지)
+    if (image) {
+      const absolute = image.startsWith('http') ? image : `${BASE_DOMAIN}${image}`;
+      if (ogImage) ogImage.setAttribute('content', absolute);
+      if (twImage) twImage.setAttribute('content', absolute);
+      if (ogImageAlt) ogImageAlt.setAttribute('content', title || DEFAULT_TITLE);
     }
 
     // Dynamic JSON-LD structured data injection
@@ -116,6 +134,10 @@ export function useSEO({ title, description, path, jsonLd, noindex }: SEOConfig)
       if (ogDesc) ogDesc.setAttribute('content', prevOgDesc);
       if (twTitle) twTitle.setAttribute('content', prevTwTitle);
       if (twDesc) twDesc.setAttribute('content', prevTwDesc);
+      // [CL-OGIMG-20260709-233100] og:image 계열 대칭 복원
+      if (ogImage) ogImage.setAttribute('content', prevOgImage);
+      if (ogImageAlt) ogImageAlt.setAttribute('content', prevOgImageAlt);
+      if (twImage) twImage.setAttribute('content', prevTwImage);
       const scriptToRemove = document.getElementById(JSON_LD_ID);
       if (scriptToRemove) {
         scriptToRemove.remove();
@@ -126,5 +148,5 @@ export function useSEO({ title, description, path, jsonLd, noindex }: SEOConfig)
         robotsToRemove.remove();
       }
     };
-  }, [title, description, path, jsonLd, noindex]);
+  }, [title, description, path, jsonLd, noindex, image]);
 }

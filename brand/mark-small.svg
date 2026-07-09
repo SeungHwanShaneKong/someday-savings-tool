@@ -1,0 +1,12 @@
+<!-- [CL-BRAND-HEART-20260709-231800] ≤48px 파비콘용 단순화 마크 — 디테일(뒤 하트·광택) 제거,
+     단일 하트 + 상단 투톤만 유지해 16px에서도 또렷하게. 마스터는 brand/mark.svg. -->
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="웨딩셈 파비콘">
+  <defs>
+    <linearGradient id="gMini" x1="20%" y1="6%" x2="80%" y2="94%">
+      <stop offset="0%" stop-color="#FF7FA9"/>
+      <stop offset="100%" stop-color="#E23663"/>
+    </linearGradient>
+  </defs>
+  <path d="M50 91 C21.2 65.8 3 47.6 3 28.9 C3 13.5 14.9 2 29.4 2 C38.2 2 46 6.5 50 13.8 C54 6.5 61.8 2 70.6 2 C85.1 2 97 13.5 97 28.9 C97 47.6 78.8 65.8 50 91 Z" fill="url(#gMini)"/>
+  <ellipse cx="30" cy="24" rx="14" ry="9.5" fill="#FFFFFF" opacity="0.32" transform="rotate(-20 30 24)"/>
+</svg>

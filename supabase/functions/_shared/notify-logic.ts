@@ -56,11 +56,13 @@ export function buildSubject(senderName: string | null | undefined): string {
   return `${sanitizeSenderName(senderName)}님이 우리 결혼 예산을 함께 다듬고 있어요 💍`;
 }
 
-/** V10: 이메일 본문 — 발신자명·URL 모두 escapeHtml(태그/속성 인젝션 불가). */
+/** V10: 이메일 본문 — 발신자명·URL 모두 escapeHtml(태그/속성 인젝션 불가).
+ *  [CL-EMAIL-BRAND-20260711-211500] 브랜드 v5 정렬: 배경 웜 블러시·CTA 브랜드 딥핑크 #DB2E66
+ *  (하트 그라디언트 #FF8FB3→#F2547F 계열, 흰 글자 명암비 ≥4.5:1). 살균 계약 무변경. */
 export function buildEmailHtml(senderName: string | null | undefined, appUrl: string): string {
   const safe = escapeHtml(sanitizeSenderName(senderName));
   const href = escapeHtml(appUrl);
-  return `<!doctype html><html lang="ko"><body style="margin:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  return `<!doctype html><html lang="ko"><body style="margin:0;background:#FDF2F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
     <div style="max-width:480px;margin:0 auto;padding:32px 20px;">
       <div style="background:#fff;border-radius:16px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
         <div style="font-size:40px;text-align:center;">💍</div>
@@ -68,7 +70,7 @@ export function buildEmailHtml(senderName: string | null | undefined, appUrl: st
         <p style="font-size:14px;color:#555;line-height:1.6;text-align:center;margin:0 0 20px;">
           지금 함께 보면 더 즐거워요. 잠깐 들어와 오늘의 변화를 확인해 보세요 😊
         </p>
-        <a href="${href}" style="display:block;text-align:center;background:#3b82f6;color:#fff;text-decoration:none;font-weight:600;padding:13px 0;border-radius:10px;font-size:15px;">우리 예산 보러 가기</a>
+        <a href="${href}" style="display:block;text-align:center;background:#DB2E66;color:#fff;text-decoration:none;font-weight:600;padding:13px 0;border-radius:10px;font-size:15px;">우리 예산 보러 가기</a>
         <p style="font-size:11px;color:#aaa;text-align:center;margin:18px 0 0;">웨딩셈 · 하루 한 번만 보내드려요</p>
       </div>
     </div></body></html>`;
@@ -175,11 +177,12 @@ export function subjectForKind(kind: NotifyKind, senderName: string | null | und
   return buildSubject(senderName);
 }
 
-/** poke 전용 본문 — 한 줄 개인화 넛지 + 기존 CTA 버튼 + 기존 '하루 한 번' 푸터(따뜻·비스팸). */
+/** poke 전용 본문 — 한 줄 개인화 넛지 + 기존 CTA 버튼 + 기존 '하루 한 번' 푸터(따뜻·비스팸).
+ *  [CL-EMAIL-BRAND-20260711-211500] 브랜드 v5 정렬(buildEmailHtml 과 동일 팔레트). 살균 계약 무변경. */
 export function buildPokeEmailHtml(senderName: string | null | undefined, appUrl: string): string {
   const safe = escapeHtml(sanitizeSenderName(senderName));
   const href = escapeHtml(appUrl);
-  return `<!doctype html><html lang="ko"><body style="margin:0;background:#f6f7f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  return `<!doctype html><html lang="ko"><body style="margin:0;background:#FDF2F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
     <div style="max-width:480px;margin:0 auto;padding:32px 20px;">
       <div style="background:#fff;border-radius:16px;padding:28px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
         <div style="font-size:40px;text-align:center;">👉💍</div>
@@ -187,7 +190,7 @@ export function buildPokeEmailHtml(senderName: string | null | undefined, appUrl
         <p style="font-size:14px;color:#555;line-height:1.6;text-align:center;margin:0 0 20px;">
           ${safe}님이 우리 결혼 예산을 같이 보고 싶어해요. 잠깐 들러 함께 다듬어 주실래요? 😊
         </p>
-        <a href="${href}" style="display:block;text-align:center;background:#3b82f6;color:#fff;text-decoration:none;font-weight:600;padding:13px 0;border-radius:10px;font-size:15px;">우리 예산 보러 가기</a>
+        <a href="${href}" style="display:block;text-align:center;background:#DB2E66;color:#fff;text-decoration:none;font-weight:600;padding:13px 0;border-radius:10px;font-size:15px;">우리 예산 보러 가기</a>
         <p style="font-size:11px;color:#aaa;text-align:center;margin:18px 0 0;">웨딩셈 · 하루 한 번만 보내드려요</p>
       </div>
     </div></body></html>`;

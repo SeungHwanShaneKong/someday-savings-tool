@@ -50,7 +50,7 @@ export function PokeNudgeCard({
   myEditedThisSession,
   onPoked,
 }: PokeNudgeCardProps) {
-  const { poke, onCooldown } = usePoke({ budgetId, partner, onPoked });
+  const { poke, onCooldown, unavailable } = usePoke({ budgetId, partner, onPoked });
   const [visible, setVisible] = useState(false);
   const [suppressChecked, setSuppressChecked] = useState(false);
   // 세션당 1회 평가 가드(wizardDecidedRef 패턴) — 데이터 준비 전에는 소진하지 않는다
@@ -137,7 +137,7 @@ export function PokeNudgeCard({
           size="sm"
           className="flex-1 gap-1.5"
           onClick={handlePoke}
-          disabled={onCooldown}
+          disabled={onCooldown || unavailable}
           loadingText="찌르는 중..."
         >
           <HandHeart className="w-3.5 h-3.5" aria-hidden="true" /> 콕 찌르기

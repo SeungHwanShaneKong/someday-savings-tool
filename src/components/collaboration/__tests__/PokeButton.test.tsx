@@ -104,4 +104,23 @@ describe('PokeButton', () => {
     renderWithProviders(<PokeButton budgetId="b1" partner={PARTNER} />);
     expect(screen.getByRole('button', { name: /콕 찌르기/ })).not.toBeDisabled();
   });
+
+  // [CL-POKE-UNAVAIL-20260711-204500] 발송 불가(서버 미구성) → 반복 실패 방지 세션 비활성 개선
+  it('PK.7 unavailable(no_sender_domain) → 버튼 비활성 + "이메일 알림 준비 중" 안내(쿨다운과 구분)', async () => {
+    invokeMock.mockResolvedValueOnce({ data: { ok: true, skipped: 'no_sender_domain' }, error: null });
+    renderWithProviders(<PokeButton budgetId="b1" partner={PARTNER} />);
+
+    const btn = screen.getByRole('button', { name: /콕 찌르기/ });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledTimes(1));
+    expect(toastSpy.mock.calls[0][0].title).toBe('지금은 알림을 보낼 수 없어요');
+    // 개선: 한 번 '발송 불가'를 받으면 세션 내 버튼 비활성(같은 실패 반복 클릭 차단)
+    await waitFor(() => expect(btn).toBeDisabled());
+    expect(screen.getByText('이메일 알림 준비 중이에요 🛠️')).toBeInTheDocument();
+    // 쿨다운(내일 다시)과 다른 상태 — 쿨다운 미기록·쿨다운 문구 없음
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(screen.queryByText('내일 다시 찌를 수 있어요 ⏰')).toBeNull();
+  });
 });

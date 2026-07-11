@@ -29,6 +29,19 @@ function broadcastCooldown(pairKey: string, lastMs: number) {
   cooldownListeners.forEach((listener) => listener(pairKey, lastMs));
 }
 
+// ── 모듈 레벨 '발송 불가(이메일 백엔드 미구성)' 브로드캐스트 — 서버 전역 상태(페어 무관) ──
+// [CL-POKE-UNAVAIL-20260711-204500] notify-partner 가 no_provider/no_sender_domain/schema_not_ready
+//   (=mapPokeOutcome type:'unavailable') 로 응답하면 이메일 백엔드가 아직 구성 전이라는 뜻이며 모든
+//   페어에 공통이다. 세션 내 마운트된 모든 poke 인스턴스를 즉시 비활성화해, 동일한 '보낼 수 없어요'
+//   실패를 반복 클릭하는 UX 를 막는다. 쿨다운(localStorage 24h 지속)과 달리 **세션 휘발** — 백엔드
+//   구성 후 새로고침하면 초기화되어 재확인(자동 재활성). 페어 스코프인 쿨다운과 달리 전역이라
+//   pairKey 검사 없이 모든 리스너에 통지한다.
+type UnavailableListener = () => void;
+const unavailableListeners = new Set<UnavailableListener>();
+function broadcastUnavailable() {
+  unavailableListeners.forEach((listener) => listener());
+}
+
 export interface UsePokeArgs {
   budgetId: string | null;
   /** 현재 파트너(useCollaboration.myPartner / useMyPartner) — 없으면 poke 는 no-op·onCooldown=false */
@@ -42,6 +55,11 @@ export interface UsePokeResult {
   poke: () => Promise<void>;
   /** 24h 낙관 쿨다운 중 여부(같은 페어의 다른 인스턴스 poke 도 pub-sub 으로 즉시 반영) */
   onCooldown: boolean;
+  /**
+   * 서버가 '발송 불가(이메일 백엔드 미구성)'를 응답한 세션인가 — 버튼을 '준비 중'으로 비활성화해
+   * 반복 실패를 막는다. 전역 브로드캐스트(페어 무관)·세션 휘발(구성 후 새로고침 시 재확인).
+   */
+  unavailable: boolean;
 }
 
 export function usePoke({ budgetId, partner, onPoked }: UsePokeArgs): UsePokeResult {
@@ -49,6 +67,8 @@ export function usePoke({ budgetId, partner, onPoked }: UsePokeArgs): UsePokeRes
   const { toast } = useToast();
   // 쿨다운 만료 시각(ms) — null 이면 즉시 찌르기 가능
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  // 세션 내 '발송 불가(서버 미구성)' 감지 여부 — 어느 인스턴스가 감지하든 전역 브로드캐스트로 즉시 동기
+  const [unavailable, setUnavailable] = useState(false);
 
   const userId = user?.id ?? null;
   const partnerId = partner?.user_id ?? null;
@@ -85,6 +105,15 @@ export function usePoke({ budgetId, partner, onPoked }: UsePokeArgs): UsePokeRes
     };
   }, [pairKey]);
 
+  // 어느 인스턴스든 '발송 불가'를 감지하면 마운트된 모든 인스턴스를 즉시 비활성화(전역 — 페어 무관)
+  useEffect(() => {
+    const listener: UnavailableListener = () => setUnavailable(true);
+    unavailableListeners.add(listener);
+    return () => {
+      unavailableListeners.delete(listener);
+    };
+  }, []);
+
   const onCooldown = cooldownUntil != null && cooldownUntil > Date.now();
 
   const recordCooldown = (nowMs: number) => {
@@ -107,9 +136,11 @@ export function usePoke({ budgetId, partner, onPoked }: UsePokeArgs): UsePokeRes
     }
     const outcome = mapPokeOutcome(res, partnerName);
     toast(outcome.toast);
+    // 발송 불가(서버 미구성) → 세션 내 모든 인스턴스 비활성(자신 리스너 포함 전원 통지). 쿨다운·보상 없음.
+    if (outcome.type === 'unavailable') broadcastUnavailable();
     if (outcome.startCooldown) recordCooldown(Date.now());
     if (outcome.awardPoke) onPoked?.();
   };
 
-  return { poke, onCooldown };
+  return { poke, onCooldown, unavailable };
 }

@@ -23,11 +23,15 @@ interface PokeButtonProps {
 }
 
 export function PokeButton({ budgetId, partner, onPoked, compact = false }: PokeButtonProps) {
-  const { poke, onCooldown } = usePoke({ budgetId, partner, onPoked });
+  const { poke, onCooldown, unavailable } = usePoke({ budgetId, partner, onPoked });
 
   const partnerName = partner?.display_name?.trim() || '파트너';
 
   if (!partner) return null;
+
+  // [CL-POKE-UNAVAIL-20260711-204500] 발송 불가(서버 미구성) 세션 → 쿨다운과 별개로 비활성 + 다른 안내.
+  //   우선순위: unavailable(구성 문제, 새로고침 전 불변) > onCooldown(내일 해제).
+  const disabled = onCooldown || unavailable;
 
   if (compact) {
     return (
@@ -36,14 +40,22 @@ export function PokeButton({ budgetId, partner, onPoked, compact = false }: Poke
         size="sm"
         className="gap-1.5 flex-shrink-0"
         onClick={poke}
-        disabled={onCooldown}
+        disabled={disabled}
         loadingText="찌르는 중..."
         aria-label={
-          onCooldown
-            ? `파트너 ${partnerName}님에게 콕 찌르기 — 내일 다시 찌를 수 있어요`
-            : `파트너 ${partnerName}님에게 콕 찌르기`
+          unavailable
+            ? '콕 찌르기 — 이메일 알림 준비 중이에요'
+            : onCooldown
+              ? `파트너 ${partnerName}님에게 콕 찌르기 — 내일 다시 찌를 수 있어요`
+              : `파트너 ${partnerName}님에게 콕 찌르기`
         }
-        title={onCooldown ? '내일 다시 찌를 수 있어요 ⏰' : undefined}
+        title={
+          unavailable
+            ? '이메일 알림 준비 중이에요 🛠️'
+            : onCooldown
+              ? '내일 다시 찌를 수 있어요 ⏰'
+              : undefined
+        }
       >
         <HandHeart className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
         <span className="hidden sm:inline">콕 찌르기</span>
@@ -58,15 +70,17 @@ export function PokeButton({ budgetId, partner, onPoked, compact = false }: Poke
         size="sm"
         className="h-7 gap-1.5 text-primary hover:text-primary"
         onClick={poke}
-        disabled={onCooldown}
+        disabled={disabled}
         loadingText="찌르는 중..."
         aria-label={`파트너 ${partnerName}님에게 콕 찌르기`}
       >
         <HandHeart className="w-3.5 h-3.5" aria-hidden="true" /> 콕 찌르기
       </AsyncButton>
-      {onCooldown && (
+      {unavailable ? (
+        <p className="text-[10px] text-muted-foreground/70 pl-1">이메일 알림 준비 중이에요 🛠️</p>
+      ) : onCooldown ? (
         <p className="text-[10px] text-muted-foreground/70 pl-1">내일 다시 찌를 수 있어요 ⏰</p>
-      )}
+      ) : null}
     </div>
   );
 }

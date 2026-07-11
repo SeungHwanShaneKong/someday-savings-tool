@@ -80,6 +80,8 @@
     --brand-pink-soft: 341 100% 78%;
     --brand-pink: 344 85% 64%;
     --brand-pink-deep: 342 73% 53%;
+    /* [CL-BRAND-V3-20260711-183000] 인터로킹 링 밴드용 펄 화이트(라이트/다크 동일 — 핑크 하트 위 대비) */
+    --brand-ring: 0 0% 100%;
   }
 
   .dark {
@@ -141,6 +143,7 @@
     --brand-pink-soft: 341 80% 74%;
     --brand-pink: 344 80% 68%;
     --brand-pink-deep: 342 70% 60%;
+    --brand-ring: 0 0% 100%;
   }
 }
 

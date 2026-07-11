@@ -1,20 +1,24 @@
-<!-- [CL-BRAND-V2-20260711-173300] ≤48px 파비콘용 감축 마크 — 마스터(mark.svg)와 동일 지오메트리 패밀리:
-     '링 홀 2개가 뚫린 볼드 하트'. 감축 규칙(100 좌표계·16px 렌더 기준): 림·젬·광택 제거,
-     2-stop 그라데이션만, 밴드 ≥12유닛(홀 사이 14)·홀 지름 24(≥22)·클레프트 폭 ≥10 유지. -->
+<!-- [CL-BRAND-V5-20260711-191500] ≤48px 파비콘용 감축 마크 — 마스터의 플래티넘 인터로킹 웨딩링을 소형 판독성에
+     맞춰 단순화: 베젤 다이아·파베·정반사 제거, 백금 밴드를 두툼한 도넛(홀 큼)으로 유지 → 16px 에서도 '두 반지'가
+     읽히게. 감축 규칙: 밴드 폭 ≥ 12유닛(홀 r7)·겹침 유지. -->
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="웨딩셈 파비콘">
   <defs>
     <linearGradient id="gMini" x1="20%" y1="6%" x2="80%" y2="94%">
       <stop offset="0%" stop-color="#FF7FA9"/>
       <stop offset="100%" stop-color="#E23663"/>
     </linearGradient>
+    <linearGradient id="gPlatMini" x1="20%" y1="8%" x2="80%" y2="92%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C3CDD9"/>
+    </linearGradient>
   </defs>
-  <path fill="url(#gMini)" fill-rule="evenodd" d="
-    M 50 94
-    Q 35.5 73 12.6 49.4
-    A 24 24 0 1 1 50 19.34
-    A 24 24 0 1 1 87.4 49.4
-    Q 64.5 73 50 94
-    Z
-    M 43 34 A 12 12 0 1 0 19 34 A 12 12 0 1 0 43 34 Z
-    M 81 34 A 12 12 0 1 0 57 34 A 12 12 0 1 0 81 34 Z"/>
+  <!-- 하트 바디 -->
+  <path fill="url(#gMini)" d="M 50 94 Q 35.5 73 12.6 49.4 A 24 24 0 1 1 50 19.34 A 24 24 0 1 1 87.4 49.4 Q 64.5 73 50 94 Z"/>
+  <!-- 인터로킹 플래티넘 밴드(두툼한 도넛) — 홀 r7, 밴드 폭 12 -->
+  <g fill="url(#gPlatMini)" fill-rule="evenodd">
+    <path d="M 29.5 41 a 13 13 0 1 0 26 0 a 13 13 0 1 0 -26 0 Z M 35.5 41 a 7 7 0 1 1 14 0 a 7 7 0 1 1 -14 0 Z"/>
+    <path d="M 44.5 41 a 13 13 0 1 0 26 0 a 13 13 0 1 0 -26 0 Z M 50.5 41 a 7 7 0 1 1 14 0 a 7 7 0 1 1 -14 0 Z"/>
+  </g>
+  <!-- weave: 상단 교차에서 왼쪽 밴드가 위 -->
+  <path d="M 44.0 30.2 A 10 10 0 0 1 52.6 39.9" fill="none" stroke="url(#gPlatMini)" stroke-width="6"/>
 </svg>

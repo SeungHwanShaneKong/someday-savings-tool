@@ -35,20 +35,26 @@ describe('WeddingMark', () => {
         expect(value).toMatch(allowed);
       }
     }
-    // [CL-BRAND-V2-20260711-173300] 브랜드 핑크 토큰이 실제로 사용되는지(구 primary/chart-2 링 폐기)
+    // [CL-BRAND-V3-20260711-183000] 브랜드 핑크 토큰 + 링 밴드 펄 토큰 사용(구 primary/chart-2 링 폐기)
     expect(container.innerHTML).toContain('hsl(var(--brand-pink))');
-    expect(container.innerHTML).toContain('hsl(var(--brand-pink-soft))');
+    expect(container.innerHTML).toContain('hsl(var(--brand-ring))');
     expect(container.innerHTML).not.toContain('hsl(var(--chart-2))');
   });
 
-  it('[CL-BRAND-V2] 하트+링 지오메트리 계약 — evenodd 링 홀 2개(원 서브패스)와 스파클이 존재', () => {
+  it('[CL-BRAND-V5] 하트+플래티넘 도넛 밴드 지오메트리 계약 — 하트 바디 + 도넛 2개 + weave', () => {
     const { container } = render(<WeddingMark />);
-    const body = container.querySelector('path[fill-rule="evenodd"]');
+    // 하트 바디(단색 fill path) 존재
+    const body = container.querySelector('path[fill="hsl(var(--brand-pink))"]');
     expect(body).not.toBeNull();
-    // 링 홀 2개 = 12 반지름 원 서브패스 2개(마스터 brand/mark.svg 와 동일 수치 계약)
-    const d = body!.getAttribute('d') ?? '';
-    expect(d.match(/A 12 12/g)?.length).toBe(4); // 원 1개당 반호 2개 × 2홀
-    // 폴리시드 림 원 2개
-    expect(container.querySelectorAll('circle[r="12"]').length).toBe(2);
+    // 인터로킹 밴드 = evenodd 도넛 2개(mark-small 과 동일 외경 r13/내경 r7 계약)
+    const donutGroup = container.querySelector('g[fill-rule="evenodd"]');
+    expect(donutGroup).not.toBeNull();
+    const donuts = donutGroup!.querySelectorAll('path');
+    expect(donuts.length).toBe(2);
+    const allD = Array.from(donuts).map((p) => p.getAttribute('d')).join(' ');
+    expect(allD.match(/a 13 13/g)?.length).toBe(4); // 밴드 2개 × 외경 반호 2개
+    expect(allD.match(/a 7 7/g)?.length).toBe(4); // 밴드 2개 × 내경 반호 2개(반지 두께)
+    // weave 호(상단 교차 왼쪽 밴드 위) 존재
+    expect(container.innerHTML).toContain('A 10 10 0 0 1 52.6 39.9');
   });
 });

@@ -31,30 +31,16 @@ const markSvg = stripComments(readFileSync(path.join(BRAND, 'mark.svg'), 'utf8')
 const markSmallSvg = stripComments(readFileSync(path.join(BRAND, 'mark-small.svg'), 'utf8'));
 const ogTemplate = readFileSync(path.join(BRAND, 'og-template.html'), 'utf8');
 
-/** 타일(그라데이션 배경) 전용 화이트 마크 — [CL-BRAND-V2-20260711-173300] 마스터와 동일 지오메트리
- *  ('링 홀 2개 하트')의 단색 화이트 버전. 홀은 투명 → 핑크 타일 그라데이션이 비쳐 링이 읽힘. */
-const tileHeartSvg = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <path fill="#FFFFFF" fill-rule="evenodd" d="
-    M 50 94
-    Q 35.5 73 12.6 49.4
-    A 24 24 0 1 1 50 19.34
-    A 24 24 0 1 1 87.4 49.4
-    Q 64.5 73 50 94
-    Z
-    M 43 34 A 12 12 0 1 0 19 34 A 12 12 0 1 0 43 34 Z
-    M 81 34 A 12 12 0 1 0 57 34 A 12 12 0 1 0 81 34 Z"/>
-  <!-- 링 상단 젬(다이아) 펀치 — 투명 노치로 핑크가 비쳐 '반지+젬'으로 읽힘(얼굴 인상 차단) -->
-  <rect x="28.3" y="19.3" width="5.4" height="5.4" rx="1" fill="#F76D96" transform="rotate(45 31 22)"/>
-  <rect x="66.3" y="19.3" width="5.4" height="5.4" rx="1" fill="#F76D96" transform="rotate(45 69 22)"/>
-</svg>`;
-
 const log = (...a) => console.log('[brand]', ...a);
 
-/** 아이콘 타일 HTML — bg: 'gradient'(불투명 타일) | 'transparent', scale: 하트가 캔버스에서 차지하는 비율 */
+/** 아이콘 타일 HTML — bg: 'gradient'|'blush'(불투명 타일) | 'transparent', scale: 마크가 캔버스에서 차지하는 비율.
+ *  [CL-BRAND-V4-20260711-190000] 'blush' = 소프트 크림-블러시 타일(마스터 마크의 핑크 하트가 대비되어 보이도록). */
 function iconHtml(size, { bg, scale, svg = markSvg }) {
   const background = bg === 'gradient'
     ? 'background: linear-gradient(135deg, #FFE3ED 0%, #FFB9CF 45%, #F76D96 100%);'
-    : 'background: transparent;';
+    : bg === 'blush'
+      ? 'background: linear-gradient(140deg, #FFF6F2 0%, #FFE7EF 52%, #FFD3E1 100%);'
+      : 'background: transparent;';
   const inner = Math.round(size * scale);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
     * { margin:0; padding:0; }
@@ -106,26 +92,26 @@ async function main() {
       log(`${name} (${(buf.length / 1024).toFixed(1)}KB)`);
     };
 
-    // 1) OG 카드 (홈)
+    // 1) OG 카드 (홈) — [CL-BRAND-V3-20260711-183000] 감성 카피
     const ogHtml = fillOgTemplate(ogTemplate, {
-      badge: '결혼 예산 계산기',
+      badge: '결혼 예산 · 체크리스트 · AI 상담',
       title: '웨딩셈',
-      subtitle: '예산·체크리스트·AI 상담까지, 결혼 준비의 시작',
+      subtitle: '설레는 결혼 준비, 여기서 시작해요',
     });
     out('og-image.png', await renderPng(browser, ogHtml, 1200, 630));
 
-    // 2) PWA 아이콘 (any) — 불투명 그라데이션 타일 + 화이트 하트 68%(대비 확보)
+    // 2) PWA 아이콘 (any) — [CL-BRAND-V4] 블러시 타일 + 마스터 마크(핑크 하트+골드 웨딩링)로 전 자산 통일
     for (const size of [512, 256, 192]) {
-      out(`pwa-icon-${size}.png`, await renderPng(browser, iconHtml(size, { bg: 'gradient', scale: 0.68, svg: tileHeartSvg }), size, size));
+      out(`pwa-icon-${size}.png`, await renderPng(browser, iconHtml(size, { bg: 'blush', scale: 0.82, svg: markSvg }), size, size));
     }
 
-    // 3) PWA maskable — 안전영역(중앙 80% 원) 안에 들어오도록 56%
+    // 3) PWA maskable — 안전영역(중앙 80% 원) 안에 들어오도록 축소
     for (const size of [512, 192]) {
-      out(`pwa-icon-maskable-${size}.png`, await renderPng(browser, iconHtml(size, { bg: 'gradient', scale: 0.56, svg: tileHeartSvg }), size, size));
+      out(`pwa-icon-maskable-${size}.png`, await renderPng(browser, iconHtml(size, { bg: 'blush', scale: 0.66, svg: markSvg }), size, size));
     }
 
-    // 4) apple-touch-icon (iOS는 알파 미지원 → 불투명 타일)
-    out('apple-touch-icon.png', await renderPng(browser, iconHtml(180, { bg: 'gradient', scale: 0.68, svg: tileHeartSvg }), 180, 180));
+    // 4) apple-touch-icon (iOS는 알파 미지원 → 불투명 블러시 타일)
+    out('apple-touch-icon.png', await renderPng(browser, iconHtml(180, { bg: 'blush', scale: 0.82, svg: markSvg }), 180, 180));
 
     // 5) favicon.png — 투명 배경 원색 마크(Organization logo 겸용이라 512 고해상)
     out('favicon.png', await renderPng(browser, iconHtml(512, { bg: 'transparent', scale: 1.0 }), 512, 512, { transparent: true }));

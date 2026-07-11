@@ -54,7 +54,9 @@ describe('브랜드 자산 골든 (BA)', () => {
     for (const f of ['favicon-96.png', 'favicon-48.png']) {
       expect(fileSize(f), f).toBeGreaterThan(512);
     }
-    expect(fileSize('og-image.png')).toBeLessThan(300 * 1024);
+    // [CL-BRAND-V3-20260711-183000] 감성 그라데이션 OG 카드 상한 = 420KB. 소셜 플랫폼 실한계(카카오/트위터/FB
+    //   모두 MB 단위)엔 여유. 상한 역할 = 백지·바이너리 폭주 가드(품질 저하 유발하는 300KB 강제는 완화).
+    expect(fileSize('og-image.png')).toBeLessThan(420 * 1024);
   });
 
   it('BA.5 manifest — 아이콘 엔트리 전부 실파일 존재 + maskable 512 포함', () => {
@@ -80,7 +82,9 @@ describe('브랜드 자산 골든 (BA)', () => {
   it('BA.8 favicon.svg — SVG 파비콘 발행(mark-small 동기·주석 스트립)', () => {
     const svg = readFileSync(path.join(PUB, 'favicon.svg'), 'utf8');
     expect(svg.trimStart().startsWith('<svg')).toBe(true); // stripComments 발행 확인(헤더 주석 없음)
-    expect(svg).toContain('fill-rule="evenodd"'); // 링 홀 compound path 계약
+    // [CL-BRAND-V4-20260711-190000] 인터로킹 웨딩링(두툼한 도넛 밴드 2개) 하트 마크 계약 — 소형에서도 두 반지 판독.
+    expect(svg).toContain('fill-rule="evenodd"'); // 도넛 밴드(반지 두께)
+    expect((svg.match(/a 13 13/g) ?? []).length).toBe(4); // 링 2개 × 반호 2개(마스터 패밀리 수치)
     expect(svg.length).toBeGreaterThan(300);
     expect(svg.length).toBeLessThan(20 * 1024);
   });

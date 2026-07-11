@@ -4,14 +4,18 @@
       <stop offset="0%" stop-color="#FF7FA9"/>
       <stop offset="100%" stop-color="#E23663"/>
     </linearGradient>
+    <linearGradient id="gPlatMini" x1="20%" y1="8%" x2="80%" y2="92%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C3CDD9"/>
+    </linearGradient>
   </defs>
-  <path fill="url(#gMini)" fill-rule="evenodd" d="
-    M 50 94
-    Q 35.5 73 12.6 49.4
-    A 24 24 0 1 1 50 19.34
-    A 24 24 0 1 1 87.4 49.4
-    Q 64.5 73 50 94
-    Z
-    M 43 34 A 12 12 0 1 0 19 34 A 12 12 0 1 0 43 34 Z
-    M 81 34 A 12 12 0 1 0 57 34 A 12 12 0 1 0 81 34 Z"/>
+  
+  <path fill="url(#gMini)" d="M 50 94 Q 35.5 73 12.6 49.4 A 24 24 0 1 1 50 19.34 A 24 24 0 1 1 87.4 49.4 Q 64.5 73 50 94 Z"/>
+  
+  <g fill="url(#gPlatMini)" fill-rule="evenodd">
+    <path d="M 29.5 41 a 13 13 0 1 0 26 0 a 13 13 0 1 0 -26 0 Z M 35.5 41 a 7 7 0 1 1 14 0 a 7 7 0 1 1 -14 0 Z"/>
+    <path d="M 44.5 41 a 13 13 0 1 0 26 0 a 13 13 0 1 0 -26 0 Z M 50.5 41 a 7 7 0 1 1 14 0 a 7 7 0 1 1 -14 0 Z"/>
+  </g>
+  
+  <path d="M 44.0 30.2 A 10 10 0 0 1 52.6 39.9" fill="none" stroke="url(#gPlatMini)" stroke-width="6"/>
 </svg>

@@ -1,78 +1,72 @@
 <!doctype html>
-<!-- [CL-BRAND-HEART-20260709-231800] OG 카드 템플릿(1200×630) — 홈/아티클 겸용.
-     플레이스홀더(이 주석엔 중괄호 토큰을 절대 쓰지 말 것 — replaceAll 이 주석 내부까지 치환해
-     mark.svg 내부 주석의 종료 시퀀스가 바깥 주석을 조기 종료시키는 사고 방지): BADGE, TITLE,
-     SUBTITLE, TITLE_SIZE, MARK_SVG. scripts/generate-brand-assets.mjs 가 치환 후 Puppeteer로 캡처. -->
+<!-- [CL-BRAND-V3-20260711-183000] OG 카드 템플릿(1200×630) v3 — 감성 에디토리얼 톤(홈/아티클 겸용).
+     플레이스홀더(주석엔 중괄호 토큰 금지 — replaceAll 오염 방지): BADGE, TITLE, SUBTITLE, TITLE_SIZE, MARK_SVG.
+     웜 블러시 층 그라데이션 + 로즈골드 프레임 + 떠다니는 하트/스파클 + 글로우 위 인터로킹 링 마크.
+     scripts/generate-brand-assets.mjs(홈) · generate-og-images.mjs(아티클 28장)가 치환 후 Puppeteer 캡처. -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <link rel="preload" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/packages/pretendard/dist/web/variable/woff2/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1200px; height:630px; overflow:hidden; }
   body {
-    font-family: 'Pretendard Variable', Pretendard, -apple-system, sans-serif;
-    background: linear-gradient(135deg, #FFF7FA 0%, #FFECF3 48%, #FFDDE9 100%);
-    position: relative;
-    display: flex;
-    align-items: center;
+    font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif; position:relative;
+    background:
+      radial-gradient(120% 90% at 18% 8%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 42%),
+      radial-gradient(80% 70% at 88% 92%, rgba(255,169,196,0.55) 0%, rgba(255,169,196,0) 55%),
+      linear-gradient(128deg, #FFF7F2 0%, #FFE9F0 46%, #FFD7E4 100%);
   }
-  /* 장식 하트 아웃라인 — 아주 연하게 */
-  .deco { position: absolute; opacity: 0.5; }
-  .deco svg path { fill: none; stroke: #FFC7D8; }
-  .deco-tr { top: -70px; right: -50px; width: 340px; height: 306px; transform: rotate(14deg); }
-  .deco-bl { bottom: -90px; left: 430px; width: 260px; height: 234px; transform: rotate(-12deg); opacity: 0.38; }
-  .mark { width: 330px; height: 330px; margin-left: 84px; flex-shrink: 0; }
-  .mark svg { width: 100%; height: 100%; }
-  .text { margin-left: 64px; margin-right: 80px; min-width: 0; }
-  .badge {
-    display: inline-block;
-    background: rgba(242, 84, 127, 0.12);
-    color: #D42A5E;
-    font-size: 26px; font-weight: 700;
-    padding: 10px 26px; border-radius: 999px;
-    letter-spacing: -0.01em;
-    margin-bottom: 26px;
-  }
-  h1 {
-    font-size: {{TITLE_SIZE}}px;
-    font-weight: 800;
-    color: #40222F;
-    letter-spacing: -0.03em;
-    line-height: 1.22;
-    word-break: keep-all;
-  }
-  .subtitle {
-    margin-top: 24px;
-    font-size: 30px; font-weight: 500;
-    color: #A9647F;
-    letter-spacing: -0.015em;
-    line-height: 1.45;
-    word-break: keep-all;
-  }
-  .domain {
-    position: absolute; left: 116px; bottom: 44px;
-    display: flex; align-items: center; gap: 12px;
-    font-size: 24px; font-weight: 600; color: #C4849B;
-    letter-spacing: 0.01em;
-  }
-  .domain .dot { width: 10px; height: 10px; border-radius: 50%; background: #F2547F; }
+  .frame { position:absolute; inset:26px; border:1.5px solid rgba(214,150,120,0.35); border-radius:26px; }
+  .deco { position:absolute; } .deco svg { display:block; }
+  .h-tr { top:-46px; right:34px; width:300px; height:270px; transform:rotate(12deg); opacity:.42; }
+  .h-bl { bottom:-58px; left:360px; width:210px; height:189px; transform:rotate(-10deg); opacity:.32; }
+  .spark { position:absolute; } .spark svg { display:block; }
+  .s1 { top:96px; left:250px; width:26px; height:26px; opacity:.9; }
+  .s2 { top:392px; left:300px; width:18px; height:18px; opacity:.75; }
+  .s3 { top:150px; right:250px; width:20px; height:20px; opacity:.7; }
+  .stage { position:absolute; inset:0; display:flex; align-items:center; padding:0 84px; }
+  .markwrap { position:relative; width:290px; height:290px; flex-shrink:0; margin-left:8px; }
+  .glow { position:absolute; inset:-8% -8%; border-radius:50%;
+          background: radial-gradient(circle at 42% 38%, rgba(255,255,255,.88) 0%, rgba(255,214,228,.5) 42%, rgba(255,214,228,0) 74%); }
+  .mark { position:absolute; inset:0; } .mark svg { width:100%; height:100%; }
+  .text { margin-left:56px; margin-right:24px; min-width:0; }
+  .badge { display:inline-flex; align-items:center; gap:9px; background:rgba(255,255,255,0.72); color:#C43A6B;
+    font-size:24px; font-weight:700; letter-spacing:-0.01em; padding:11px 24px; border-radius:999px;
+    box-shadow:0 3px 14px rgba(222,47,99,0.10); margin-bottom:24px; max-width:100%; }
+  .badge .dot { width:8px; height:8px; border-radius:50%; background:#F2547F; flex-shrink:0; }
+  .badge span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  h1 { font-size:{{TITLE_SIZE}}px; font-weight:800; line-height:1.08; letter-spacing:-0.04em;
+       word-break:keep-all; color:#3A1D28;
+       background:linear-gradient(120deg,#E23A6E 0%,#F2547F 55%,#FF7FA9 100%);
+       -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .rule { width:64px; height:4px; border-radius:2px; margin:26px 0 20px; background:linear-gradient(90deg,#E8B4A0,#F2547F); }
+  .tagline { font-size:32px; font-weight:600; color:#8A5A6B; letter-spacing:-0.02em; line-height:1.4; word-break:keep-all; }
+  .domain { position:absolute; left:112px; bottom:52px; display:flex; align-items:center; gap:11px;
+            font-size:23px; font-weight:600; color:#C08398; letter-spacing:.01em; }
+  .domain .heart { width:16px; height:15px; }
 </style>
 </head>
 <body>
-  <div class="deco deco-tr">
-    <svg viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" stroke-width="1.6"/></svg>
+  <div class="frame"></div>
+  <div class="deco h-tr"><svg viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" fill="none" stroke="#FFB9CF" stroke-width="1.6"/></svg></div>
+  <div class="deco h-bl"><svg viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" fill="none" stroke="#E8B4A0" stroke-width="2"/></svg></div>
+  <div class="spark s1"><svg viewBox="0 0 24 24"><path d="M12 0 C13 5.6 18.4 8 24 12 C18.4 15.6 13 18.4 12 24 C11 18.4 5.6 15.6 0 12 C5.6 8 11 5.6 12 0 Z" fill="#F2547F"/></svg></div>
+  <div class="spark s2"><svg viewBox="0 0 24 24"><path d="M12 0 C13 5.6 18.4 8 24 12 C18.4 15.6 13 18.4 12 24 C11 18.4 5.6 15.6 0 12 C5.6 8 11 5.6 12 0 Z" fill="#E8B4A0"/></svg></div>
+  <div class="spark s3"><svg viewBox="0 0 24 24"><path d="M12 0 C13 5.6 18.4 8 24 12 C18.4 15.6 13 18.4 12 24 C11 18.4 5.6 15.6 0 12 C5.6 8 11 5.6 12 0 Z" fill="#FF9FBC"/></svg></div>
+  <div class="stage">
+    <div class="markwrap"><div class="glow"></div><div class="mark">{{MARK_SVG}}</div></div>
+    <div class="text">
+      <div class="badge"><span class="dot"></span><span>{{BADGE}}</span></div>
+      <h1>{{TITLE}}</h1>
+      <div class="rule"></div>
+      <p class="tagline">{{SUBTITLE}}</p>
+    </div>
   </div>
-  <div class="deco deco-bl">
-    <svg viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" stroke-width="2"/></svg>
+  <div class="domain">
+    <svg class="heart" viewBox="0 0 100 90"><path d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z" fill="#F2547F"/></svg>
+    moderninsightspot.com
   </div>
-  <div class="mark">{{MARK_SVG}}</div>
-  <div class="text">
-    <div class="badge">{{BADGE}}</div>
-    <h1>{{TITLE}}</h1>
-    <p class="subtitle">{{SUBTITLE}}</p>
-  </div>
-  <div class="domain"><span class="dot"></span>moderninsightspot.com</div>
 </body>
 </html>

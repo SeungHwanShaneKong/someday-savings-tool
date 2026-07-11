@@ -20,12 +20,15 @@ describe('golden: 아티클 OG 이미지 (public/og)', () => {
     expect(missing).toEqual([]);
   });
 
-  it('전 OG 카드가 정확히 1200×630 + 백지 가드(>5KB)', () => {
+  it('전 OG 카드가 정확히 1200×630 + 백지 가드(>5KB) + 용량 상한(420KB)', () => {
     for (const a of ARTICLES) {
       const file = path.join(OG_DIR, `${a.slug}.png`);
       if (!existsSync(file)) continue; // 존재성은 위 케이스가 전담(이중 실패 소음 방지)
       expect(pngSize(file), a.slug).toEqual({ width: 1200, height: 630 });
-      expect(readFileSync(file).length, a.slug).toBeGreaterThan(5 * 1024);
+      const bytes = readFileSync(file).length;
+      expect(bytes, a.slug).toBeGreaterThan(5 * 1024);
+      // [CL-BRAND-V3-20260711-183000] 감성 그라데이션 카드 상한 = 420KB(저장소 폭주·백지 가드, 소셜 실한계 여유)
+      expect(bytes, a.slug).toBeLessThan(420 * 1024);
     }
   });
 });

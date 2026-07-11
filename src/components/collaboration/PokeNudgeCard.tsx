@@ -18,7 +18,7 @@ import { HandHeart } from 'lucide-react';
 import { AsyncButton } from '@/components/ui/async-button';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { MOBILE_BREAKPOINT } from '@/hooks/use-mobile';
 import { isInstallPromptSuppressed } from '@/hooks/usePWAInstall';
 import { usePoke } from '@/hooks/usePoke';
 import type { PartnerInfo } from '@/hooks/useCollaboration';
@@ -50,7 +50,6 @@ export function PokeNudgeCard({
   myEditedThisSession,
   onPoked,
 }: PokeNudgeCardProps) {
-  const isMobile = useIsMobile();
   const { poke, onCooldown } = usePoke({ budgetId, partner, onPoked });
   const [visible, setVisible] = useState(false);
   const [suppressChecked, setSuppressChecked] = useState(false);
@@ -94,12 +93,15 @@ export function PokeNudgeCard({
     });
     if (!show) return;
 
-    // InstallPrompt(모바일 하단 배너)와 시간 배타 — 미노출 + 일일 키 미기록(기회 보존)
-    if (isMobile && !isInstallPromptSuppressed()) return;
+    // [CL-AUDIT-POKE-D1-20260711] InstallPrompt(모바일 하단 배너)와 시간 배타 — 미노출 + 일일 키 미기록(기회 보존).
+    //   근본수정: useIsMobile(비동기 첫-렌더 false → 세션 1회 게이트 소진 후 되돌릴 수 없어 배타 무력화)의
+    //   잠정값 대신, 이 effect(마운트 후 실행)의 정확한 window.innerWidth 를 직접 읽어 판정한다.
+    const isMobileNow = typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
+    if (isMobileNow && !isInstallPromptSuppressed()) return;
 
     try { localStorage.setItem(shownKey, '1'); } catch { /* noop */ }
     setVisible(true);
-  }, [active, partner, myUserId, myEditedThisSession, items, isMobile]);
+  }, [active, partner, myUserId, myEditedThisSession, items]);
 
   // 닫힘 공통 경로 — '한 달간 다시 보지 않기' 체크 시 억제 시각 기록(storage degrade)
   const close = () => {

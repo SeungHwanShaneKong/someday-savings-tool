@@ -42,7 +42,18 @@ export interface UseCollaborationResult {
   refresh: () => Promise<void>;
 }
 
-export function useCollaboration(budgetId: string | null): UseCollaborationResult {
+// [CL-POKE-VIS-20260711-173901] 옵션 — 기본값(trackPartner:true)이 기존 시그니처/동작과 완전 동일(하위호환).
+export interface UseCollaborationOptions {
+  /** false 면 get_my_partner 조회를 생략(myPartner 항상 null). CollaboratorManager 가 external
+   *  주입으로 비활성일 때 내부 인스턴스의 중복 RPC 발사를 근본 제거하기 위한 스위치. */
+  trackPartner?: boolean;
+}
+
+export function useCollaboration(
+  budgetId: string | null,
+  opts?: UseCollaborationOptions,
+): UseCollaborationResult {
+  const trackPartner = opts?.trackPartner ?? true;
   const { user } = useAuth();
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
@@ -99,7 +110,12 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
   }, [budgetId, user?.id]);
 
   // [CL-PARTNER-1TO1-20260622-233012] 전역 파트너(user 단위) 조회. 미배포 RPC → null 강등.
+  // [CL-POKE-VIS-20260711-173901] trackPartner:false → 조회 자체를 생략(중복 RPC 이중발사 근본수정).
   const refreshPartner = useCallback(async () => {
+    if (!trackPartner) {
+      setMyPartner(null);
+      return;
+    }
     if (!user) {
       setMyPartner(null);
       return;
@@ -111,7 +127,7 @@ export function useCollaboration(budgetId: string | null): UseCollaborationResul
     } else {
       setMyPartner(null);
     }
-  }, [user?.id]);
+  }, [user?.id, trackPartner]);
 
   useEffect(() => {
     void refresh();

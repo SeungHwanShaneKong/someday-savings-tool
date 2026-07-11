@@ -66,6 +66,9 @@ import { CollaboratorManager } from '@/components/collaboration/CollaboratorMana
 import { useCollaboration } from '@/hooks/useCollaboration';
 import { NicknameDialog } from '@/components/collaboration/NicknameDialog';
 import { PartnerActivityChip } from '@/components/collaboration/PartnerActivityChip'; // [CL-TOP20-P4-COLLAB-20260703-040000]
+// [CL-POKE-VIS-20260711-173901] 콕 찌르기 가시성 확대 — 헤더 컴팩트 버튼 + 비모달 넛지 카드
+import { PokeButton } from '@/components/collaboration/PokeButton';
+import { PokeNudgeCard } from '@/components/collaboration/PokeNudgeCard';
 import { useRealtimeBudget } from '@/hooks/useRealtimeBudget';
 import { useToast } from '@/hooks/use-toast'; // [CL-AUDIT-R3-SHARE-20260623-000000] 자동공유 실패 안내
 // [CL-COEDIT-NUDGE-20260624-000000] 개선2/3/4: 파트너 2분 편집 알림 · 오프라인 변경 시머 · 회전 칭찬
@@ -498,6 +501,14 @@ export default function BudgetFlow() {
                 </Button>
               </div>
 
+              {/* [CL-POKE-VIS-20260711-173901] 파트너 콕 찌르기 — 상시 노출(비교 뷰 포함, 무파트너 시 자체 null) */}
+              <PokeButton
+                compact
+                budgetId={activeBudget?.id ?? null}
+                partner={collaboration.myPartner}
+                onPoked={() => increment({ total_points: 2 })}
+              />
+
               {/* History Sheet - Snapshots */}
               <VersionHistorySheet
                 isOpen={isHistoryOpen}
@@ -910,6 +921,17 @@ export default function BudgetFlow() {
           onSaved={() => { void collaboration.refresh(); }}
         />
       )}
+
+      {/* [CL-POKE-VIS-20260711-173901] 비모달 넛지 — 내 편집 + 파트너 3일+ 조용 시 하단 카드 1회 제안 */}
+      <PokeNudgeCard
+        active={partnerPresent}
+        partner={collaboration.myPartner}
+        budgetId={activeBudget?.id ?? null}
+        items={items}
+        myUserId={myUserId}
+        myEditedThisSession={editSignal > 0}
+        onPoked={() => increment({ total_points: 2 })}
+      />
     </div>
   );
 }

@@ -74,6 +74,12 @@
     --wedding-rose: 346 60% 60%;
     --wedding-rose-soft: 348 100% 97%;
     --wedding-gold: 40 92% 56%;
+
+    /* [CL-BRAND-V2-20260711-173300] 브랜드 마크 전용 핑크 토큰(brand/mark.svg 팔레트의 HSL 대응).
+       WeddingMark 등 브랜드 시그니처 표면 전용 — 차트(--chart-2)·감성축(--wedding-rose)과 역할 분리. */
+    --brand-pink-soft: 341 100% 78%;
+    --brand-pink: 344 85% 64%;
+    --brand-pink-deep: 342 73% 53%;
   }
 
   .dark {
@@ -130,6 +136,11 @@
     --wedding-rose: 346 65% 68%;
     --wedding-rose-soft: 345 30% 14%;
     --wedding-gold: 42 90% 60%;
+
+    /* [CL-BRAND-V2-20260711-173300] 브랜드 핑크 다크모드 변형(어두운 배경 대비 소폭 상향) */
+    --brand-pink-soft: 341 80% 74%;
+    --brand-pink: 344 80% 68%;
+    --brand-pink-deep: 342 70% 60%;
   }
 }
 

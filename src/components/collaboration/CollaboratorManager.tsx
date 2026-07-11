@@ -47,7 +47,8 @@ interface CollaboratorManagerProps {
 
 export function CollaboratorManager({ budgetId, isOwner, autoInvite, onAutoInviteHandled, showCopyToCoedit, onCopyToCoedit, onEditMyNickname, external, onPoked }: CollaboratorManagerProps) {
   // external 주입 시 내부 훅은 null 로 비활성(RPC 최소화). 미주입 시 자체 조회(독립 사용·테스트 호환).
-  const internal = useCollaboration(external ? null : budgetId);
+  // [CL-POKE-VIS-20260711-173901] trackPartner:!external — 주입 시 내부 인스턴스의 get_my_partner 도 0회(이중발사 근본수정).
+  const internal = useCollaboration(external ? null : budgetId, { trackPartner: !external });
   const { collaborators, inviteUrl, busy, myPartner, createInvite, removeCollaborator, releasePartner } = external ?? internal;
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);

@@ -1,6 +1,8 @@
 /** [CL-QA100-BTN-20260531] 데이터 페이지 버튼 검증 — Summary 페이지 */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, fireEvent, currentPath } from '@/test/test-utils';
+// [CL-POKE-VIS-20260711-173901] 헤더 콕 찌르기 스모크 — get_my_partner 전역 mock 제어용
+import { supabase } from '@/integrations/supabase/client';
 import Summary from '../Summary';
 
 // ── useSEO: no-op ──
@@ -142,5 +144,24 @@ describe('Summary — 버튼 / 네비게이션', () => {
     fireEvent.click(screen.getByRole('button', { name: '전체 비교' }));
     // In comparison view, budget name "옵션 1" appears in the summary card
     expect(screen.getAllByText('옵션 1').length).toBeGreaterThan(0);
+  });
+
+  // [CL-POKE-VIS-20260711-173901] 헤더 콕 찌르기(compact) 스모크 — 파트너 유무에 따른 상호배타 렌더
+  it('SM5: 파트너 존재(get_my_partner) → 헤더에 "콕 찌르기" 접근명 버튼 렌더', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({
+      data: [{ user_id: 'p-1', display_name: '민지', email: null }],
+      error: null,
+    } as never);
+    renderWithProviders(<Summary />, { route: '/summary' });
+    expect(
+      await screen.findByRole('button', { name: '파트너 민지님에게 콕 찌르기' }),
+    ).toBeInTheDocument();
+  });
+
+  it('SM6: 파트너 없음(빈 결과) → "콕 찌르기" 버튼 부재(로그아웃만)', async () => {
+    renderWithProviders(<Summary />, { route: '/summary' });
+    await Promise.resolve(); // useMyPartner 쿼리 settle 기회
+    expect(screen.queryByRole('button', { name: /콕 찌르기/ })).toBeNull();
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument();
   });
 });

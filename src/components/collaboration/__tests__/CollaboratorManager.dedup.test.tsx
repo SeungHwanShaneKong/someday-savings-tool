@@ -33,4 +33,12 @@ describe('CollaboratorManager RPC 중복 제거', () => {
     const calls = vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === 'get_budget_participants');
     expect(calls.length).toBe(0);
   });
+
+  // [CL-POKE-VIS-20260711-173901] trackPartner:!external — 주입 시 내부 인스턴스의 파트너 조회도 0회(이중발사 근본수정)
+  it('external 주입 시 get_my_partner RPC 도 미호출(trackPartner:false)', async () => {
+    renderWithProviders(<CollaboratorManager budgetId="b1" isOwner external={externalStub} />);
+    await Promise.resolve(); // refreshPartner effect 기회 부여
+    const calls = vi.mocked(supabase.rpc).mock.calls.filter((c) => c[0] === 'get_my_partner');
+    expect(calls.length).toBe(0);
+  });
 });

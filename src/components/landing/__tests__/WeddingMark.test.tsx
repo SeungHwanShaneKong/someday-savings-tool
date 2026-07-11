@@ -35,8 +35,20 @@ describe('WeddingMark', () => {
         expect(value).toMatch(allowed);
       }
     }
-    // 두 링의 브랜드 토큰(primary / chart-2 rose)이 실제로 사용되는지
-    expect(container.innerHTML).toContain('hsl(var(--primary))');
-    expect(container.innerHTML).toContain('hsl(var(--chart-2))');
+    // [CL-BRAND-V2-20260711-173300] 브랜드 핑크 토큰이 실제로 사용되는지(구 primary/chart-2 링 폐기)
+    expect(container.innerHTML).toContain('hsl(var(--brand-pink))');
+    expect(container.innerHTML).toContain('hsl(var(--brand-pink-soft))');
+    expect(container.innerHTML).not.toContain('hsl(var(--chart-2))');
+  });
+
+  it('[CL-BRAND-V2] 하트+링 지오메트리 계약 — evenodd 링 홀 2개(원 서브패스)와 스파클이 존재', () => {
+    const { container } = render(<WeddingMark />);
+    const body = container.querySelector('path[fill-rule="evenodd"]');
+    expect(body).not.toBeNull();
+    // 링 홀 2개 = 12 반지름 원 서브패스 2개(마스터 brand/mark.svg 와 동일 수치 계약)
+    const d = body!.getAttribute('d') ?? '';
+    expect(d.match(/A 12 12/g)?.length).toBe(4); // 원 1개당 반호 2개 × 2홀
+    // 폴리시드 림 원 2개
+    expect(container.querySelectorAll('circle[r="12"]').length).toBe(2);
   });
 });

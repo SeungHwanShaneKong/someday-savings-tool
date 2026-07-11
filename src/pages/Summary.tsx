@@ -44,6 +44,10 @@ import { NegotiationTips } from '@/components/planning/NegotiationTips';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ComparisonInsightsCard } from '@/components/summary/ComparisonInsightsCard';
 import { ComparisonCards } from '@/components/summary/ComparisonCards';
+// [CL-POKE-VIS-20260711-173901] 콕 찌르기 가시성 확대 — 헤더 컴팩트 버튼(공유 파트너 조회 + 실발송 +2p)
+import { useMyPartner } from '@/hooks/useMyPartner';
+import { useGamificationState } from '@/hooks/useGamificationState';
+import { PokeButton } from '@/components/collaboration/PokeButton';
 
 // [CL-TOP20-R50-UI-20260703-094000] sev1 정리: useNegotiateCoach 이중 인스턴스 해소.
 // 개별 뷰 전용 협상 코치 상태(훅 + 카테고리 선택 + NegotiationTips Sheet)를 이 서브컴포넌트로 한정 —
@@ -192,6 +196,9 @@ export default function Summary() {
   // [CL-BTNPERFECT-20260629] 동기 더블서밋 게이트(state 는 async → 같은 틱 연타 누수). 공유/다운로드 레이스 차단.
   const sharingRef = useRef(false);
   const downloadingRef = useRef(false);
+  // [CL-POKE-VIS-20260711-173901] 헤더 콕 찌르기 — 훅은 early return(인증/로딩) 이전에 호출(훅 규칙)
+  const { myPartner } = useMyPartner();
+  const { increment } = useGamificationState();
 
   const total = getTotal();
   const budgetsForComparison = getBudgetsForComparison();
@@ -458,7 +465,18 @@ export default function Summary() {
             <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </Button>
           <h1 className="text-subheading font-semibold">예산 요약</h1>
-          <LogoutButton />
+          {/* [CL-POKE-VIS-20260711-173901] 우측 그룹 — 파트너 있을 때만 콕 찌르기(컴팩트) + 로그아웃 */}
+          <div className="flex items-center gap-1.5">
+            {myPartner && (
+              <PokeButton
+                compact
+                budgetId={activeBudgetId}
+                partner={myPartner}
+                onPoked={() => increment({ total_points: 2 })}
+              />
+            )}
+            <LogoutButton />
+          </div>
         </div>
       </header>
 

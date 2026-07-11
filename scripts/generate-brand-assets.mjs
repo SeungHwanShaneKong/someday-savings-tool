@@ -31,13 +31,21 @@ const markSvg = stripComments(readFileSync(path.join(BRAND, 'mark.svg'), 'utf8')
 const markSmallSvg = stripComments(readFileSync(path.join(BRAND, 'mark-small.svg'), 'utf8'));
 const ogTemplate = readFileSync(path.join(BRAND, 'og-template.html'), 'utf8');
 
-/** 타일(그라데이션 배경) 전용 화이트 하트 — 핑크 배경 위 대비 확보(마크 원색은 배경에 묻힘) */
+/** 타일(그라데이션 배경) 전용 화이트 마크 — [CL-BRAND-V2-20260711-173300] 마스터와 동일 지오메트리
+ *  ('링 홀 2개 하트')의 단색 화이트 버전. 홀은 투명 → 핑크 타일 그라데이션이 비쳐 링이 읽힘. */
 const tileHeartSvg = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <path d="M53 89 C24.2 63.8 6 45.6 6 26.9 C6 11.5 17.9 0 32.4 0 C41.2 0 49 4.5 53 11.8 C57 4.5 64.8 0 73.6 0 C88.1 0 100 11.5 100 26.9 C100 45.6 81.8 63.8 53 89 Z"
-        transform="translate(-3 6)" fill="#FFFFFF" opacity="0.55"/>
-  <path d="M50 91 C21.2 65.8 3 47.6 3 28.9 C3 13.5 14.9 2 29.4 2 C38.2 2 46 6.5 50 13.8 C54 6.5 61.8 2 70.6 2 C85.1 2 97 13.5 97 28.9 C97 47.6 78.8 65.8 50 91 Z"
-        transform="translate(2 4) rotate(4 50 46)" fill="#FFFFFF"/>
-  <ellipse cx="31" cy="27" rx="14" ry="9.5" fill="#F76D96" opacity="0.16" transform="rotate(-20 31 27)"/>
+  <path fill="#FFFFFF" fill-rule="evenodd" d="
+    M 50 94
+    Q 35.5 73 12.6 49.4
+    A 24 24 0 1 1 50 19.34
+    A 24 24 0 1 1 87.4 49.4
+    Q 64.5 73 50 94
+    Z
+    M 43 34 A 12 12 0 1 0 19 34 A 12 12 0 1 0 43 34 Z
+    M 81 34 A 12 12 0 1 0 57 34 A 12 12 0 1 0 81 34 Z"/>
+  <!-- 링 상단 젬(다이아) 펀치 — 투명 노치로 핑크가 비쳐 '반지+젬'으로 읽힘(얼굴 인상 차단) -->
+  <rect x="28.3" y="19.3" width="5.4" height="5.4" rx="1" fill="#F76D96" transform="rotate(45 31 22)"/>
+  <rect x="66.3" y="19.3" width="5.4" height="5.4" rx="1" fill="#F76D96" transform="rotate(45 69 22)"/>
 </svg>`;
 
 const log = (...a) => console.log('[brand]', ...a);
@@ -121,6 +129,14 @@ async function main() {
 
     // 5) favicon.png — 투명 배경 원색 마크(Organization logo 겸용이라 512 고해상)
     out('favicon.png', await renderPng(browser, iconHtml(512, { bg: 'transparent', scale: 1.0 }), 512, 512, { transparent: true }));
+
+    // 5b) [CL-BRAND-V2-20260711-173300] 구글 파비콘 최적화 — 신규 파일명 = URL 변경 = SERP 캐시 버스트.
+    //     favicon.svg(구글 선호 벡터, mark-small 그대로 발행) + 48/96 PNG(구글 권장 48px 배수).
+    writeFileSync(path.join(PUB, 'favicon.svg'), markSmallSvg);
+    log(`favicon.svg (${(markSmallSvg.length / 1024).toFixed(1)}KB)`);
+    for (const size of [96, 48]) {
+      out(`favicon-${size}.png`, await renderPng(browser, iconHtml(size, { bg: 'transparent', scale: 0.98, svg: markSmallSvg }), size, size, { transparent: true }));
+    }
 
     // 6) favicon.ico — 단순화 마크 16/32/48 멀티사이즈 (버퍼로만 처리, 임시파일 없음)
     const icoBufs = [];

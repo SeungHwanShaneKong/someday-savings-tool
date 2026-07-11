@@ -1,10 +1,11 @@
-// [CL-TOP20-P1-MARK-20260703-010000] WeddingMark — 웨딩셈 브랜드 모티프 SVG.
-// Top 20 로드맵 P1(#4 일부): 랜딩 히어로의 generic Sparkles 아이콘을 대체하는 커스텀 마크.
-// 결혼 반지 2개의 교차(위빙: 상단 교차부는 왼쪽 링이 위, 하단 교차부는 오른쪽 링이 위) + 상단 스파클 1개.
-// 색상 규칙: CSS 토큰/currentColor 만 사용(하드코딩 hex 금지) —
-//   왼쪽 링 = hsl(var(--primary)) · 오른쪽 링 = hsl(var(--chart-2)) (rose 340 75% 55%)
-//   스파클 = currentColor (부모에서 text-primary 등으로 문맥 제어 가능).
-// 장식용 아이콘이므로 aria-hidden 고정 — 의미 전달이 필요하면 부모에서 텍스트로 제공할 것.
+// [CL-BRAND-V2-20260711-173300] WeddingMark v2 — 브랜드 마크(brand/mark.svg)와 동일 지오메트리 패밀리.
+// 컨셉 '하트+반지 결합': 볼드 하트 바디의 두 로브에 링 홀이 뚫려 — 하트인 동시에 겹친 두 웨딩링.
+// 구 버전(파랑+핑크 링 2개)은 러버블풍 오브로 읽혀 폐기하고 파비콘/OG 와 시각 정체성을 통일한다.
+// 색상 규칙: CSS 토큰/currentColor 만(하드코딩 hex 금지) —
+//   하트 바디 = hsl(var(--brand-pink)) (26~44px 렌더에서 그라데이션은 미식별 → 단색)
+//   링 림 = hsl(var(--brand-pink-soft)) · 스파클 = currentColor(부모 문맥 제어, 기존 계약 유지).
+// 기하는 100 좌표계(마스터와 동일 수치)를 scale(0.44)로 48 뷰박스에 배치 — 단일소스 일관성.
+// 장식용 아이콘이므로 aria-hidden 고정 — 의미 전달은 부모 텍스트 책임.
 
 export interface WeddingMarkProps {
   /** 렌더 크기(px). 기본 40 */
@@ -24,23 +25,27 @@ export function WeddingMark({ size = 40, className }: WeddingMarkProps) {
       focusable="false"
       className={className}
     >
-      {/* 왼쪽 링 — primary */}
-      <circle cx="19" cy="29" r="10" stroke="hsl(var(--primary))" strokeWidth="2.5" />
-      {/* 오른쪽 링 — chart-2(rose). 나중에 그려져 두 교차부에서 왼쪽 링 위를 지난다 */}
-      <circle cx="29" cy="29" r="10" stroke="hsl(var(--chart-2))" strokeWidth="2.5" />
-      {/*
-        위빙 아크 — 상단 교차점(24, 20.34) 주변에서만 왼쪽 링의 호(θ −85°→−35°)를 다시 위에 그려
-        "상단은 왼쪽이 위, 하단은 오른쪽이 위"의 자연스러운 interlocking 을 만든다.
-      */}
+      <g transform="translate(2.4 2.2) scale(0.44)">
+        {/* 하트 바디 + 링 홀 2개(evenodd 펀치) — brand/mark.svg 와 동일 패스 */}
+        <path
+          fill="hsl(var(--brand-pink))"
+          fillRule="evenodd"
+          d="M 50 94
+             Q 35.5 73 12.6 49.4
+             A 24 24 0 1 1 50 19.34
+             A 24 24 0 1 1 87.4 49.4
+             Q 64.5 73 50 94
+             Z
+             M 43 34 A 12 12 0 1 0 19 34 A 12 12 0 1 0 43 34 Z
+             M 81 34 A 12 12 0 1 0 57 34 A 12 12 0 1 0 81 34 Z"
+        />
+        {/* 링 홀 안쪽 림 — 반지의 폴리시드 인상 */}
+        <circle cx="31" cy="34" r="12" stroke="hsl(var(--brand-pink-soft))" strokeWidth="4" opacity="0.9" />
+        <circle cx="69" cy="34" r="12" stroke="hsl(var(--brand-pink-soft))" strokeWidth="4" opacity="0.9" />
+      </g>
+      {/* 스파클 1개 — 우상단 반짝임(4-point star, 기존 브랜드 요소 계승) */}
       <path
-        d="M19.87 19.04 A10 10 0 0 1 27.19 23.26"
-        stroke="hsl(var(--primary))"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      {/* 스파클 1개 — 오른쪽 링 상단의 반짝임 (4-point star) */}
-      <path
-        d="M30.5 5 C31 7.1 31.9 8 34 8.5 C31.9 9 31 9.9 30.5 12 C30 9.9 29.1 9 27 8.5 C29.1 8 30 7.1 30.5 5 Z"
+        d="M40.5 3 C41 5.1 41.9 6 44 6.5 C41.9 7 41 7.9 40.5 10 C40 7.9 39.1 7 37 6.5 C39.1 6 40 5.1 40.5 3 Z"
         fill="currentColor"
         opacity="0.85"
       />

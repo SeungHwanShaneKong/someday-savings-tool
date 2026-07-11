@@ -1,38 +1,53 @@
-<!-- [CL-BRAND-HEART-20260709-231800] 웨딩셈 브랜드 마크 마스터(벡터 단일소스).
-     컨셉: 서로 기울어 겹친 두 하트(신랑·신부) — 뒤 하트는 블러시 톤, 앞 하트는 딥 핑크 그라데이션.
-     모든 래스터 자산(og/pwa/favicon)은 scripts/generate-brand-assets.mjs 가 이 파일에서 렌더한다.
-     수정 시 반드시 `pnpm run brand:assets` 재실행. -->
-<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="웨딩셈 하트 마크">
+<!-- [CL-BRAND-V2-20260711-173300] 웨딩셈 브랜드 마크 v2 마스터(벡터 단일소스).
+     컨셉 '하트+반지 결합': 볼드 하트 바디의 두 로브에 원형 링 홀이 뚫려 — 하트인 동시에
+     겹친 두 웨딩링으로 읽히는 시그니처. 구 로고(링 2개) 정체성 계승 + 완전 유니크.
+     기하(100 좌표계): 로브 원 (31,34)/(69,34) r24 → 클레프트 (50,19.34)·외측 접점 (12.6/87.4, 49.4),
+     포인트 P(50,94)로 살짝 안으로 휘는 레그(Q). 링 홀 r12 — 16px 감축 규칙: 밴드 ≥12유닛·홀 ≥22유닛.
+     모든 래스터 자산은 scripts/generate-brand-assets.mjs 가 렌더 — 수정 시 `pnpm run brand:assets` 재실행. -->
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="웨딩셈 하트 링 마크">
   <defs>
-    <linearGradient id="gFront" x1="18%" y1="8%" x2="82%" y2="96%">
+    <linearGradient id="gFront" x1="15%" y1="10%" x2="80%" y2="95%">
       <stop offset="0%" stop-color="#FF8FB3"/>
-      <stop offset="52%" stop-color="#F2547F"/>
+      <stop offset="50%" stop-color="#F2547F"/>
       <stop offset="100%" stop-color="#DE2F63"/>
     </linearGradient>
     <linearGradient id="gBack" x1="20%" y1="0%" x2="80%" y2="100%">
-      <stop offset="0%" stop-color="#FFDCE7"/>
-      <stop offset="100%" stop-color="#FFAEC6"/>
+      <stop offset="0%" stop-color="#FFF1F5"/>
+      <stop offset="100%" stop-color="#FFC7D8"/>
     </linearGradient>
-    <radialGradient id="gShine" cx="32%" cy="24%" r="45%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.85"/>
+    <radialGradient id="gShine" cx="30%" cy="22%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.75"/>
       <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
     </radialGradient>
     <filter id="softShadow" x="-30%" y="-30%" width="160%" height="170%">
-      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#D42A5E" flood-opacity="0.28"/>
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#D42A5E" flood-opacity="0.25"/>
     </filter>
-    <!-- 하트 원형 패스 (100x90 좌표계) — 양쪽 로브가 부드럽게 만나는 클래식 실루엣 -->
-    <path id="heart" d="M50 86 C23.6 62.5 6 45.4 6 27.8 C6 13.4 17 3 30.4 3 C38.5 3 45.9 7.2 50 14.1 C54.1 7.2 61.5 3 69.6 3 C83 3 94 13.4 94 27.8 C94 45.4 76.4 62.5 50 86 Z"/>
   </defs>
 
-  <!-- 뒤 하트(블러시) — 좌상단으로 살짝 밀고 반시계 기울임 -->
-  <g transform="translate(150 132) rotate(-14 150 135) scale(3.1)">
-    <use href="#heart" fill="url(#gBack)" opacity="0.92"/>
-  </g>
+  <!-- 마크 본체: 100 좌표계 → 512 캔버스 중앙 배치 -->
+  <g transform="translate(46 26) scale(4.2)" filter="url(#softShadow)">
+    <!-- 하트 바디(그라데이션) + 링 홀 2개(evenodd 펀치) -->
+    <path fill="url(#gFront)" fill-rule="evenodd" d="
+      M 50 94
+      Q 35.5 73 12.6 49.4
+      A 24 24 0 1 1 50 19.34
+      A 24 24 0 1 1 87.4 49.4
+      Q 64.5 73 50 94
+      Z
+      M 43 34 A 12 12 0 1 0 19 34 A 12 12 0 1 0 43 34 Z
+      M 81 34 A 12 12 0 1 0 57 34 A 12 12 0 1 0 81 34 Z"/>
 
-  <!-- 앞 하트(딥 핑크) — 우하단, 시계 방향 기울임 + 소프트 섀도 -->
-  <g transform="translate(112 130) rotate(9 200 180) scale(3.34)" filter="url(#softShadow)">
-    <use href="#heart" fill="url(#gFront)"/>
-    <!-- 좌상단 로브 하이라이트 — 유리질 광택 -->
-    <ellipse cx="30" cy="22" rx="17" ry="12" fill="url(#gShine)" transform="rotate(-18 30 22)"/>
+    <!-- 링 홀 안쪽 림 — 반지의 폴리시드 인상(블러시 하이라이트) -->
+    <circle cx="31" cy="34" r="12" fill="none" stroke="url(#gBack)" stroke-width="2.6" opacity="0.95"/>
+    <circle cx="69" cy="34" r="12" fill="none" stroke="url(#gBack)" stroke-width="2.6" opacity="0.95"/>
+
+    <!-- 각 링 상단의 젬(다이아) — '눈'이 아니라 '반지'로 읽히게 하는 결정 디테일 -->
+    <rect x="28.6" y="19.2" width="4.8" height="4.8" rx="0.9" fill="#FFF1F5"
+          transform="rotate(45 31 21.6)"/>
+    <rect x="66.6" y="19.2" width="4.8" height="4.8" rx="0.9" fill="#FFF1F5"
+          transform="rotate(45 69 21.6)"/>
+
+    <!-- 좌상단 로브 광택 -->
+    <ellipse cx="30" cy="16.5" rx="13" ry="6" fill="url(#gShine)" transform="rotate(-16 30 16.5)"/>
   </g>
 </svg>

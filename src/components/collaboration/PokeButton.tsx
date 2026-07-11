@@ -1,26 +1,16 @@
 // [CL-POKE-20260709-231909] 파트너 '콕 찌르기' 버튼 — notify-partner Edge(kind:'poke') 수동 넛지.
+// [CL-POKE-VIS-20260711-173901] 본문 로직을 usePoke 훅으로 추출(동작 등가) + compact 변형(헤더 컨트롤 라인용).
 //
 // 계약:
 //  - partner 없으면 렌더 자체를 하지 않음(null).
 //  - AsyncButton 재사용 → 진행 중 disabled+스피너(더블서밋 차단).
-//  - 서버 유니크((sender,recipient,day,kind))가 권위. localStorage 24h 쿨다운은 낙관적 UX.
-//  - sent/rate_limited(서버가 슬롯 소진 확정)일 때만 쿨다운 기록. 일시 에러는 미기록(재시도 허용).
-//  - onPoked 는 sent:true 일 때만 1회 호출(거짓 게이미피케이션 적립 차단).
-//  - localStorage 불가 환경(사파리 프라이빗 등)은 try/catch degrade — 서버가 여전히 1일 1회 강제.
-import { useEffect, useState } from 'react';
+//  - 발송/토스트/쿨다운/보상 로직은 usePoke 가 소유(같은 페어 멀티 인스턴스 쿨다운 동기 포함).
+//  - compact=false(기본) 경로의 렌더 트리는 추출 이전과 무변경(기존 PokeButton.test.tsx 계약 보존).
+//  - compact=true: outline·좁은 화면 라벨 축약(아이콘 상시)·쿨다운 시 서브텍스트 대신 title/aria 안내.
 import { HandHeart } from 'lucide-react';
 import { AsyncButton } from '@/components/ui/async-button';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { usePoke } from '@/hooks/usePoke';
 import type { PartnerInfo } from '@/hooks/useCollaboration';
-import {
-  POKE_COOLDOWN_MS,
-  canPoke,
-  mapPokeOutcome,
-  pokeStorageKey,
-  type PokeInvokeResult,
-} from '@/lib/collab/poke-logic';
 
 interface PokeButtonProps {
   budgetId: string | null;
@@ -28,60 +18,38 @@ interface PokeButtonProps {
   partner: PartnerInfo | null;
   /** 실제 발송(sent:true) 시 1회 호출 — 게이미피케이션 보상 배선용 */
   onPoked?: () => void;
+  /** [CL-POKE-VIS-20260711-173901] 헤더 컨트롤 라인용 컴팩트 변형 */
+  compact?: boolean;
 }
 
-export function PokeButton({ budgetId, partner, onPoked }: PokeButtonProps) {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  // 쿨다운 만료 시각(ms) — null 이면 즉시 찌르기 가능
-  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+export function PokeButton({ budgetId, partner, onPoked, compact = false }: PokeButtonProps) {
+  const { poke, onCooldown } = usePoke({ budgetId, partner, onPoked });
 
-  const userId = user?.id ?? null;
-  const partnerId = partner?.user_id ?? null;
   const partnerName = partner?.display_name?.trim() || '파트너';
-
-  // 마운트/페어 변경 시 localStorage 에서 쿨다운 복원(storage 불가 환경 degrade)
-  useEffect(() => {
-    if (!userId || !partnerId) return;
-    try {
-      const raw = localStorage.getItem(pokeStorageKey(userId, partnerId));
-      const lastMs = raw == null ? null : Number(raw);
-      if (lastMs != null && Number.isFinite(lastMs) && !canPoke(lastMs, Date.now())) {
-        setCooldownUntil(lastMs + POKE_COOLDOWN_MS);
-      } else {
-        setCooldownUntil(null);
-      }
-    } catch {
-      setCooldownUntil(null); // storage 접근 불가 → 낙관 쿨다운 없이 서버 판정에 위임
-    }
-  }, [userId, partnerId]);
 
   if (!partner) return null;
 
-  const onCooldown = cooldownUntil != null && cooldownUntil > Date.now();
-
-  const recordCooldown = (nowMs: number) => {
-    setCooldownUntil(nowMs + POKE_COOLDOWN_MS);
-    if (!userId || !partnerId) return;
-    try {
-      localStorage.setItem(pokeStorageKey(userId, partnerId), String(nowMs));
-    } catch { /* storage 불가 — 서버 유니크가 여전히 강제 */ }
-  };
-
-  const handlePoke = async () => {
-    let res: PokeInvokeResult | null = null;
-    try {
-      res = (await supabase.functions.invoke('notify-partner', {
-        body: { budgetId, kind: 'poke' },
-      })) as PokeInvokeResult;
-    } catch (e) {
-      res = { data: null, error: e };
-    }
-    const outcome = mapPokeOutcome(res, partnerName);
-    toast(outcome.toast);
-    if (outcome.startCooldown) recordCooldown(Date.now());
-    if (outcome.awardPoke) onPoked?.();
-  };
+  if (compact) {
+    return (
+      <AsyncButton
+        variant="outline"
+        size="sm"
+        className="gap-1.5 flex-shrink-0"
+        onClick={poke}
+        disabled={onCooldown}
+        loadingText="찌르는 중..."
+        aria-label={
+          onCooldown
+            ? `파트너 ${partnerName}님에게 콕 찌르기 — 내일 다시 찌를 수 있어요`
+            : `파트너 ${partnerName}님에게 콕 찌르기`
+        }
+        title={onCooldown ? '내일 다시 찌를 수 있어요 ⏰' : undefined}
+      >
+        <HandHeart className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+        <span className="hidden sm:inline">콕 찌르기</span>
+      </AsyncButton>
+    );
+  }
 
   return (
     <div className="inline-flex flex-col items-start">
@@ -89,7 +57,7 @@ export function PokeButton({ budgetId, partner, onPoked }: PokeButtonProps) {
         variant="ghost"
         size="sm"
         className="h-7 gap-1.5 text-primary hover:text-primary"
-        onClick={handlePoke}
+        onClick={poke}
         disabled={onCooldown}
         loadingText="찌르는 중..."
         aria-label={`파트너 ${partnerName}님에게 콕 찌르기`}

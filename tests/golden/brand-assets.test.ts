@@ -30,6 +30,9 @@ describe('브랜드 자산 골든 (BA)', () => {
     ['pwa-icon-maskable-192.png', 192],
     ['apple-touch-icon.png', 180],
     ['favicon.png', 512],
+    // [CL-BRAND-V2-20260711-173300] 구글 권장 48px 배수 파비콘(신규 URL = SERP 캐시 버스트)
+    ['favicon-96.png', 96],
+    ['favicon-48.png', 48],
   ])('BA.2 %s = %i×%i 정방형', (file, size) => {
     expect(pngSize(file)).toEqual({ width: size, height: size });
   });
@@ -47,6 +50,10 @@ describe('브랜드 자산 골든 (BA)', () => {
       'apple-touch-icon.png', 'favicon.png', 'favicon.ico',
     ];
     for (const f of all) expect(fileSize(f), f).toBeGreaterThan(2 * 1024);
+    // [CL-BRAND-V2-20260711-173300] 소형 투명 PNG(48/96)는 2KB 미만이 정상 — 별도 하한(0.5KB)
+    for (const f of ['favicon-96.png', 'favicon-48.png']) {
+      expect(fileSize(f), f).toBeGreaterThan(512);
+    }
     expect(fileSize('og-image.png')).toBeLessThan(300 * 1024);
   });
 
@@ -63,6 +70,19 @@ describe('브랜드 자산 골든 (BA)', () => {
     const html = readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">');
     expect(html).toContain('property="og:image" content="https://moderninsightspot.com/og-image.png"');
+    // [CL-BRAND-V2-20260711-173300] 구글 파비콘 가이드라인 준수 링크 세트(SVG+48배수 PNG+ico sizes="any")
+    expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="any">');
+    expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon.svg">');
+    expect(html).toContain('<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">');
+    expect(html).toContain('<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png">');
+  });
+
+  it('BA.8 favicon.svg — SVG 파비콘 발행(mark-small 동기·주석 스트립)', () => {
+    const svg = readFileSync(path.join(PUB, 'favicon.svg'), 'utf8');
+    expect(svg.trimStart().startsWith('<svg')).toBe(true); // stripComments 발행 확인(헤더 주석 없음)
+    expect(svg).toContain('fill-rule="evenodd"'); // 링 홀 compound path 계약
+    expect(svg.length).toBeGreaterThan(300);
+    expect(svg.length).toBeLessThan(20 * 1024);
   });
 
   it('BA.7 마스터 SVG·템플릿·생성 스크립트 존재 (재현성 3종 세트)', () => {

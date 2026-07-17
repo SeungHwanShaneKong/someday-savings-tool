@@ -33,14 +33,14 @@ describe('impact-calculator', () => {
         {
           id: 'b1',
           items: [
-            // venue-fee avg: 5,000,000. User: 3,000,000 → saves 2M
+            // [CL-COST-2026Q2-20260713-231500] venue-fee avg: 3,500,000. User: 3,000,000 → saves 0.5M
             { category: 'main-ceremony', sub_category: 'venue-fee', amount: 3000000 },
           ],
         },
       ];
       const result = calculateImpact(budgets);
       expect(result.activeBudgets).toBe(1);
-      expect(result.avgSavingsAmount).toBe(2000000);
+      expect(result.avgSavingsAmount).toBe(500000);
       expect(result.avgSavingsRate).toBeGreaterThan(0);
       expect(result.belowAvgPercent).toBe(100);
     });
@@ -78,9 +78,9 @@ describe('impact-calculator', () => {
       const result = calculateImpact(budgets);
       expect(result.totalBudgets).toBe(2);
       expect(result.activeBudgets).toBe(2);
-      // b1 saves 2M, b2 saves 0
-      expect(result.totalSavingsEstimate).toBe(2000000);
-      expect(result.avgSavingsAmount).toBe(1000000);
+      // [CL-COST-2026Q2-20260713-231500] venue 평균 3.5M — b1(3M) saves 0.5M, b2(7M) saves 0
+      expect(result.totalSavingsEstimate).toBe(500000);
+      expect(result.avgSavingsAmount).toBe(250000);
     });
 
     it('generates category breakdown', () => {

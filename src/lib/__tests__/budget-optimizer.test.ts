@@ -20,7 +20,7 @@ describe('budget-optimizer', () => {
     });
 
     it('generates warning for items above average by >30%', () => {
-      // venue-fee average is 5,000,000
+      // [CL-COST-2026Q2-20260713-231500] venue-fee average is 3,500,000 — 8M = +128%
       const insights = generateBudgetInsights([
         { categoryId: 'main-ceremony', subCategoryId: 'venue-fee', amount: 8000000 },
       ]);
@@ -31,9 +31,9 @@ describe('budget-optimizer', () => {
     });
 
     it('generates praise for items below average by >30%', () => {
-      // venue-fee average is 5,000,000; 3,000,000 is 40% below
+      // [CL-COST-2026Q2-20260713-231500] venue-fee average is 3,500,000; 2,000,000 is ~43% below
       const insights = generateBudgetInsights([
-        { categoryId: 'main-ceremony', subCategoryId: 'venue-fee', amount: 3000000 },
+        { categoryId: 'main-ceremony', subCategoryId: 'venue-fee', amount: 2000000 },
       ]);
 
       const praiseInsight = insights.find((i) => i.type === 'praise');
@@ -115,21 +115,21 @@ describe('budget-optimizer', () => {
     });
 
     it('returns warning for >50% above average', () => {
-      // venue-fee avg: 5,000,000. 8,000,000 = 60% above
+      // [CL-COST-2026Q2-20260713-231500] venue-fee avg: 3,500,000. 8,000,000 = +128% above
       const warning = getInlineWarning('main-ceremony', 'venue-fee', 8000000);
       expect(warning).toContain('평균 대비');
       expect(warning).toContain('높아요');
     });
 
     it('returns praise for >50% below average', () => {
-      // venue-fee avg: 5,000,000. 2,000,000 = 60% below
-      const praise = getInlineWarning('main-ceremony', 'venue-fee', 2000000);
+      // [CL-COST-2026Q2-20260713-231500] venue-fee avg: 3,500,000. 1,500,000 = ~57% below
+      const praise = getInlineWarning('main-ceremony', 'venue-fee', 1500000);
       expect(praise).toContain('저렴해요');
     });
 
     it('returns null when within normal range', () => {
-      // venue-fee avg: 5,000,000. 4,500,000 = only 10% below
-      expect(getInlineWarning('main-ceremony', 'venue-fee', 4500000)).toBeNull();
+      // [CL-COST-2026Q2-20260713-231500] venue-fee avg: 3,500,000. 3,200,000 = ~9% below
+      expect(getInlineWarning('main-ceremony', 'venue-fee', 3200000)).toBeNull();
     });
   });
 });

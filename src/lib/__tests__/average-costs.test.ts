@@ -20,18 +20,24 @@ import {
 describe('average-costs', () => {
   describe('AC.1 getAverageCost — happy path', () => {
     it('AC.1.1 알려진 카테고리×서브카테고리는 정확한 amount/note 를 반환한다', () => {
+      // [CL-COST-2026Q2-20260713-231500] 2026 상반기 공표치: 식대 200명×5.8만(참가격 2025.4)=1,160만
       const meal = getAverageCost('main-ceremony', 'meal-cost');
       expect(meal).not.toBeNull();
       // 비-널 단언 후 필드 접근(타입 안전)
-      expect(meal!.amount).toBe(14000000);
+      expect(meal!.amount).toBe(11600000);
       expect(meal!.note).toBe('200명 기준');
+      // 대관료 = 전국 중간가 350만(참가격 2026.2)
+      const venue = getAverageCost('main-ceremony', 'venue-fee');
+      expect(venue!.amount).toBe(3500000);
+      expect(venue!.note).toContain('참가격');
     });
 
     it('AC.1.2 note 가 없는 항목은 note 가 undefined 다(추가 필드 미발명)', () => {
-      const venue = getAverageCost('main-ceremony', 'venue-fee');
-      expect(venue).not.toBeNull();
-      expect(venue!.amount).toBe(5000000);
-      expect(venue!.note).toBeUndefined();
+      // [CL-COST-2026Q2-20260713-231500] venue-fee 에 출처 note 가 생겨 note-없는 항목을 ceremony-staff 로 교체
+      const staff = getAverageCost('main-ceremony', 'ceremony-staff');
+      expect(staff).not.toBeNull();
+      expect(staff!.amount).toBe(400000);
+      expect(staff!.note).toBeUndefined();
     });
 
     it('AC.1.3 반환된 객체는 원본 AVERAGE_COSTS 레퍼런스와 동일(복제 아님)', () => {
@@ -143,9 +149,10 @@ describe('average-costs', () => {
       }
     });
 
-    it('AC.5.3 SOURCE_TEXT 는 출처 고지 문자열을 노출한다', () => {
+    it('AC.5.3 SOURCE_TEXT 는 출처 고지 문자열을 노출한다(2026 공표 자료 기준)', () => {
       expect(SOURCE_TEXT).toContain('출처');
-      expect(SOURCE_TEXT).toContain('2025');
+      expect(SOURCE_TEXT).toContain('2026');
+      expect(SOURCE_TEXT).toContain('참가격'); // 'AI 조사' 문구 제거 회귀 가드 — 실출처 표기
     });
   });
 });

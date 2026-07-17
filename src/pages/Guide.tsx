@@ -41,10 +41,11 @@ const COST_RANGES: CostRange[] = [
     high: '500만 원',
   },
   {
+    // [CL-COST-2026Q2-20260713-231500] 상단 확장 — 듀오 2026 평균 합(예물 588만+예단 1,030만=1,618만)이 범위에 들어오도록(하단 유지)
     category: '예물 및 예단',
     items: '웨딩밴드, 프러포즈 반지, 예단',
     low: '300만 원',
-    high: '1,500만 원',
+    high: '1,700만 원',
   },
   {
     category: '혼수 (가전·가구)',
@@ -53,10 +54,11 @@ const COST_RANGES: CostRange[] = [
     high: '2,000만 원',
   },
   {
+    // [CL-COST-2026Q2-20260713-231500] 상단 확장 — 듀오 2026 보고서 신혼여행 평균 763만 원이 범위에 들어오도록(하단 유지)
     category: '신혼여행',
     items: '항공권, 숙소, 현지 비용',
     low: '200만 원',
-    high: '700만 원',
+    high: '900만 원',
   },
   {
     category: '기타',
@@ -251,7 +253,7 @@ export default function Guide() {
             <div className="mt-4 bg-secondary/50 rounded-xl p-4">
               <p className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">합계 범위: </span>
-                약 2,100만 원 ~ 7,700만 원 (주거 비용 제외)
+                약 2,100만 원 ~ 8,100만 원 (주거 비용 제외)
               </p>
               <p className="text-xs text-muted-foreground/70 mt-1">
                 * 신혼집 전세/매매 비용은 지역에 따라 크게 달라 별도 분류합니다.

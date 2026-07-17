@@ -9,6 +9,7 @@ import {
   excludeAdmins,
   distinctKstDaysByUser,
   avgPositiveDuration,
+  filterDurationOutliers,
 } from '../../src/lib/admin/trend-compute';
 import { startOfKstDayUtc, subKstDays } from '../../src/lib/admin/kst-time';
 import { firstTrendBucketStart } from '../../src/lib/kpi-definitions';
@@ -59,6 +60,57 @@ describe('golden: 관리자 지표 — 고유/충성(KST 달력일)', () => {
   it('avgPositiveDuration: 0/음수 제외·정수 반올림', () => {
     expect(avgPositiveDuration([{ duration_seconds: 10 }, { duration_seconds: 0 }, { duration_seconds: 21 }])).toBe(16);
     expect(avgPositiveDuration([{ duration_seconds: 0 }, { duration_seconds: null }])).toBe(0);
+  });
+});
+
+// [CL-ADMIN-5SIGMA-20260713-224500] 평균 체류 5σ 절사 — 전역 스코프·보수적 no-op 계약.
+//  주의: 표본 내 최대 z = (n−1)/√n 이므로 n<27 표본에선 5σ 이탈이 수학적으로 불가(테스트도 n=31 사용).
+describe('golden: 평균 체류 5σ 이상치 절사(filterDurationOutliers)', () => {
+  const mk = (d: number | null) => ({ duration_seconds: d });
+
+  it('5σ 이내 표본만 → 제거 0(원본 배열 그대로) + 평균 불변', () => {
+    const rows = [mk(30), mk(60), mk(90), mk(120)];
+    expect(filterDurationOutliers(rows)).toEqual(rows);
+    expect(avgPositiveDuration(filterDurationOutliers(rows))).toBe(avgPositiveDuration(rows));
+  });
+
+  it('극단 이상치 1개 제거: 60초×30 + 100000초×1(n=31) → 절사 후 평균 60 (RED-first 핵심 케이스)', () => {
+    // n=31: mean≈3284.5, 모σ≈17657 → 5σ 경계≈88285 < |100000−3284| → 이상치만 제거
+    const rows = [...Array.from({ length: 30 }, () => mk(60)), mk(100000)];
+    const filtered = filterDurationOutliers(rows);
+    expect(filtered.length).toBe(30);
+    expect(filtered.every((r) => r.duration_seconds === 60)).toBe(true);
+    expect(avgPositiveDuration(filtered)).toBe(60);
+    // 절사 전 평균은 이상치에 오염돼 있었음을 대조(≈3284)
+    expect(avgPositiveDuration(rows)).toBeGreaterThan(3000);
+  });
+
+  it('σ=0(전부 동일 duration) → 원본 유지(제거 없음)', () => {
+    const rows = [mk(45), mk(45), mk(45)];
+    expect(filterDurationOutliers(rows)).toEqual(rows);
+  });
+
+  it('전부 0/null(양수 표본 0) → 원본 유지·평균 0', () => {
+    const rows = [mk(0), mk(null), mk(0)];
+    expect(filterDurationOutliers(rows)).toEqual(rows);
+    expect(avgPositiveDuration(rows)).toBe(0);
+  });
+
+  it('빈 배열 → 빈 배열', () => {
+    expect(filterDurationOutliers([])).toEqual([]);
+  });
+
+  it('0/음수/null 행은 절사 후에도 보존(행수 계약 — avgPositiveDuration 이 무시하므로 무해)', () => {
+    const rows = [...Array.from({ length: 30 }, () => mk(60)), mk(0), mk(null), mk(100000)];
+    const filtered = filterDurationOutliers(rows);
+    // 이상치 1행만 제거, 0/null 2행은 보존
+    expect(filtered.length).toBe(32);
+    expect(filtered.filter((r) => !r.duration_seconds).length).toBe(2);
+  });
+
+  it('양수 표본 n<2 → 원본 유지(σ 추정 불가 — 보수적 no-op)', () => {
+    const rows = [mk(999999), mk(0)];
+    expect(filterDurationOutliers(rows)).toEqual(rows);
   });
 });
 

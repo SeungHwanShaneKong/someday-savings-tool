@@ -20,7 +20,7 @@ export const WIZARD_GUESTS_MAX = 500;
 export const WIZARD_GUESTS_STEP = 10;
 export const WIZARD_DEFAULT_GUESTS = 250;
 
-/** 평균 식대 14,000,000원의 note '200명 기준' → 1인 식대 70,000원. */
+/** 평균 식대 11,600,000원의 note '200명 기준' → 1인 식대 58,000원(참가격 2025.4 중간가). */
 const MEAL_REFERENCE_GUESTS = 200;
 export const MEAL_COST_PER_GUEST =
   AVERAGE_COSTS['main-ceremony']['meal-cost'].amount / MEAL_REFERENCE_GUESTS;

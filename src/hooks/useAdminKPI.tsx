@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { subDays, differenceInMinutes } from 'date-fns';
 // [CL-ADMIN-KST-20260709-000939] 날짜 경계를 KST 달력일로 명시 고정(브라우저 로컬 TZ 종속 제거) + 순수 집계 위임
 import { startOfKstDayUtc, endOfKstDayUtc, subKstDays, kstMonthDayLabel } from '@/lib/admin/kst-time';
-import { uniqueUserCount, loyalUserCount, avgPositiveDuration } from '@/lib/admin/trend-compute';
+import { uniqueUserCount, loyalUserCount, avgPositiveDuration, filterDurationOutliers } from '@/lib/admin/trend-compute';
 import type { KPIValue, TrendDataPoint, TopPage } from '@/lib/kpi-definitions';
 import { withCumulativeSignups, firstTrendBucketStart } from '@/lib/kpi-definitions'; // [CL-ADMIN-SIGNUP-TREND-20260622]
 import { calculateImpact, type ImpactSummary, type BudgetForImpact } from '@/lib/impact-calculator';
@@ -344,6 +344,13 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const filteredPeriodBudgetItems = periodBudgetItems.filter(bi => !adminBudgetIds.has(bi.budget_id));
   const filteredSharedBudgets = sharedBudgets.filter(sb => !adminBudgetIds.has(sb.budget_id));
 
+  // [CL-ADMIN-5SIGMA-20260713-224500] 평균 체류 전용 5σ 절사 파생 배열(전역 스코프 — 기간 전체 표본으로
+  //  mean·σ 산출). ⚠️ pageViews 원본 교체 금지: PV/DAU/리텐션 등 8곳이 원본을 소비하므로 체류 계산
+  //  (일별 추이·요약·전기 비교)만 이 파생을 쓴다. 전기(prev)는 자기 윈도우 표본으로 독립 절사 —
+  //  '윈도우 내 5σ-절사 평균'이라는 동일 지표 정의를 양 기간에 대칭 적용(변화율 비교 공정성).
+  const durationSanePVs = filterDurationOutliers(pageViews);
+  const durationSanePrevPVs = filterDurationOutliers(prevPageViews);
+
   // K01: 신규 가입자
   const k01 = profiles.length;
   const k01Prev = prevProfiles.length;
@@ -504,7 +511,8 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
     const trailing7PVs = pageViews.filter(pv => { const t = Date.parse(pv.created_at); return t >= trailing7StartMs && t <= dayEndMs; });
     const dayLoyalCount = loyalUserCount(trailing7PVs);
 
-    const dayAvgDuration = avgPositiveDuration(dayPVs);
+    // [CL-ADMIN-5SIGMA-20260713-224500] 체류만 5σ-절사 파생 배열에서 일별 재필터(dayPVs 는 dau/pv 카운트용 원본 유지)
+    const dayAvgDuration = avgPositiveDuration(durationSanePVs.filter(pv => inDay(pv.created_at)));
 
     const dayAmountEntered = filteredPeriodBudgetItems.filter(bi => inDay(bi.created_at) && bi.amount > 0).length;
 
@@ -543,8 +551,9 @@ async function loadAdminKpi(startDate: Date, endDate: Date): Promise<AdminKpiDat
   const loyal = loyalUserCount(pageViews);
   const totalUnique = uniqueUserCount(pageViews);
   const prevLoyal = loyalUserCount(prevPageViews);
-  const avgDur = avgPositiveDuration(pageViews);
-  const prevAvgDur = avgPositiveDuration(prevPageViews);
+  // [CL-ADMIN-5SIGMA-20260713-224500] 요약/전기 체류 평균도 동일 5σ-절사 집합 사용(일별 추이와 지표 정합)
+  const avgDur = avgPositiveDuration(durationSanePVs);
+  const prevAvgDur = avgPositiveDuration(durationSanePrevPVs);
 
   const summaryKPIs: SummaryKPIs = {
     totalPageViews: totalPVCount,

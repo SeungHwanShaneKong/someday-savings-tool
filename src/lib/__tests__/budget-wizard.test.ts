@@ -55,7 +55,10 @@ describe('budget-wizard 계산 로직', () => {
       AVERAGE_COSTS['gifts-houseware']['yedan'].amount;
 
     expect(planTotal(plan)).toBe(expected);
-    expect(planTotal(plan)).toBe(54_470_000); // 하드 골든(수치 회귀 가드)
+    // [CL-COST-2026Q2-20260713-231500] 2026 상반기 공표치 반영 골든(구 54,470,000):
+    //  본식 21,070,000(대관 350만+식대 250×5.8만+답례 117만+헬퍼 40만+스냅 150만) + 스드메 6,010,000
+    //  + 준비 1,270,000 + 신혼여행 7,630,000 + 기타 1,250,000 + 예물·예단 16,180,000 = 53,410,000
+    expect(planTotal(plan)).toBe(53_410_000); // 하드 골든(수치 회귀 가드)
     // 항목 수 = 본식5 + 스드메9 + 준비5 + 신혼여행4 + 기타1(0원 2개 제외) + 예물·예단2 = 26
     expect(flattenWizardPlan(plan, allEnabled(plan))).toHaveLength(26);
   });
@@ -154,7 +157,7 @@ describe('budget-wizard 계산 로직', () => {
     const prefills = flattenWizardPlan(plan, enabled);
     expect(prefills.some((p) => p.category === 'gifts-houseware')).toBe(false);
     expect(sumWizardPlan(plan, enabled)).toBe(planTotal(plan) - gifts.subtotal);
-    expect(sumWizardPlan(plan, enabled)).toBe(54_470_000 - 13_600_000); // 예물650만+예단710만 제외
+    expect(sumWizardPlan(plan, enabled)).toBe(53_410_000 - 16_180_000); // 예물588만+예단1,030만 제외
 
     // 전부 비활성화 → 0원·0건
     expect(flattenWizardPlan(plan, new Set())).toEqual([]);

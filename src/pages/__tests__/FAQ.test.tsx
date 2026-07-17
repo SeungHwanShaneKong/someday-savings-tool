@@ -24,14 +24,14 @@ describe('FAQ — 버튼/네비게이션/아코디언', () => {
   it('FQ4: 아코디언 첫 번째 질문 — 클릭 전 답변 텍스트 DOM 미존재', () => {
     renderWithProviders(<FAQ />, { route: '/faq/' });
     // Radix Collapsible uses Presence — content is unmounted (not just hidden) when closed
-    expect(screen.queryByText(/2,100만~7,700만 원/)).toBeNull();
+    expect(screen.queryByText(/2,100만~8,100만 원/)).toBeNull();
   });
 
   it('FQ5: 아코디언 첫 번째 질문 — 클릭 후 답변 텍스트 노출', async () => {
     renderWithProviders(<FAQ />, { route: '/faq/' });
     const trigger = screen.getByRole('button', { name: /결혼 준비 비용은 평균 얼마인가요/ });
     fireEvent.click(trigger);
-    const answer = await screen.findByText(/2,100만~7,700만 원/);
+    const answer = await screen.findByText(/2,100만~8,100만 원/);
     expect(answer).toBeVisible();
   });
 

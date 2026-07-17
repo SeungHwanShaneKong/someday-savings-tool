@@ -78,12 +78,13 @@ describe('BudgetSetupWizard', () => {
     expect(screen.getByText('어디까지 관리할까요?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /예식 \+ 혼수/ })).toHaveAttribute('aria-pressed', 'true');
 
-    // 2 → 3: 리뷰 화면 — 총액(=lib 계산)과 골든 표기(5,447만원) 확인
+    // 2 → 3: 리뷰 화면 — 총액(=lib 계산)과 골든 표기(5,341만원) 확인
+    // [CL-COST-2026Q2-20260713-231500] 2026 상반기 공표치 반영(구 54,470,000 — budget-wizard.test C1 과 동일 골든)
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     expect(screen.getByText('제안 금액을 확인해 주세요')).toBeInTheDocument();
     const plan = defaultPlan();
     const expectedTotal = sumWizardPlan(plan, allEnabled(plan));
-    expect(expectedTotal).toBe(54_470_000);
+    expect(expectedTotal).toBe(53_410_000);
     expect(screen.getByText(formatKoreanWon(expectedTotal))).toBeInTheDocument();
 
     // 적용 → onApply(정확 페이로드) → 4단계 완료 화면
@@ -119,7 +120,7 @@ describe('BudgetSetupWizard', () => {
     const gifts = plan.find((g) => g.categoryId === 'gifts-houseware')!;
     const fullTotal = sumWizardPlan(plan, allEnabled(plan));
 
-    // '혼수 및 예물' 끄기 → 총액 감소(5,447만원 → 4,087만원)
+    // '혼수 및 예물' 끄기 → 총액 감소(5,341만원 → 3,723만원) [CL-COST-2026Q2-20260713-231500]
     fireEvent.click(screen.getByRole('switch', { name: '혼수 및 예물 채우기' }));
     expect(screen.getByText(formatKoreanWon(fullTotal - gifts.subtotal))).toBeInTheDocument();
 

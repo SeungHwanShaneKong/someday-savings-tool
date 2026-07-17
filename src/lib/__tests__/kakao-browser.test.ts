@@ -269,3 +269,78 @@ describe('KB: getAppSpecificGuide()', () => {
     expect(guide.steps.some(s => s.includes('외부 브라우저로 열기'))).toBe(true);
   });
 });
+
+// ─── KB.23–KB.29: [CL-INAPP-IOS-20260713-224500] iOS Threads(Barcelona)·WKWebView 휴리스틱 ───
+//  실증 배경: iPhone Threads 인앱에서 Google OAuth 403 disallowed_useragent — iOS Threads UA 는
+//  'Threads' 대신 코드명 'Barcelona' 를 실어 기존 감지가 뚫렸다(감지 실패 → OAuth 시도 → 구글 차단).
+
+// 실측 형태 기반 UA 픽스처
+const THREADS_IOS_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Barcelona 289.0.0.77.109';
+const THREADS_ANDROID_UA =
+  'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 Barcelona 289.0.0.77.109';
+/** 앱 토큰이 전혀 없는 일반 iOS WKWebView(예: 미지의 인앱) — Safari/ 토큰 부재가 유일 신호 */
+const IOS_WKWEBVIEW_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148';
+const IOS_SAFARI_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+const IOS_CHROME_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.6478.54 Mobile/15E148 Safari/604.1';
+const IOS_FIREFOX_UA =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/127.0 Mobile/15E148 Safari/605.1.15';
+
+describe('KB: iOS Threads(Barcelona) + WKWebView 휴리스틱', () => {
+  it('KB.23 iOS Threads(Barcelona) UA → detectedApp Threads·isInAppBrowser true·isIOS true (RED-first: 구 코드에서 미감지)', () => {
+    setUA(THREADS_IOS_UA);
+    const info = getBrowserInfo();
+    expect(info.isInAppBrowser).toBe(true);
+    expect(info.detectedApp).toBe('Threads');
+    expect(info.isIOS).toBe(true);
+  });
+
+  it('KB.24 Android Threads(Barcelona) UA → detectedApp Threads', () => {
+    setUA(THREADS_ANDROID_UA);
+    const info = getBrowserInfo();
+    expect(info.detectedApp).toBe('Threads');
+    expect(info.isAndroid).toBe(true);
+  });
+
+  it('KB.25 일반 iOS WKWebView(Safari/ 토큰 부재) → 휴리스틱으로 인앱 감지', () => {
+    setUA(IOS_WKWEBVIEW_UA);
+    const info = getBrowserInfo();
+    expect(info.isInAppBrowser).toBe(true);
+    expect(info.detectedApp).toBe('인앱 브라우저');
+  });
+
+  it('KB.26 iOS Safari(Version/+Safari/) → 오탐 없음', () => {
+    setUA(IOS_SAFARI_UA);
+    expect(getBrowserInfo().isInAppBrowser).toBe(false);
+  });
+
+  it('KB.27 iOS Chrome(CriOS)·Firefox(FxiOS) → 오탐 없음', () => {
+    setUA(IOS_CHROME_UA);
+    expect(getBrowserInfo().isInAppBrowser).toBe(false);
+    setUA(IOS_FIREFOX_UA);
+    expect(getBrowserInfo().isInAppBrowser).toBe(false);
+  });
+
+  it('KB.28 iOS 홈화면 PWA(standalone) → 휴리스틱 제외(로그인 차단 회귀 방지 가드)', () => {
+    // standalone UA 도 Safari/ 토큰이 없어 가드 없인 인앱으로 오판된다 — navigator.standalone 가드 검증
+    setUA(IOS_WKWEBVIEW_UA);
+    Object.defineProperty(window.navigator, 'standalone', {
+      value: true, configurable: true, writable: true,
+    });
+    try {
+      expect(getBrowserInfo().isInAppBrowser).toBe(false);
+    } finally {
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: undefined, configurable: true, writable: true,
+      });
+    }
+  });
+
+  it('KB.29 iOS + Threads → Safari에서 열기 안내(기존 guide 재사용)', () => {
+    const guide = getAppSpecificGuide('Threads', true, false);
+    expect(guide.steps.some(s => s.includes('Safari에서 열기'))).toBe(true);
+  });
+});

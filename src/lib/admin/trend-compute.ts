@@ -56,6 +56,30 @@ export function avgPositiveDuration(rows: { duration_seconds?: number | null }[]
   return Math.round(ds.reduce((a, b) => a + b, 0) / ds.length);
 }
 
+// [CL-ADMIN-5SIGMA-20260713-224500] 평균 체류 5σ 이상치 절사 — 전역(로드 기간) 스코프.
+//  근거: 표본 내 최대 z = (n−1)/√n 이라 n<27 표본에선 5σ 이탈이 수학적으로 불가 → 일별(소표본) σ 는
+//  영구 no-op. 따라서 로드된 기간 전체의 양수 표본으로 mean·모σ 를 1회 산출해 |x−mean|>k·σ 행만
+//  제거하고, 그 파생 배열을 일별 추이·요약 카드가 공유한다(동일 제외 집합 = 지표 정합).
+//  엣지: 양수 표본 n<2 또는 σ=0 → 원본 그대로(제거 없음 — 보수적 no-op). 0/음수/null 행은 보존
+//  (avgPositiveDuration 이 어차피 무시 — 행수 계약 불변). 한계: 다중 이상치가 σ 를 부풀려 서로를
+//  가릴 수 있음(단회 절사 — 반복 절사는 요구 밖).
+export function filterDurationOutliers<T extends { duration_seconds?: number | null }>(
+  rows: T[],
+  k = 5,
+): T[] {
+  const ds = rows.map((r) => r.duration_seconds || 0).filter((d) => d > 0);
+  if (ds.length < 2) return rows;
+  const mean = ds.reduce((a, b) => a + b, 0) / ds.length;
+  const variance = ds.reduce((a, b) => a + (b - mean) * (b - mean), 0) / ds.length;
+  const sigma = Math.sqrt(variance);
+  if (sigma === 0) return rows;
+  const limit = k * sigma;
+  return rows.filter((r) => {
+    const d = r.duration_seconds || 0;
+    return d <= 0 || Math.abs(d - mean) <= limit;
+  });
+}
+
 // [CL-ADMIN-VISITOR-20260709-231827] 일별 접속자(익명 세션 + 로그인 사용자) 병합 — '일별 접속자 (추정)' 카드용.
 //   모집단 상호배타 근거: usePageTracking 이 page_views(로그인)와 track-visit(익명, user 있으면 return)를
 //   분기하므로 같은 인스턴트에 이중 기록 없음(같은 날 로그인 전 방문은 익명 1회 포함 가능 — 카드 각주로 고지).

@@ -13,10 +13,17 @@ type Source = NonNullable<Article['sources']>[number];
 /** 자주 인용되는 공개 출처(중복 정의 방지용 상수).
  *  [CL-ADSENSE-MAX-20260709-234500] t5/t6 신규 아티클이 재사용하도록 export 승격(중복 정의 금지). */
 export const S = {
+  // [CL-COST-2026Q2-20260713-231500] 듀오 2026년판으로 갱신(2026-03-11 발표, 조사 2025.11 신혼부부 1,000명) — 원문 실접근 확인.
   duo: {
-    title: '2024 결혼비용 보고서 — 신혼부부 1,000명 조사',
-    url: 'https://www.beyondpost.co.kr/view.php?ud=2025030410152157439aeda69934_30',
+    title: '2026 결혼비용 실태 보고서 — 신혼부부 1,000명 조사',
+    url: 'https://www.businesskorea.co.kr/news/articleView.html?idxno=264825',
     publisher: '결혼정보회사 듀오(언론 보도)',
+  } as Source,
+  // [CL-COST-2026Q2-20260713-231500] 참가격 2026년 2월 기준 가격동향(2026-03-30 보도) — 결혼서비스 평균 2,139만·대관료 중간 350만·스드메 294만.
+  kcaTrend2026: {
+    title: '결혼서비스 가격동향(2026년 2월 기준) — 평균·대관료·스드메 중간가',
+    url: 'https://www.newsin.co.kr/news/articleView.html?idxno=130836',
+    publisher: '한국소비자원 참가격(언론 보도)',
   } as Source,
   kcaWedding: {
     title: '결혼서비스(예식장·스드메) 지역별 가격 통계',
@@ -75,7 +82,7 @@ export const S = {
 
 /** slug → 참고 자료(검증된 실제 공개 출처). */
 export const ARTICLE_SOURCES: Record<string, Source[]> = {
-  '2026-wedding-cost': [S.duo, S.kcaPrice, S.statMarriage],
+  '2026-wedding-cost': [S.duo, S.kcaPrice, S.kcaTrend2026, S.statMarriage],
   'sdm-checklist': [S.sdm, S.kcaWedding],
   'budget-10million': [S.kcaPrice, S.duo],
   'wedding-prep-order': [S.statMarriage, S.duo],
@@ -97,6 +104,7 @@ export const ARTICLE_METHODOLOGY: Record<string, string> = {
   'main-snap-dvd': `본식 스냅·영상은 공개 통계가 제한적이어서, 공개된 작가·업체 견적과 후기에서 반복 확인되는 가격대를 바탕으로 웨딩셈이 보수적 범위로 정리했습니다. 실제 비용은 작가·지역·구성에 따라 달라지므로 견적으로 직접 확인하세요.`,
   'invitation-guide': `청첩장(모바일·종이) 비용은 업체·수량·디자인에 따라 편차가 커서, 공개된 제작 업체 가격표와 사례를 바탕으로 웨딩셈이 일반적 범위로 정리했습니다. 최소 주문 수량·추가 단가는 업체마다 다릅니다.`,
   'honsu-appliances': `혼수 가전·가구 비용은 품목·브랜드·구매 시기에 따라 차이가 커서, 공개 가격과 혼수 박람회 사례를 참고해 웨딩셈이 품목별 범위로 정리했습니다. 빌트인 포함 여부에 따라 크게 달라집니다.`,
-  'yedan-yemul': `예단·예물 금액은 공공 통계가 거의 없어 결혼정보회사 듀오의 자체 조사(2024) 수치를 인용하되, 집안 관례에 따른 편차가 매우 크다는 점을 함께 안내합니다.`,
+  // [CL-COST-2026Q2-20260713-231500] 듀오 2026 보고서(2025.11 조사) 기준으로 갱신
+  'yedan-yemul': `예단·예물 금액은 공공 통계가 거의 없어 결혼정보회사 듀오의 자체 조사(2026년 보고서, 2025년 11월 조사) 수치를 인용하되, 집안 관례에 따른 편차가 매우 크다는 점을 함께 안내합니다.`,
   'wedding-contract-checklist': `계약서 점검 항목은 한국소비자원의 결혼서비스 가격 공개 자료와 분쟁 사례에서 반복되는 위험 요소를 바탕으로 웨딩셈이 정리한 체크리스트입니다.`,
 };

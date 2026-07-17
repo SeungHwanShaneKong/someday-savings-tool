@@ -32,7 +32,10 @@ const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
   { pattern: /KAKAOTALK/i, name: '카카오톡' },
   { pattern: /FB_IAB|FBAV|FBAN/i, name: 'Facebook' },
   { pattern: /Instagram/i, name: 'Instagram' },
-  { pattern: /Threads/i, name: 'Threads' },
+  // [CL-INAPP-IOS-20260713-224500] iOS/Android Threads 앱 UA 는 'Threads' 가 아니라 내부 코드명
+  //  'Barcelona' 토큰을 싣는다(실측: 403 disallowed_useragent 재현 스크린샷) → 미감지로 OAuth 가
+  //  시도돼 구글이 차단. 두 토큰 모두 매칭해 근본 봉합.
+  { pattern: /Threads|Barcelona/i, name: 'Threads' },
   { pattern: /musical_ly|TikTok|BytedanceWebview/i, name: 'TikTok' },
   { pattern: /Line\//i, name: 'LINE' },
   // 네이버 계열 앱
@@ -57,12 +60,27 @@ const IN_APP_BROWSER_PATTERNS: { pattern: RegExp; name: string }[] = [
   { pattern: /wv\)|WebView/i, name: '인앱 브라우저' },
 ];
 
+// [CL-INAPP-IOS-20260713-224500] iOS 홈화면 PWA(standalone) 판정 — standalone UA 도 'Safari/' 토큰이
+//  없어 아래 WKWebView 휴리스틱에 걸리므로 반드시 제외(미가드 시 PWA 사용자의 Google 로그인 차단 회귀).
+//  usePWAInstall.isStandaloneDisplay 와 동일 판정이지만 재구현: hooks 모듈은 로드 즉시 window 리스너를
+//  등록하는 사이드이펙트가 있어 lib→hooks 역참조 부적절.
+function isStandalonePWA(): boolean {
+  try {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(display-mode: standalone)').matches) return true;
+    return typeof navigator !== 'undefined'
+      && (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 현재 브라우저 환경 정보를 반환
  */
 export function getBrowserInfo(): BrowserInfo {
-  const userAgent = navigator.userAgent || '';
-  
+  const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+
   let detectedApp: string | null = null;
   for (const { pattern, name } of IN_APP_BROWSER_PATTERNS) {
     if (pattern.test(userAgent)) {
@@ -71,11 +89,28 @@ export function getBrowserInfo(): BrowserInfo {
     }
   }
 
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
+
+  // [CL-INAPP-IOS-20260713-224500] iOS 일반 WKWebView 휴리스틱(구체 패턴 미매칭 시 폴백).
+  //  iOS 인앱 웹뷰는 Android 와 달리 'wv' 토큰이 없어 기존 폴백(/wv\)|WebView/)이 못 잡는다.
+  //  iOS 실브라우저(Safari=Version/+Safari/, Chrome=CriOS, Firefox=FxiOS, Edge=EdgiOS, Opera=OPiOS/OPT/)는
+  //  전부 'Safari/' 토큰을 유지 → 'AppleWebKit 있으면서 Safari/ 부재'가 인앱 신호. 홈화면 PWA 는 가드로
+  //  제외. 오탐 시에도 탈출 안내(브릿지 UI)로 soft 강등이라 하드 차단 없음.
+  if (
+    !detectedApp && isIOS
+    && /AppleWebKit/i.test(userAgent)
+    && !/Safari\//i.test(userAgent)
+    && !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|Version\//i.test(userAgent)
+    && !isStandalonePWA()
+  ) {
+    detectedApp = '인앱 브라우저';
+  }
+
   return {
     isInAppBrowser: detectedApp !== null,
     isKakaoTalk: /KAKAOTALK/i.test(userAgent),
     isAndroid: /Android/i.test(userAgent),
-    isIOS: /iPhone|iPad|iPod/i.test(userAgent),
+    isIOS,
     userAgent,
     detectedApp,
   };

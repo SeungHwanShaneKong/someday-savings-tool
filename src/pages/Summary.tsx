@@ -48,6 +48,9 @@ import { ComparisonCards } from '@/components/summary/ComparisonCards';
 import { useMyPartner } from '@/hooks/useMyPartner';
 import { useGamificationState } from '@/hooks/useGamificationState';
 import { PokeButton } from '@/components/collaboration/PokeButton';
+// [CL-SHARE-P1-20260717-170000] 공유 카드 P1 — 발신자 share_create 계측(설계 §4.1)
+import { trackFunnelOnce } from '@/lib/analytics/funnel-events';
+import { completenessBand, computeShareGrade } from '@/lib/share-grade';
 
 // [CL-TOP20-R50-UI-20260703-094000] sev1 정리: useNegotiateCoach 이중 인스턴스 해소.
 // 개별 뷰 전용 협상 코치 상태(훅 + 카테고리 선택 + NegotiationTips Sheet)를 이 서브컴포넌트로 한정 —
@@ -248,6 +251,30 @@ export default function Summary() {
     );
   }
 
+  // [CL-SHARE-P1-20260717-170000] 공유 발급 성공 시 — 등급·완성도 밴드만 전송(금액·토큰 0).
+  //  현재 활성 예산의 항목(items)으로 등급 산출 — 공유 대상과 동일 소스라 수신자 카드 등급과 일치한다.
+  // [CL-SHARE-AUDIT-D8-20260717-200000] (채널,예산)당 세션 1회 — 분모 부풀림 차단.
+  //  배경: share_create 는 K = i×c 의 **분모**(i = create/MAU)다. 구 동작은 다이얼로그를 다시 열
+  //  때마다(=이미 발급된 토큰 재사용 경로) 매번 발화해, 링크 한 번 만들고 5번 복사하면 i 가 5배로
+  //  부풀어 K 가 왜곡됐다. 설계 §4.1 의 트리거는 '링크 발급 성공'이지 '다이얼로그 열람'이 아니다.
+  //  → D6(취소를 성공으로 오인)와 **동일 결함 클래스**(시도≠성공)라 같은 규율로 처리한다.
+  //  인스턴스 키 = channel+budgetId(로컬 sessionStorage 전용 — GA4 페이로드 미전송).
+  const trackShareCreate = (channel: 'link' | 'image') => {
+    const grade = computeShareGrade(
+      items.map((i) => ({ category: i.category, sub_category: i.sub_category, amount: i.amount })),
+    );
+    trackFunnelOnce(
+      'share_create',
+      {
+        channel,
+        privacy_level: 'full', // P1 시점 레거시 고정(P2 프라이버시 3단계에서 실값) — 설계 §4.1
+        grade: grade.grade,
+        completeness_band: completenessBand(grade.completeness),
+      },
+      `${channel}_${activeBudgetId ?? 'none'}`,
+    );
+  };
+
   const handleDownloadImage = async () => {
     // [CL-BTNPERFECT-20260629] 동기 게이트 — html2canvas 렌더 중 연타로 중복 렌더/다운로드가 겹치는 것 차단.
     if (!summaryRef.current || downloadingRef.current) return;
@@ -300,7 +327,15 @@ export default function Summary() {
       
       // Use multi-device download utility
       const result = await downloadImage(canvas, '웨딩셈_예산요약.png');
-      
+
+      // [CL-SHARE-AUDIT-D6-20260717-190000] 사용자가 공유 시트를 취소 → 성공 토스트·계측 모두 금지.
+      //  구 동작은 취소를 'shared'(성공)로 뭉개 '공유되었어요' 오해 토스트 + share_create 부풀림을 냈다.
+      if (result === 'cancelled') return;
+
+      // [CL-SHARE-P1-20260717-170000] share_create(image) — 저장/공유 성공 후에만 발화(실패·취소 시 미발화).
+      //  절대 금액·토큰 미전송: 등급 + 완성도 밴드만(§4.1 금지 계약).
+      trackShareCreate('image');
+
       const messages: Record<string, { title: string; description: string }> = {
         downloaded: {
           title: '이미지가 저장되었어요! 📸',
@@ -315,7 +350,7 @@ export default function Summary() {
           description: '이미지를 길게 눌러 저장해주세요',
         },
       };
-      
+
       toast(messages[result]);
     } catch (error) {
       const message = error instanceof Error && error.message === '이미지 저장이 진행 중입니다'
@@ -361,6 +396,9 @@ export default function Summary() {
         setShareUrl(url);
       }
       
+      // [CL-SHARE-P1-20260717-170000] share_create(link) — URL 확보 성공 후에만 발화(신규/기존 재사용 공통).
+      //  토큰은 절대 미전송(§4.1 금지 계약) — 등급·완성도 밴드만.
+      trackShareCreate('link');
       setShareDialogOpen(true);
     } catch (error) {
       // [CL-TOP20-P3-SUMMARY-20260703-030000] lint: no-explicit-any 해소(동작 불변 — 메시지 표시만)

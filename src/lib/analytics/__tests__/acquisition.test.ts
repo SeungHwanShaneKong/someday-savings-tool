@@ -96,3 +96,55 @@ describe('sourceLabel (한국어 라벨)', () => {
     expect(sourceLabel('some-blog.net')).toBe('some-blog.net');
   });
 });
+
+// [CL-SHARE-P1-20260717-170000] 랜딩 pathname 기반 바이럴 분류 — docs/growth-share-card-design.md §4.2, DoD #2.
+//  배경(prove-first 근거): 카톡 인앱/문자 유입은 referrer 가 비거나 자기도메인이라 :71 자기참조 가드에서
+//  전부 'direct' 로 오분류된다 → 경로가 유일한 신뢰 신호. 이 분류가 없으면 K-factor 측정 자체가 불가.
+describe('classifySource — 바이럴 랜딩 경로 분류 (share_card / partner_invite)', () => {
+  it('AQ.14 /shared/:token 랜딩 → share_card·viral (referrer 없어도 direct 로 떨어지지 않음)', () => {
+    expect(classifySource('', '', 'moderninsightspot.com', '/shared/abc123')).toEqual({
+      source: 'share_card',
+      medium: 'viral',
+      referrer: null,
+    });
+  });
+
+  it('AQ.15 /invite/:token 랜딩 → partner_invite·viral (share_card 와 별도 소스 — K-factor 오염 방지)', () => {
+    expect(classifySource('', '', 'moderninsightspot.com', '/invite/tok').source).toBe('partner_invite');
+  });
+
+  it('AQ.16 자기도메인 referrer 로 온 공유 링크도 바이럴로 분류(구 동작에선 direct 오분류)', () => {
+    // 카톡 인앱 → 자기도메인 referrer 케이스
+    expect(
+      classifySource('', 'https://moderninsightspot.com/summary', 'moderninsightspot.com', '/shared/t'),
+    ).toMatchObject({ source: 'share_card', medium: 'viral' });
+  });
+
+  it('AQ.17 UTM 이 있으면 UTM 우선(명시적 캠페인 의도 > 경로 추론)', () => {
+    expect(classifySource('?utm_source=blog&utm_medium=post', '', '', '/shared/t')).toMatchObject({
+      source: 'blog',
+      medium: 'post',
+    });
+  });
+
+  it('AQ.18 바이럴 경로가 아니면 기존 referrer 분류 유지(회귀 0)', () => {
+    expect(classifySource('', 'https://search.naver.com/x', 'wedsem.com', '/guide/').source).toBe('naver');
+    expect(classifySource('', '', 'wedsem.com', '/').source).toBe('direct');
+    // 유사 경로 오탐 금지 — prefix 정확 일치만
+    expect(classifySource('', '', 'wedsem.com', '/sharedx/t').source).toBe('direct');
+    expect(classifySource('', '', 'wedsem.com', '/shared').source).toBe('direct');
+  });
+
+  it('AQ.19 외부 referrer 로 공유 링크 진입 시에도 경로가 우선(바이럴 귀속 보장)', () => {
+    expect(classifySource('', 'https://instagram.com/p/x', 'wedsem.com', '/shared/t')).toMatchObject({
+      source: 'share_card',
+      medium: 'viral',
+      referrer: 'https://instagram.com',
+    });
+  });
+
+  it('AQ.20 바이럴 소스도 한국어 라벨 보유(Admin 유입 차트 자동 편입)', () => {
+    expect(sourceLabel('share_card')).toBe('공유 카드');
+    expect(sourceLabel('partner_invite')).toBe('파트너 초대');
+  });
+});

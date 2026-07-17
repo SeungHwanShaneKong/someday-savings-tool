@@ -55,7 +55,13 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
  * 
  * Supported: iOS 15+ Safari, Android Chrome 75+, Samsung Internet 11+
  */
-async function tryWebShare(blob: Blob, fileName: string): Promise<boolean> {
+// [CL-SHARE-AUDIT-D6-20260717-190000] '시도' 신호와 '확인된 성공' 신호를 계약 수준에서 분리.
+//  구 계약은 AbortError(사용자가 공유 시트를 명시적으로 취소)를 true 로 뭉개 downloadImage 가 'shared'
+//  를 반환했다 → 호출측(Summary)이 이를 성공으로 보고 share_create(image) 를 발화 → K-factor 분모가
+//  구조적으로 부풀려진다. 취소를 별도 값으로 전파해 호출측이 성공/취소를 구분할 수 있게 한다.
+type ShareAttempt = 'shared' | 'cancelled' | false;
+
+async function tryWebShare(blob: Blob, fileName: string): Promise<ShareAttempt> {
   if (!navigator.share || !navigator.canShare) return false;
 
   try {
@@ -65,10 +71,12 @@ async function tryWebShare(blob: Blob, fileName: string): Promise<boolean> {
     if (!navigator.canShare(shareData)) return false;
 
     await navigator.share(shareData);
-    return true;
+    return 'shared';
   } catch (err) {
-    // AbortError = user cancelled the share sheet — not a failure
-    if (err instanceof Error && err.name === 'AbortError') return true;
+    // [CL-SHARE-AUDIT-D6-20260717-190000] AbortError = 사용자가 공유 시트를 취소 — '실패'는 아니지만
+    //  '저장 성공'도 아니다. 폴백(anchor download)으로 흘리지 않되(사용자 의도 존중) 호출측에는
+    //  취소임을 정확히 알린다.
+    if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
     return false;
   }
 }
@@ -135,7 +143,9 @@ function openImageInNewTab(blob: Blob): void {
 export async function downloadImage(
   canvas: HTMLCanvasElement,
   fileName: string = '웨딩셈_예산요약.png'
-): Promise<'downloaded' | 'shared' | 'opened'> {
+  // [CL-SHARE-AUDIT-D6-20260717-190000] 'cancelled' 추가 — 사용자가 공유 시트를 취소한 경우.
+  //  호출측은 이를 성공으로 오인하면 안 된다(계측 부풀림·오해 유발 토스트).
+): Promise<'downloaded' | 'shared' | 'opened' | 'cancelled'> {
   // Debounce guard: prevent rapid consecutive calls
   if (isProcessing) {
     throw new Error('이미지 저장이 진행 중입니다');
@@ -149,7 +159,10 @@ export async function downloadImage(
     if (isMobileDevice()) {
       // Stage 1: Try Web Share API (best UX — native "Save Image" option)
       const shared = await tryWebShare(blob, fileName);
-      if (shared) return 'shared';
+      if (shared === 'shared') return 'shared';
+      // [CL-SHARE-AUDIT-D6-20260717-190000] 취소는 폴백으로 흘리지 않는다(사용자 의도 존중) —
+      //  구 동작과 동일하게 여기서 종료하되, 'shared'(성공)가 아니라 'cancelled' 로 정확히 보고.
+      if (shared === 'cancelled') return 'cancelled';
 
       if (isIOS()) {
         // Stage 2 (iOS): Try anchor download — works on iOS Chrome/Firefox

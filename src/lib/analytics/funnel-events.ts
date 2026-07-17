@@ -32,7 +32,13 @@ export type FunnelEvent =
   | 'pwa_install_accepted'        // 네이티브 프롬프트 수락 (params.placement)
   | 'pwa_install_dismissed'       // 네이티브 프롬프트 거절 (params.placement)
   | 'pwa_install_guide_shown'     // 수동 안내 모달 노출 (params.platform)
-  | 'pwa_install_shortcut_download'; // 바탕화면 바로가기 파일 다운로드 (params.os)
+  | 'pwa_install_shortcut_download' // 바탕화면 바로가기 파일 다운로드 (params.os)
+  // [CL-SHARE-P1-20260717-170000] 예산 리포트 공유 카드 바이럴 퍼널 — docs/growth-share-card-design.md §4.1.
+  //  금지 계약: share token(원문·해시 모두)·절대 금액·이름/이메일 전송 0. 금액은 항상 등급/밴드/퍼센트로.
+  //  share_convert 전용 이벤트는 두지 않는다 — signup_complete 의 acq_source='share_card' 로 정의(§4.1).
+  | 'share_create'                // 공유 발급 성공 (params.channel: link|image, privacy_level, grade, completeness_band)
+  | 'share_open'                  // 수신자 /shared/:token 열람 (params.grade, privacy_level, has_session) — 세션 1회
+  | 'share_cta_click';            // 수신자 랜딩 CTA 클릭 (params.cta: hero|banner, grade)
 
 type FunnelParams = Record<string, string | number | boolean>;
 
@@ -54,10 +60,20 @@ export function trackFunnel(event: FunnelEvent, params?: FunnelParams): void {
 
 const ONCE_PREFIX = 'wedsem_funnel_once_';
 
-/** 세션당 1회만 전송(노출·시작류 이벤트 중복 방지). sessionStorage 실패 시 일반 전송으로 폴백. */
-export function trackFunnelOnce(event: FunnelEvent, params?: FunnelParams): void {
+/**
+ * 세션당 1회만 전송(노출·시작류 이벤트 중복 방지). sessionStorage 실패 시 일반 전송으로 폴백.
+ *
+ * [CL-SHARE-AUDIT-D3-20260717-190000] `instanceId` — 인스턴스 차원(선택).
+ *  배경(감사 D3 재현): once 키가 이벤트명만 네임스페이스로 쓰면(구 동작), 세션당 논리적으로 1회인
+ *  이벤트(auth_view·wizard_enter·social_proof_view)에는 정확하지만, **인스턴스별 이벤트**에는 과소집계를
+ *  만든다. share_open 은 공유 링크(token)마다 별개 사건인데, 한 세션에서 두 번째 링크를 열면 첫 링크의
+ *  키에 막혀 전량 유실 → open 과소집계 → landing_cvr(=convert/open) 과대. 설계 의도는 '새로고침 중복
+ *  차단'이지 '다른 링크 무시'가 아니다(§4.1) → 의도를 키에 그대로 표현한다.
+ *  instanceId 미지정 시 동작은 구 계약과 **비트 동일**(기존 호출부 회귀 0).
+ */
+export function trackFunnelOnce(event: FunnelEvent, params?: FunnelParams, instanceId?: string): void {
   try {
-    const key = `${ONCE_PREFIX}${event}`;
+    const key = instanceId ? `${ONCE_PREFIX}${event}_${instanceId}` : `${ONCE_PREFIX}${event}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, '1');
   } catch {

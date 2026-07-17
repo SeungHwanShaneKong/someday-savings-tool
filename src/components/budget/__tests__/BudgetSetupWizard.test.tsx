@@ -30,6 +30,8 @@ vi.mock('@/lib/analytics/funnel-events', () => ({
 beforeEach(() => {
   funnel.trackFunnel.mockClear();
   funnel.trackFunnelOnce.mockClear();
+  // [CL-SHARE-AUDIT-D1-20260717-200000] first-touch 실값 경로 검증을 위해 저장소 초기화
+  localStorage.clear();
 });
 
 const allEnabled = (groups: readonly WizardCategoryGroup[]): Set<string> =>
@@ -162,7 +164,16 @@ describe('BudgetSetupWizard', () => {
 
     // 노출 계측 — wizard_enter + signup_complete(가입 완료 근사, funnel-events.ts 주석 참조)
     expect(funnel.trackFunnelOnce).toHaveBeenCalledWith('wizard_enter');
-    expect(funnel.trackFunnelOnce).toHaveBeenCalledWith('signup_complete');
+    // [CL-SHARE-AUDIT-D1-20260717-190000] signup_complete 는 first-touch 귀속 파라미터를 반드시 동반.
+    //  이게 없으면 share_convert(= acq_source='share_card' 인 signup_complete)를 식별할 수 없어
+    //  K = i×c 가 GA4 에서 산출 불능(설계 §4.1·DoD #5). 페이로드 스냅샷으로 드리프트 봉인.
+    const signupCall = vi
+      .mocked(funnel.trackFunnelOnce)
+      .mock.calls.find((c) => c[0] === 'signup_complete');
+    expect(signupCall).toBeDefined();
+    expect(Object.keys(signupCall![1]!).sort()).toEqual(['acq_medium', 'acq_source']);
+    // first-touch 미기록(프라이빗 모드 등) → 폴백. GA4 스키마(문자열)는 유지
+    expect(signupCall![1]).toEqual({ acq_source: 'unknown', acq_medium: 'none' });
 
     // 키보드 End 로 슬라이더 최대치 이동 — jsdom 에서 결정적인 Radix Slider 조작 경로
     fireEvent.keyDown(screen.getByRole('slider'), { key: 'End' });
@@ -234,5 +245,26 @@ describe('BudgetSetupWizard', () => {
       guests: WIZARD_DEFAULT_GUESTS,
       style: 'standard',
     });
+  });
+
+  // [CL-SHARE-AUDIT-D1-20260717-200000] K-factor 종점 귀속 — **실값 경로** 가드.
+  //  폴백('unknown')만 검증하면 share_convert 식별이라는 실제 목적이 미검증으로 남는다(검증관 지적).
+  //  공유 링크로 유입된 방문자의 first-touch(share_card)가 가입 이벤트까지 실제로 전달되는지 고정한다.
+  it('W7 공유 링크 유입자의 가입 → signup_complete 에 acq_source=share_card 귀속(share_convert 식별)', () => {
+    // /shared/:token 랜딩에서 기록된 first-touch(= acquisition.getOrSetFirstTouch 산출물과 동일 형태)
+    localStorage.setItem(
+      'wedsem_first_touch',
+      JSON.stringify({ source: 'share_card', medium: 'viral', referrer: null, ts: '2026-07-17T00:00:00.000Z' }),
+    );
+
+    setup();
+
+    const signupCall = vi
+      .mocked(funnel.trackFunnelOnce)
+      .mock.calls.find((c) => c[0] === 'signup_complete');
+    // 이 단언이 곧 'GA4 에서 share_convert = signup_complete where acq_source=share_card' 의 성립 근거
+    expect(signupCall![1]).toEqual({ acq_source: 'share_card', acq_medium: 'viral' });
+    // §4.1 금지 계약: 토큰·금액·PII 미전송(분류 키만)
+    expect(JSON.stringify(signupCall![1])).not.toMatch(/@|http|tok/i);
   });
 });

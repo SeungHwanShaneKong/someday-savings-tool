@@ -38,6 +38,8 @@ import {
 } from '@/lib/budget-wizard';
 // [CL-TOP20-R50-TRACK-20260703-094000] 온보딩 퍼널 계측(wizard_enter/apply + signup_complete 근사)
 import { trackFunnel, trackFunnelOnce } from '@/lib/analytics/funnel-events';
+// [CL-SHARE-AUDIT-D1-20260717-190000] 공유 카드 K-factor 종점 귀속 — first-touch 소스를 가입 이벤트에 부착.
+import { readFirstTouch } from '@/lib/analytics/acquisition';
 import { cn } from '@/lib/utils';
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -67,10 +69,19 @@ export function BudgetSetupWizard({ open, onOpenChange, onApply }: BudgetSetupWi
   // open 전이에서 발화해야 '미노출 사용자 오발화'가 없다(세션 중복은 trackFunnelOnce 가 차단).
   // signup_complete 근사 근거: 노출 게이트(본인 소유·개인 모드·전 항목 0·custom 0·완료 플래그
   // 없음)가 "가입 직후 첫 예산 진입"과 사실상 일치 — funnel-events.ts taxonomy 주석 참조.
+  // [CL-SHARE-AUDIT-D1-20260717-190000] signup_complete 에 first-touch 귀속 파라미터 부착(설계 §4.1·§5 P1).
+  //  배경: share_convert 는 전용 이벤트를 두지 않고 **signup_complete 의 acq_source='share_card'** 로
+  //  정의된다(닫힌 유니언 오염 최소화). 이 파라미터가 없으면 c = share_convert/share_create 가 항상 0 이라
+  //  K-factor 가 GA4 에서 산출 불능 — P1 의 1차 성공 조건(DoD #5 '측정 가능화') 자체가 미달한다.
+  //  전송값은 분류된 소스/미디엄 키(share_card·viral 등)뿐 — referrer·토큰·금액·PII 미전송(§4.1 금지 계약).
   useEffect(() => {
     if (!open) return;
     trackFunnelOnce('wizard_enter');
-    trackFunnelOnce('signup_complete');
+    const ft = readFirstTouch();
+    trackFunnelOnce('signup_complete', {
+      acq_source: ft?.source ?? 'unknown',
+      acq_medium: ft?.medium ?? 'none',
+    });
   }, [open]);
 
   const plan = useMemo(

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 const TRUST_CHIPS = [
   { emoji: '🔒', label: '이메일 주소만 사용해요' },
-  { emoji: '⚡', label: '비밀번호 없이 10초' },
+  { emoji: '⚡', label: '비밀번호 없이 5초' }, // [CL-HERO-SUMMARY-20260718-153000] 5초 메시징 일관화(버튼과 통일)
   { emoji: '💸', label: '평생 무료·카드 등록 없음' },
 ] as const;
 

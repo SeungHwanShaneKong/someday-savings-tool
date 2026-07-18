@@ -2,6 +2,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, fireEvent, within, currentPath, waitFor } from '@/test/test-utils';
 import Landing from '../Landing';
+// [CL-HERO-SUMMARY-20260718] 카드 요약 총액 === 아래 전체표 총액(단일소스) 정합 회귀
+import { buildSampleBudget, sampleBudgetTotal } from '@/lib/sample-budget';
+import { formatKoreanWon } from '@/lib/budget-categories';
 
 /* ─── useAuth mock (hoisted) ─── */
 // [CL-TOP20-P3-LINT-20260703-043000] 선재 any 5건 → 명시 타입(리포 lint 클린화)
@@ -182,11 +185,14 @@ describe('로그인 허브 게이팅 (Top20 #9)', () => {
   it('비로그인: 히어로 가입 카드 표시 + 허브 미표시', () => {
     renderWithProviders(<Landing />);
     expect(
-      screen.getByRole('button', { name: 'Google로 10초 만에 시작' }),
+      screen.getByRole('button', { name: 'Google로 5초 만에 시작' }),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
     // [CL-SAMPLE-SHEET-20260718-100000] 비로그인 전용 엑셀형 예시표 노출
     expect(screen.getByRole('region', { name: '결혼 예산 예시표' })).toBeInTheDocument();
+    // [CL-HERO-SUMMARY-20260718] 카드 요약 총액 === 아래 전체표 총액(단일소스) — 둘 다 노출되어 문자열 2회 이상 등장
+    const totalText = formatKoreanWon(sampleBudgetTotal(buildSampleBudget()));
+    expect(screen.getAllByText(totalText).length).toBeGreaterThanOrEqual(2);
   });
 
   it('로그인: 허브(빠른 이동 카드) 표시 + 가입 카드·챗프리뷰·예시표 미표시', () => {
@@ -195,7 +201,7 @@ describe('로그인 허브 게이팅 (Top20 #9)', () => {
     expect(screen.getByLabelText('내 결혼 준비 현황')).toBeInTheDocument();
     expect(screen.getByText('예산 이어하기')).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Google로 10초 만에 시작' }),
+      screen.queryByRole('button', { name: 'Google로 5초 만에 시작' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI 웨딩 챗봇 미리보기')).not.toBeInTheDocument();
     // [CL-SAMPLE-SHEET-20260718-100000] 로그인 시 예시표 미표시(비로그인 전용)
@@ -207,7 +213,7 @@ describe('로그인 허브 게이팅 (Top20 #9)', () => {
     renderWithProviders(<Landing />);
     expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Google로 10초 만에 시작' }),
+      screen.queryByRole('button', { name: 'Google로 5초 만에 시작' }),
     ).not.toBeInTheDocument();
   });
 });
@@ -216,7 +222,7 @@ describe('로그인 허브 게이팅 (Top20 #9)', () => {
 describe('HeroSignupCard 통합 — 직접 Google 로그인', () => {
   it('G1: Google 버튼 클릭 → signInWithGoogle 1회 호출', async () => {
     renderWithProviders(<Landing />);
-    fireEvent.click(screen.getByRole('button', { name: 'Google로 10초 만에 시작' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Google로 5초 만에 시작' }));
     await waitFor(() => expect(mockAuth.signInWithGoogle).toHaveBeenCalledTimes(1));
   });
 
@@ -235,7 +241,7 @@ describe('HeroSignupCard 통합 — 직접 Google 로그인', () => {
     renderWithProviders(<Landing />);
     // 칩 li 는 이모지(aria-hidden) + 텍스트 복합 노드 → 부분 매칭(regex)
     expect(screen.getByText(/이메일 주소만 사용해요/)).toBeInTheDocument();
-    expect(screen.getByText(/비밀번호 없이 10초/)).toBeInTheDocument();
+    expect(screen.getByText(/비밀번호 없이 5초/)).toBeInTheDocument();
     expect(screen.getByText(/평생 무료·카드 등록 없음/)).toBeInTheDocument();
   });
 });

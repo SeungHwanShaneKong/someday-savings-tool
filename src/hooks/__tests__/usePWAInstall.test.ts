@@ -105,8 +105,14 @@ describe('usePWAInstall', () => {
     expect(result.current.isInstallable).toBe(false);
   });
 
-  it('iOS 감지: iPhone UA → isIOS=true / jsdom 기본 UA → false', () => {
-    expect(isIOSDevice()).toBe(false); // jsdom 기본 UA
+  it('iOS 감지: iPhone UA → isIOS=true / 비iOS UA → false', () => {
+    // [CL-SAMPLE-SHEET-20260718-100000] ambient UA 의존 제거(결정론) — 형제 테스트가 iPhone UA 를
+    //  남겨도 이 케이스가 깨지지 않도록 비iOS UA 를 명시(singleFork 실행순서 무관 보장).
+    Object.defineProperty(window.navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+      configurable: true,
+    });
+    expect(isIOSDevice()).toBe(false); // 비iOS UA
 
     Object.defineProperty(window.navigator, 'userAgent', {
       value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',

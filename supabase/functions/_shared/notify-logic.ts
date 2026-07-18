@@ -201,3 +201,53 @@ export function htmlForKind(kind: NotifyKind, senderName: string | null | undefi
   if (kind === 'poke') return buildPokeEmailHtml(senderName, appUrl);
   return buildEmailHtml(senderName, appUrl);
 }
+
+// [CL-EMAIL-SPAM-20260718-100000] 스팸 저감 — HTML-only 메일은 대표적 스팸 가점 요인이므로 text/plain
+//  멀티파트 대체본을 함께 보낸다. HTML 템플릿의 제목·안내·CTA URL·푸터를 평문으로 미러(개행 포함, 태그 0).
+//  텍스트 컨텍스트라 escapeHtml 불필요(오히려 &amp; 등이 그대로 보이면 안 됨) — sanitizeSenderName 만 유지.
+
+/** V-SPAM: 파트너 편집 알림 text/plain 대체본(buildEmailHtml 평문 미러). */
+export function buildEmailText(senderName: string | null | undefined, appUrl: string): string {
+  const name = sanitizeSenderName(senderName);
+  return [
+    `${name}님이 우리 예산을 다듬고 있어요`,
+    ``,
+    `지금 함께 보면 더 즐거워요. 잠깐 들어와 오늘의 변화를 확인해 보세요.`,
+    ``,
+    `우리 예산 보러 가기: ${appUrl}`,
+    ``,
+    `웨딩셈 · 하루 한 번만 보내드려요`,
+  ].join('\n');
+}
+
+/** V-SPAM: poke text/plain 대체본(buildPokeEmailHtml 평문 미러). */
+export function buildPokeEmailText(senderName: string | null | undefined, appUrl: string): string {
+  const name = sanitizeSenderName(senderName);
+  return [
+    `${name}님이 콕 찔렀어요`,
+    ``,
+    `${name}님이 우리 결혼 예산을 같이 보고 싶어해요. 잠깐 들러 함께 다듬어 주실래요?`,
+    ``,
+    `우리 예산 보러 가기: ${appUrl}`,
+    ``,
+    `웨딩셈 · 하루 한 번만 보내드려요`,
+  ].join('\n');
+}
+
+/** kind별 text/plain 본문 — htmlForKind 와 동일 분기(poke 전용/기본). */
+export function textForKind(kind: NotifyKind, senderName: string | null | undefined, appUrl: string): string {
+  if (kind === 'poke') return buildPokeEmailText(senderName, appUrl);
+  return buildEmailText(senderName, appUrl);
+}
+
+// [CL-EMAIL-SPAM-20260718-100000] List-Unsubscribe 헤더용 mailto 파생 — NOTIFY_FROM 의 주소부만 추출.
+//  from 은 "웨딩셈 <noreply@domain>" 또는 "noreply@domain" 형태. 꺾쇠 안 주소를 우선, 없으면 전체를 주소로.
+//  파싱 불가/빈값이면 null(호출측이 헤더를 생략) — 잘못된 헤더로 오히려 스팸 가점 나는 것을 방지.
+export function unsubscribeMailto(from: string | null | undefined): string | null {
+  if (!from) return null;
+  const angle = from.match(/<([^>]+)>/);
+  const addr = (angle ? angle[1] : from).trim();
+  // 최소 이메일 형태 검증(공백 없는 x@y.z) — 표시명이 주소로 새는 것 차단.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr)) return null;
+  return `<mailto:${addr}?subject=unsubscribe>`;
+}

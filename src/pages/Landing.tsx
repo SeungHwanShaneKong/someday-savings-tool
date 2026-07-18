@@ -46,6 +46,7 @@ import { useStreak } from '@/hooks/useStreak';
 import { WeddingMark } from '@/components/landing/WeddingMark';
 // [CL-LOGIN-GATE-20260709-233447] 시뮬레이터/데모 폐지 → 직접 Google 로그인 가입 카드
 import { HeroSignupCard } from '@/components/landing/HeroSignupCard';
+import { SampleBudgetSheet } from '@/components/landing/SampleBudgetSheet';
 import { ChatPreview } from '@/components/landing/ChatPreview';
 import TrustSection from '@/components/landing/TrustSection';
 import { trackFunnel } from '@/lib/analytics/funnel-events';
@@ -432,6 +433,17 @@ export default function Landing() {
               isInAppBrowser={browserInfo.isInAppBrowser}
               onInAppEscape={handleRetryBreakout}
             />
+          </section>
+        )}
+
+        {/* ─── [CL-SAMPLE-SHEET-20260718-100000] 엑셀형 예산 예시표 — 비로그인 전용(로그인 욕구 유발) ─── */}
+        {!loading && !user && (
+          <section
+            className="w-full max-w-lg mb-10 animate-fade-up"
+            style={{ animationDelay: '0.28s' }}
+            aria-label="결혼 예산 예시"
+          >
+            <SampleBudgetSheet />
           </section>
         )}
 

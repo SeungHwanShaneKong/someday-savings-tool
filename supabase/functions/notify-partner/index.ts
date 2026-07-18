@@ -17,6 +17,8 @@ import {
   isUnverifiedSharedSender, isConfigErrorStatus, mapReserveError,
   // [CL-POKE-20260709-231909] kind 허용목록 + kind별 제목/본문(기존 kind 는 buildSubject/buildEmailHtml 위임 — 동작 불변)
   coerceKind, subjectForKind, htmlForKind,
+  // [CL-EMAIL-SPAM-20260718-100000] 스팸 저감 — text/plain 대체본 + List-Unsubscribe mailto 파생
+  textForKind, unsubscribeMailto,
 } from '../_shared/notify-logic.ts';
 
 const DAILY_GLOBAL_CAP = 100; // 글로벌 하루 발송 상한(요청: ≤100, best-effort)
@@ -133,16 +135,30 @@ serve(async (req: Request) => {
       .from('profiles').select('display_name').eq('user_id', senderId).maybeSingle();
     const senderName = (senderProfile?.display_name as string | undefined) ?? '';
 
+    // [CL-EMAIL-SPAM-20260718-100000] 스팸 저감 헤더 — List-Unsubscribe(mailto)로 정당성 신호 부여(RFC 2369).
+    //  ⚠️ List-Unsubscribe-Post: One-Click 은 넣지 않는다 — RFC 8058 One-Click 은 List-Unsubscribe 에
+    //  **https POST 엔드포인트**를 요구하는데 정적 호스팅상 수신 엔드포인트가 없어(mailto 뿐) 지킬 수 없는
+    //  신호가 된다. mailto 단독이 RFC 2369 상 정상 신호. 발송량 ≤100/일이라 Gmail bulk One-Click 의무
+    //  대상(5k+/일)도 아님. (ponytail: https 언섭 엔드포인트 생기면 One-Click 재도입)
+    //  mailto 파생 실패 시 헤더 자체 생략(잘못된 헤더가 오히려 가점 요인).
+    const unsub = unsubscribeMailto(NOTIFY_FROM);
+
     // [V10] 발송 — 제목은 sanitizeHeaderText, 본문은 escapeHtml 처리된 값 사용
+    // [CL-EMAIL-SPAM-20260718-100000] text/plain 멀티파트(HTML-only 스팸 가점 제거) + reply_to(정당성 신호)
+    //  ⚠️ 아래 인라인 필드(text/reply_to/headers)는 Deno 런타임이라 vitest(Node) 로 커버 안 됨 — 순수
+    //  빌더(textForKind/unsubscribeMailto)만 단위테스트. 필드명/헤더 shape 회귀는 코드리뷰+라이브 발송으로 확인.
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: NOTIFY_FROM, // [V(R6-B)] env 외부화 — 도메인 인증된 발신자만(위 가드로 샌드박스 차단됨)
         to: [partner.email],
+        reply_to: NOTIFY_FROM,
         // [CL-POKE-20260709-231909] kind별 제목/본문 — 기존 kind 는 buildSubject/buildEmailHtml 그대로 위임(불변)
         subject: subjectForKind(kind, senderName),
         html: htmlForKind(kind, senderName, APP_URL),
+        text: textForKind(kind, senderName, APP_URL),
+        ...(unsub ? { headers: { 'List-Unsubscribe': unsub } } : {}),
       }),
     });
     if (!resp.ok) {

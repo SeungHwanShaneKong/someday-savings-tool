@@ -8,7 +8,7 @@
 /** 방문자 퍼널 이벤트 taxonomy — 신규 이벤트는 여기에만 추가(오타 하드코딩 금지). */
 export type FunnelEvent =
   // 랜딩 첫인상
-  | 'landing_hero_cta_click'      // 히어로 주 CTA 클릭 (params.method: google_direct|auth_page)
+  | 'landing_hero_cta_click'      // 히어로 주 CTA 클릭 (params.method: google_direct|auth_page|sample_sheet)
   | 'feature_card_click'          // 기능 카드 클릭 (params.feature)
   | 'social_proof_view'           // 후기/신뢰 섹션 노출(1회)
   // AI 프리뷰

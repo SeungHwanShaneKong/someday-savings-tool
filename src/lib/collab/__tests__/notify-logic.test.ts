@@ -22,6 +22,11 @@ import {
   subjectForKind,
   htmlForKind,
   buildPokeEmailHtml,
+  // [CL-EMAIL-SPAM-20260718-100000] 스팸 저감 — text/plain 대체본 + List-Unsubscribe mailto
+  buildEmailText,
+  buildPokeEmailText,
+  textForKind,
+  unsubscribeMailto,
 } from '../../../../supabase/functions/_shared/notify-logic';
 
 describe('notify-logic V2 — 레이트리밋 원자성(TOCTOU)', () => {
@@ -229,5 +234,76 @@ describe('notify-logic POKE — kind 독립 일일 슬롯(유니크 키에 kind 
     expect(ledger.tryReserve('s1', 'r1', '2026-07-09', 'poke')).toBe(true);              // 콕 찌르기 독립 슬롯
     expect(ledger.tryReserve('s1', 'r1', '2026-07-09', 'poke')).toBe(false);             // 같은 날 2번째 poke 거부
     expect(ledger.tryReserve('s1', 'r1', '2026-07-10', 'poke')).toBe(true);              // 다음 날은 다시 허용
+  });
+});
+
+// [CL-EMAIL-SPAM-20260718-100000] 스팸 저감 — text/plain 멀티파트 대체본 + List-Unsubscribe mailto.
+//  근거: HTML-only 메일·List-Unsubscribe 부재는 대표적 스팸 가점 요인. 순수 빌더는 vitest 로 계약 고정.
+describe('notify-logic SPAM — text/plain 대체본', () => {
+  const URL = 'https://moderninsightspot.com/budget';
+
+  it('buildEmailText: 제목·안내·CTA URL·푸터 포함, HTML 태그 0(순수 평문)', () => {
+    const text = buildEmailText('홍길동', URL);
+    expect(text).toContain('홍길동님이 우리 예산을 다듬고 있어요');
+    expect(text).toContain(URL);
+    expect(text).toContain('하루 한 번만 보내드려요');
+    expect(text).toContain('\n');            // 멀티라인(가독성)
+    expect(text).not.toMatch(/<[a-z!/]/i);   // '<' 로 시작하는 태그 0
+    expect(text).not.toContain('&lt;');      // 엔티티 잔재 0(평문이라 이스케이프 불필요)
+  });
+
+  it('buildPokeEmailText: poke 전용 카피 + 동일 CTA URL·푸터', () => {
+    const text = buildPokeEmailText('민지', URL);
+    expect(text).toContain('민지님이 콕 찔렀어요');
+    expect(text).toContain('같이 보고 싶어해요');
+    expect(text).toContain(URL);
+    expect(text).not.toMatch(/<[a-z!/]/i);
+  });
+
+  it('buildEmailText: 빈/제어 발신자명은 폴백(파트너)', () => {
+    expect(buildEmailText('  ', URL)).toContain('파트너님이');
+    expect(buildPokeEmailText(null, URL)).toContain('파트너님이 콕 찔렀어요');
+  });
+
+  it('textForKind: htmlForKind 와 동일 분기(poke 전용/기본, 서로 다름)', () => {
+    expect(textForKind('poke', '홍길동', URL)).toBe(buildPokeEmailText('홍길동', URL));
+    expect(textForKind('partner_edit_2min', '홍길동', URL)).toBe(buildEmailText('홍길동', URL));
+    expect(textForKind('poke', '홍길동', URL)).not.toBe(textForKind('partner_edit_2min', '홍길동', URL));
+  });
+
+  it('발신자명 유래 개행/제어문자는 제거(구조 개행만 남음) — sanitizeSenderName 재사용', () => {
+    // 평문 컨텍스트라 HTML 인젝션은 무관하나, 발신자명이 개행을 심어 가짜 라인을 만드는 것은 차단해야 한다.
+    const text = buildPokeEmailText('민지\r\n악성라인', URL);
+    // \r 은 완전 제거(구조 개행은 join('\n') 의 \n 뿐 — \r 은 어디에도 없다)
+    expect(text).not.toContain('\r');
+    // 이름의 제어문자 제거 후 텍스트는 이어붙음(개행 없이) → '민지악성라인'
+    expect(text).toContain('민지악성라인님이 콕 찔렀어요');
+    // 첫 줄(제목)에 추가 개행이 끼어들지 않음
+    expect(text.split('\n')[0]).toBe('민지악성라인님이 콕 찔렀어요');
+  });
+});
+
+describe('notify-logic SPAM — unsubscribeMailto(List-Unsubscribe 파생)', () => {
+  it('표시명 있는 from 에서 꺾쇠 안 주소만 추출', () => {
+    expect(unsubscribeMailto('웨딩셈 <noreply@moderninsightspot.com>')).toBe(
+      '<mailto:noreply@moderninsightspot.com?subject=unsubscribe>',
+    );
+  });
+
+  it('주소만 있는 from 도 처리', () => {
+    expect(unsubscribeMailto('noreply@moderninsightspot.com')).toBe(
+      '<mailto:noreply@moderninsightspot.com?subject=unsubscribe>',
+    );
+  });
+
+  it('빈값·표시명만·비이메일은 null(잘못된 헤더로 인한 스팸 가점 방지)', () => {
+    expect(unsubscribeMailto('')).toBeNull();
+    expect(unsubscribeMailto(null)).toBeNull();
+    expect(unsubscribeMailto(undefined)).toBeNull();
+    expect(unsubscribeMailto('웨딩셈')).toBeNull();               // 표시명만(주소 없음)
+    expect(unsubscribeMailto('웨딩셈 <not-an-email>')).toBeNull(); // 꺾쇠 안이 이메일 아님
+    expect(unsubscribeMailto('onboarding@resend.dev')).toBe(
+      '<mailto:onboarding@resend.dev?subject=unsubscribe>',        // 샌드박스도 형식은 유효(발송 가드는 별도)
+    );
   });
 });

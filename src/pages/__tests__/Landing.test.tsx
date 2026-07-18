@@ -185,9 +185,11 @@ describe('로그인 허브 게이팅 (Top20 #9)', () => {
       screen.getByRole('button', { name: 'Google로 10초 만에 시작' }),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('내 결혼 준비 현황')).not.toBeInTheDocument();
+    // [CL-SAMPLE-SHEET-20260718-100000] 비로그인 전용 엑셀형 예시표 노출
+    expect(screen.getByRole('region', { name: '결혼 예산 예시표' })).toBeInTheDocument();
   });
 
-  it('로그인: 허브(빠른 이동 카드) 표시 + 가입 카드·챗프리뷰 미표시', () => {
+  it('로그인: 허브(빠른 이동 카드) 표시 + 가입 카드·챗프리뷰·예시표 미표시', () => {
     mockAuth.user = { id: 'u1', email: 't@t.dev' };
     renderWithProviders(<Landing />);
     expect(screen.getByLabelText('내 결혼 준비 현황')).toBeInTheDocument();
@@ -196,6 +198,8 @@ describe('로그인 허브 게이팅 (Top20 #9)', () => {
       screen.queryByRole('button', { name: 'Google로 10초 만에 시작' }),
     ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI 웨딩 챗봇 미리보기')).not.toBeInTheDocument();
+    // [CL-SAMPLE-SHEET-20260718-100000] 로그인 시 예시표 미표시(비로그인 전용)
+    expect(screen.queryByRole('region', { name: '결혼 예산 예시표' })).not.toBeInTheDocument();
   });
 
   it('인증 확정 전(loading): 허브·가입 카드 둘 다 미표시(오표시 플래시 방지)', () => {
